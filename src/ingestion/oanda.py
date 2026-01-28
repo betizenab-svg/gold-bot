@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
+import logging
 
 import requests
 
@@ -9,6 +10,7 @@ from config.settings import OANDA_ACCOUNT_ID, OANDA_API_KEY, OANDA_BASE_URL
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
 from src.resilience.circuit_breaker import CircuitBreaker
+from src.validation.validator import DataValidator
 
 
 class DataIngestionError(RuntimeError):
@@ -114,8 +116,14 @@ class OandaClient:
             )
             candles.append(candle)
 
+        validator = DataValidator()
+        valid_candles = validator.filter_candles(candles)
+        dropped = len(candles) - len(valid_candles)
+        if dropped:
+            logging.info("Dropped %s invalid candles", dropped)
+
         self.circuit_breaker.record_success("OANDA")
-        return candles
+        return valid_candles
 
     def _parse_timestamp(self, time_value: Optional[str]) -> int:
         if not time_value:

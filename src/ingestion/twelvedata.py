@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from math import ceil
 from typing import Dict, List, Optional
+import logging
 
 import requests
 
@@ -10,6 +11,7 @@ from config.settings import SYMBOL_MAP, TWELVEDATA_API_KEY, TWELVEDATA_BASE_URL
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
 from src.resilience.circuit_breaker import CircuitBreaker
+from src.validation.validator import DataValidator
 
 
 class DataIngestionError(RuntimeError):
@@ -137,5 +139,11 @@ class TwelveDataClient:
                 )
             )
 
+        validator = DataValidator()
+        valid_candles = validator.filter_candles(candles)
+        dropped = len(candles) - len(valid_candles)
+        if dropped:
+            logging.info("Dropped %s invalid candles", dropped)
+
         self.circuit_breaker.record_success("TWELVEDATA")
-        return candles
+        return valid_candles
