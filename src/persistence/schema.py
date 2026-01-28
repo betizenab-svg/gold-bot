@@ -56,6 +56,15 @@ class SchemaInitializer:
                 created_at INTEGER
             );
             """,
+            """
+            CREATE TABLE IF NOT EXISTS errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider TEXT,
+                error_code TEXT,
+                message TEXT,
+                timestamp INTEGER
+            );
+            """,
         )
         cursor = self.connection.cursor()
         for statement in statements:

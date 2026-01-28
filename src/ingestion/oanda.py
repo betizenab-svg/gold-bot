@@ -8,6 +8,7 @@ import requests
 from config.settings import OANDA_ACCOUNT_ID, OANDA_API_KEY, OANDA_BASE_URL
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
+from src.resilience.circuit_breaker import CircuitBreaker
 
 
 class DataIngestionError(RuntimeError):
@@ -15,8 +16,9 @@ class DataIngestionError(RuntimeError):
 
 
 class OandaClient:
-    def __init__(self, repository: Repository) -> None:
+    def __init__(self, repository: Repository, circuit_breaker: Optional[CircuitBreaker] = None) -> None:
         self.repository = repository
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(repository)
         self.api_key = OANDA_API_KEY
         self.account_id = OANDA_ACCOUNT_ID
         self.base_url = OANDA_BASE_URL.rstrip("/")
@@ -67,6 +69,9 @@ class OandaClient:
         return symbol
 
     def fetch_latest_candles(self, symbol: str, timeframe: str) -> List[Candle]:
+        if self.circuit_breaker.is_open("OANDA"):
+            return []
+
         last_timestamp = self._get_last_timestamp(symbol, timeframe)
         instrument = self._normalize_instrument(symbol)
         granularity = self._map_timeframe(timeframe)
@@ -82,8 +87,14 @@ class OandaClient:
             "Content-Type": "application/json",
         }
 
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+        except requests.exceptions.RequestException as exc:
+            self.circuit_breaker.record_failure("OANDA", "REQUEST_EXCEPTION", str(exc))
+            raise DataIngestionError("OANDA request failed") from exc
+
         if response.status_code != 200:
+            self.circuit_breaker.record_failure("OANDA", str(response.status_code), response.text)
             raise DataIngestionError(f"OANDA API error: {response.status_code} {response.text}")
 
         payload = response.json()
@@ -103,6 +114,7 @@ class OandaClient:
             )
             candles.append(candle)
 
+        self.circuit_breaker.record_success("OANDA")
         return candles
 
     def _parse_timestamp(self, time_value: Optional[str]) -> int:

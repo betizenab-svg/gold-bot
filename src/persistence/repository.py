@@ -137,3 +137,13 @@ class Repository:
             }
             for row in rows
         ]
+
+    def log_error(self, provider: str, error_code: str, message: str, timestamp: int) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO errors (provider, error_code, message, timestamp)
+            VALUES (?, ?, ?, ?);
+            """,
+            (provider, error_code, message, timestamp),
+        )
+        self.connection.commit()
