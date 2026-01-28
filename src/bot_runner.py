@@ -98,6 +98,7 @@ def main() -> int:
     lock_file = open(lock_path, "a+", encoding="utf-8")
     try:
         if not acquire_lock(lock_file):
+            log_event("Lock acquisition failed")
             return 0
 
         lock_file.seek(0)

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from config.database import get_connection
 from src.core.telemetry import MemoryProfiler
@@ -12,6 +13,8 @@ from src.ingestion.twelvedata import DataIngestionError as TwelveDataIngestionEr
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
+from src.domain.candle import Candle
+from config.settings import TIMEFRAME_SECONDS
 
 
 class PulseOrchestrator:
@@ -30,6 +33,45 @@ class PulseOrchestrator:
         SchemaInitializer(connection).initialize()
         return Repository(connection)
 
+    def _mock_client(self, repository: Repository):
+        symbol = os.getenv("MOCK_SYMBOL", "XAUUSD")
+        timeframe = os.getenv("MOCK_TIMEFRAME", "M1")
+        candles_per_run = int(os.getenv("MOCK_CANDLES_PER_RUN", "1"))
+        delay_seconds = float(os.getenv("MOCK_DELAY_SECONDS", "0"))
+        start_timestamp = int(os.getenv("MOCK_START_TIMESTAMP", str(int(time.time()))))
+
+        class MockClient:
+            def fetch_latest_candles(self, _symbol: str, _timeframe: str) -> List[Candle]:
+                last_ts_value = repository.get_kv("last_processed_timestamp")
+                try:
+                    last_ts = int(last_ts_value) if last_ts_value is not None else start_timestamp
+                except ValueError:
+                    last_ts = start_timestamp
+
+                step = TIMEFRAME_SECONDS.get(timeframe, 60)
+                candles: List[Candle] = []
+                for i in range(candles_per_run):
+                    ts = last_ts + step * (i + 1)
+                    candles.append(
+                        Candle(
+                            symbol=symbol,
+                            timeframe=timeframe,
+                            timestamp=ts,
+                            open=2000.0,
+                            high=2001.0,
+                            low=1999.0,
+                            close=2000.5,
+                            volume=100.0,
+                        )
+                    )
+
+                if delay_seconds > 0:
+                    time.sleep(delay_seconds)
+
+                return candles
+
+        return MockClient()
+
     def run(self) -> None:
         logging.info("---- Pulse started ----")
         start_time = time.time()
@@ -37,7 +79,10 @@ class PulseOrchestrator:
 
         repository = self.repository_factory()
         try:
-            client = self.client_factory(repository)
+            if os.getenv("MOCK_INGESTION") == "1":
+                client = self._mock_client(repository)
+            else:
+                client = self.client_factory(repository)
             logging.info("Selected ingestion client: %s", client.__class__.__name__)
             validator = DataValidator()
 

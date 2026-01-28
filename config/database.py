@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 import sqlite3
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-DB_PATH = BASE_DIR / "data" / "trading_engine.db"
+DB_PATH = Path(os.getenv("DB_PATH", BASE_DIR / "data" / "trading_engine.db"))
 
 
 def get_connection() -> sqlite3.Connection:
