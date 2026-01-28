@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
+
+from src.domain.candle import Candle
 
 
 class Repository:
@@ -27,6 +29,32 @@ class Repository:
                 candle.get("close"),
                 candle.get("volume"),
             ),
+        )
+        self.connection.commit()
+
+    def save_candles(self, candles: Iterable[Candle]) -> None:
+        payload = [
+            (
+                candle.symbol,
+                candle.timeframe,
+                candle.timestamp,
+                candle.open,
+                candle.high,
+                candle.low,
+                candle.close,
+                candle.volume,
+            )
+            for candle in candles
+        ]
+        if not payload:
+            return
+        self.connection.executemany(
+            """
+            INSERT OR REPLACE INTO market_data (
+                symbol, timeframe, timestamp, open, high, low, close, volume
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            payload,
         )
         self.connection.commit()
 
@@ -55,6 +83,10 @@ class Repository:
             (key, stored_value, updated_at),
         )
         self.connection.commit()
+
+    def update_watermark(self, symbol: str, timeframe: str, timestamp: int) -> None:
+        key = f"last_fetch_{symbol}_{timeframe}"
+        self.set_kv(key, int(timestamp))
 
     def log_signal(self, signal: Dict[str, Any]) -> bool:
         try:
