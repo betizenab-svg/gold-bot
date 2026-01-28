@@ -21,6 +21,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from config.settings import LOCK_FILE_PATH, LOG_FILE_PATH
+from src.core.orchestrator import PulseOrchestrator
 
 
 def setup_logging() -> None:
@@ -39,8 +40,9 @@ def log_event(message: str) -> None:
 
 
 def run_pulse() -> None:
-    # Placeholder for main signal logic
-    logging.info("Pulse executed (placeholder)")
+    orchestrator = PulseOrchestrator()
+    orchestrator.run()
+
     sleep_seconds = os.getenv("BOT_RUNNER_SLEEP_SECONDS")
     if sleep_seconds:
         try:
