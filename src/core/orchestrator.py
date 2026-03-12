@@ -8,8 +8,8 @@ from typing import Callable, List, Optional
 from config.database import get_connection
 from src.core.telemetry import MemoryProfiler
 from src.ingestion.factory import get_market_data_client
-from src.ingestion.oanda import DataIngestionError as OandaDataIngestionError
 from src.ingestion.twelvedata import DataIngestionError as TwelveDataIngestionError
+from src.ingestion.yahoo_client import DataIngestionError as YahooDataIngestionError
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
@@ -88,7 +88,7 @@ class PulseOrchestrator:
 
             try:
                 candles = client.fetch_latest_candles("XAUUSD", "H1")
-            except (OandaDataIngestionError, TwelveDataIngestionError) as exc:
+            except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
                 logging.error("Ingestion failed: %s", exc)
                 return
 

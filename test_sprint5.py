@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from typing import List
 from unittest.mock import Mock, patch
 
@@ -8,8 +9,12 @@ from config.database import get_connection
 from src.domain.candle import Candle
 from src.ingestion.factory import get_market_data_client
 from src.ingestion.twelvedata import TwelveDataClient
+from src.ingestion.yahoo_client import YahooFinanceClient
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
+
+
+TEST_BASE_DATETIME = datetime(2026, 3, 11, 12, 0, tzinfo=timezone.utc)
 
 
 def _mock_twelvedata_response() -> Mock:
@@ -18,7 +23,7 @@ def _mock_twelvedata_response() -> Mock:
     response.json.return_value = {
         "values": [
             {
-                "datetime": "2023-01-01 12:00:00",
+                "datetime": TEST_BASE_DATETIME.strftime("%Y-%m-%d %H:%M:%S"),
                 "open": "1800.0",
                 "high": "1805.0",
                 "low": "1798.0",
@@ -52,6 +57,10 @@ def main() -> int:
         first = candles[0]
         assert first.symbol == "XAUUSD", "Symbol should be normalized back to XAUUSD"
         assert isinstance(first.timestamp, int), "Timestamp should be integer Unix epoch"
+
+        repository.set_kv("active_provider", "PRIMARY")
+        factory_client = get_market_data_client(repository)
+        assert isinstance(factory_client, YahooFinanceClient), "Factory should return YahooFinanceClient"
 
         repository.set_kv("active_provider", "SECONDARY")
         factory_client = get_market_data_client(repository)

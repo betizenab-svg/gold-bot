@@ -1,10 +1,9 @@
 import os
 import time
-from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import Mock, patch
 
-import requests
+import pandas as pd
 
 from config.database import get_connection
 from src.persistence.repository import Repository
@@ -20,10 +19,7 @@ def _get_kv(repository: Repository, key: str) -> Optional[str]:
 
 
 def main() -> int:
-    os.environ.setdefault("OANDA_API_KEY", "test_key")
-    os.environ.setdefault("OANDA_ACCOUNT_ID", "test_account")
-
-    from src.ingestion.oanda import OandaClient
+    from src.ingestion.yahoo_client import YahooFinanceClient
 
     connection = get_connection()
     try:
@@ -36,13 +32,13 @@ def main() -> int:
         repository.set_kv("cb_cooldown_until", 0)
         repository.set_kv("active_provider", "PRIMARY")
 
-        client = OandaClient(repository)
+        client = YahooFinanceClient(repository)
 
         symbol = "XAUUSD"
         timeframe = "H1"
 
-        with patch("src.ingestion.oanda.requests.get") as mocked_get:
-            mocked_get.side_effect = requests.exceptions.ConnectionError("network down")
+        with patch("src.ingestion.yahoo_client.yf.download") as mocked_get:
+            mocked_get.side_effect = RuntimeError("network down")
 
             for expected in (1, 2, 3):
                 try:
@@ -67,10 +63,9 @@ def main() -> int:
 
             mocked_get.reset_mock()
             mocked_get.side_effect = None
-            mocked_get.return_value = Mock(
-                status_code=200,
-                json=lambda: {"candles": []},
-                text="OK",
+            mocked_get.return_value = pd.DataFrame(
+                columns=["Open", "High", "Low", "Close", "Volume"],
+                index=pd.DatetimeIndex([], tz="UTC"),
             )
 
             client.fetch_latest_candles(symbol, timeframe)

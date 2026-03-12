@@ -1,13 +1,4 @@
-[INFO] Lock acquired | 2026-01-28T11:24:03Z
-[INFO] Pulse executed (placeholder)
-[INFO] Lock released | 2026-01-28T11:24:08Z
-[INFO] Lock acquired | 2026-01-28T11:24:14Z
-[INFO] Pulse executed (placeholder)
-[INFO] Lock released | 2026-01-28T11:24:15Z
-[INFO] Lock acquired | 2026-01-28T11:24:34Z
-[INFO] Pulse executed (placeholder)
-[INFO] Lock released | 2026-01-28T11:24:39Z
-[INFO] Lock acquired | 2026-01-28T12:41:46Z
+[INFO] Lock acquired | 2026-03-12T17:20:31Z
 [INFO] ---- Pulse started ----
 [INFO] Pulse start: Memory usage unavailable on this platform
 [INFO] Selected ingestion client: MockClient
@@ -16,8 +7,9 @@
 [INFO] Pulse end: Memory usage unavailable on this platform
 [INFO] Pulse finished in 0.03s
 [INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:41:47Z
-[INFO] Lock acquired | 2026-01-28T12:41:48Z
+[INFO] Lock released | 2026-03-12T17:20:31Z
+[INFO] Lock acquisition failed | 2026-03-12T17:20:33Z
+[INFO] Lock acquired | 2026-03-12T17:20:33Z
 [INFO] ---- Pulse started ----
 [INFO] Pulse start: Memory usage unavailable on this platform
 [INFO] Selected ingestion client: MockClient
@@ -26,60 +18,8 @@
 [INFO] Pulse end: Memory usage unavailable on this platform
 [INFO] Pulse finished in 0.01s
 [INFO] ---- Pulse ended ----
-[INFO] Lock acquisition failed | 2026-01-28T12:41:48Z
-[INFO] Lock released | 2026-01-28T12:41:49Z
-[INFO] Lock acquired | 2026-01-28T12:41:50Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:41:51Z
-[INFO] Lock acquired | 2026-01-28T12:41:51Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:41:52Z
-[INFO] Lock acquired | 2026-01-28T12:41:53Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:41:54Z
-[INFO] Lock acquired | 2026-01-28T12:42:57Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.02s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:42:58Z
-[INFO] Lock acquired | 2026-01-28T12:42:58Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock acquisition failed | 2026-01-28T12:42:59Z
-[INFO] Lock released | 2026-01-28T12:42:59Z
-[INFO] Lock acquired | 2026-01-28T12:43:44Z
+[INFO] Lock released | 2026-03-12T17:20:33Z
+[INFO] Lock acquired | 2026-03-12T17:25:51Z
 [INFO] ---- Pulse started ----
 [INFO] Pulse start: Memory usage unavailable on this platform
 [INFO] Selected ingestion client: MockClient
@@ -88,97 +28,15 @@
 [INFO] Pulse end: Memory usage unavailable on this platform
 [INFO] Pulse finished in 0.03s
 [INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:43:45Z
-[INFO] Lock acquired | 2026-01-28T12:43:45Z
+[INFO] Lock released | 2026-03-12T17:25:51Z
+[INFO] Lock acquired | 2026-03-12T17:25:54Z
 [INFO] ---- Pulse started ----
 [INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Lock acquisition failed | 2026-03-12T17:25:54Z
 [INFO] Selected ingestion client: MockClient
 [INFO] Post-ingestion: Memory usage unavailable on this platform
 [INFO] Candles received: 1, valid: 1
 [INFO] Pulse end: Memory usage unavailable on this platform
 [INFO] Pulse finished in 0.01s
 [INFO] ---- Pulse ended ----
-[INFO] Lock acquisition failed | 2026-01-28T12:43:45Z
-[INFO] Lock released | 2026-01-28T12:43:46Z
-[INFO] Lock acquired | 2026-01-28T12:44:39Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.02s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:44:40Z
-[INFO] Lock acquired | 2026-01-28T12:44:41Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock acquisition failed | 2026-01-28T12:44:41Z
-[INFO] Lock released | 2026-01-28T12:44:42Z
-[INFO] Lock acquired | 2026-01-28T12:44:42Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 2.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:44:45Z
-[INFO] Lock acquired | 2026-01-28T12:45:30Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.02s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:45:31Z
-[INFO] Lock acquired | 2026-01-28T12:45:32Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock acquisition failed | 2026-01-28T12:45:32Z
-[INFO] Lock released | 2026-01-28T12:45:33Z
-[INFO] Lock acquired | 2026-01-28T12:45:33Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 2.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:45:36Z
-[INFO] Lock acquired | 2026-01-28T12:45:37Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:45:38Z
-[INFO] Lock acquired | 2026-01-28T12:45:38Z
-[INFO] ---- Pulse started ----
-[INFO] Pulse start: Memory usage unavailable on this platform
-[INFO] Selected ingestion client: MockClient
-[INFO] Post-ingestion: Memory usage unavailable on this platform
-[INFO] Candles received: 1, valid: 1
-[INFO] Pulse end: Memory usage unavailable on this platform
-[INFO] Pulse finished in 0.01s
-[INFO] ---- Pulse ended ----
-[INFO] Lock released | 2026-01-28T12:45:39Z
+[INFO] Lock released | 2026-03-12T17:25:54Z

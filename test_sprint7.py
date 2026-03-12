@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from src.core.orchestrator import PulseOrchestrator
 from src.core.telemetry import MemoryProfiler
 from src.domain.candle import Candle
-from src.ingestion.oanda import DataIngestionError
+from src.ingestion.yahoo_client import DataIngestionError
 
 
 def _setup_logger() -> io.StringIO:

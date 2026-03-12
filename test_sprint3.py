@@ -1,15 +1,16 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 from unittest.mock import Mock, patch
+
+import pandas as pd
 
 from config.database import get_connection
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 
 
-def _iso_from_timestamp(timestamp: int) -> str:
-    return datetime.fromtimestamp(timestamp, timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+TEST_BASE_TIMESTAMP = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp())
 
 
 def _build_candles(start_ts: int, count: int, step: int = 60) -> List[Dict[str, Any]]:
@@ -18,55 +19,48 @@ def _build_candles(start_ts: int, count: int, step: int = 60) -> List[Dict[str, 
         ts = start_ts + i * step
         candles.append(
             {
-                "complete": True,
-                "volume": 100 + i,
-                "time": _iso_from_timestamp(ts),
-                "mid": {
-                    "o": "2000.0",
-                    "h": "2001.0",
-                    "l": "1999.5",
-                    "c": "2000.5",
-                },
+                "timestamp": ts,
+                "Open": 2000.0,
+                "High": 2001.0,
+                "Low": 1999.5,
+                "Close": 2000.5,
+                "Volume": 100 + i,
             }
         )
     return candles
 
 
-def _mock_response(payload: Dict[str, Any]) -> Mock:
-    response = Mock()
-    response.status_code = 200
-    response.json.return_value = payload
-    response.text = "OK"
-    return response
+def _mock_frame(payload: List[Dict[str, Any]]) -> pd.DataFrame:
+    frame = pd.DataFrame(payload)
+    frame.index = pd.to_datetime(frame.pop("timestamp"), unit="s", utc=True)
+    return frame
 
 
 def main() -> int:
-    os.environ.setdefault("OANDA_API_KEY", "test_key")
-    os.environ.setdefault("OANDA_ACCOUNT_ID", "test_account")
-
-    from src.ingestion.oanda import OandaClient
+    from src.ingestion.yahoo_client import YahooFinanceClient
 
     connection = get_connection()
     try:
         SchemaInitializer(connection).initialize()
         repository = Repository(connection)
-        client = OandaClient(repository)
+        client = YahooFinanceClient(repository)
 
         symbol = "XAUUSD_TEST"
         timeframe = "H1"
 
         connection.execute("DELETE FROM market_data WHERE symbol = ?;", (symbol,))
         connection.execute("DELETE FROM kv_store WHERE key = ?;", (f"last_fetch_{symbol}_{timeframe}",))
+        connection.execute("DELETE FROM kv_store WHERE key = 'last_processed_timestamp';")
         connection.commit()
 
-        base_timestamp = 1700000000
+        base_timestamp = TEST_BASE_TIMESTAMP
         first_candles = _build_candles(base_timestamp - 9 * 60, 10)
         second_candles = _build_candles(base_timestamp + 60, 2)
 
-        with patch("src.ingestion.oanda.requests.get") as mocked_get:
+        with patch("src.ingestion.yahoo_client.yf.download") as mocked_get:
             mocked_get.side_effect = [
-                _mock_response({"candles": first_candles}),
-                _mock_response({"candles": second_candles}),
+                _mock_frame(first_candles),
+                _mock_frame(second_candles),
             ]
 
             before_call = datetime.now(timezone.utc)
@@ -75,8 +69,7 @@ def main() -> int:
 
             assert mocked_get.call_count == 1, "Expected first API call"
             call_kwargs = mocked_get.call_args.kwargs
-            from_param = call_kwargs["params"]["from"]
-            from_ts = int(datetime.fromisoformat(from_param.replace("Z", "+00:00")).timestamp())
+            from_ts = int(call_kwargs["start"].timestamp())
             expected_start = int((before_call.timestamp()) - 24 * 3600)
             expected_end = int((after_call.timestamp()) - 24 * 3600)
             assert expected_start - 5 <= from_ts <= expected_end + 5, "First run should request ~24h ago"
@@ -98,8 +91,7 @@ def main() -> int:
             candles_second = client.fetch_latest_candles(symbol, timeframe)
             assert mocked_get.call_count == 2, "Expected second API call"
             call_kwargs = mocked_get.call_args.kwargs
-            from_param = call_kwargs["params"]["from"]
-            from_ts = int(datetime.fromisoformat(from_param.replace("Z", "+00:00")).timestamp())
+            from_ts = int(call_kwargs["start"].timestamp())
             assert from_ts == base_timestamp, "Second run should request from watermark T"
 
             repository.save_candles(candles_second)

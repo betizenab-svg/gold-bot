@@ -1,34 +1,30 @@
 import os
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-os.environ.setdefault("OANDA_API_KEY", "test_key")
-os.environ.setdefault("OANDA_ACCOUNT_ID", "test_account")
+import pandas as pd
 
 from src.domain.candle import Candle
-from src.ingestion.oanda import OandaClient
+from src.ingestion.yahoo_client import YahooFinanceClient
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from config.database import get_connection
 
 
-def _mock_oanda_response(candles_payload):
-    response = Mock()
-    response.status_code = 200
-    response.json.return_value = {"candles": candles_payload}
-    response.text = "OK"
-    return response
+TEST_BASE_TIMESTAMP = int(datetime(2026, 3, 11, 12, 0, tzinfo=timezone.utc).timestamp())
 
 
-def _iso_from_ts(ts: int) -> str:
-    return datetime.fromtimestamp(ts, timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+def _mock_yahoo_frame(candles_payload):
+    frame = pd.DataFrame(candles_payload)
+    frame.index = pd.to_datetime(frame.pop("timestamp"), unit="s", utc=True)
+    return frame
 
 
 def main() -> int:
     validator = DataValidator()
 
-    base_ts = 1700000000
+    base_ts = TEST_BASE_TIMESTAMP
     valid_candle = Candle(
         symbol="XAUUSD",
         timeframe="M1",
@@ -76,31 +72,38 @@ def main() -> int:
     try:
         SchemaInitializer(connection).initialize()
         repository = Repository(connection)
-        client = OandaClient(repository)
+        repository.set_kv("last_fetch_XAUUSD_M1", 0)
+        client = YahooFinanceClient(repository)
 
         candles_payload = [
             {
-                "complete": True,
-                "volume": 120,
-                "time": _iso_from_ts(base_ts),
-                "mid": {"o": "2000", "h": "2001", "l": "1999", "c": "2000.5"},
+                "timestamp": base_ts,
+                "Open": 2000.0,
+                "High": 2001.0,
+                "Low": 1999.0,
+                "Close": 2000.5,
+                "Volume": 120.0,
             },
             {
-                "complete": True,
-                "volume": 0,
-                "time": _iso_from_ts(base_ts + 60),
-                "mid": {"o": "2000", "h": "2001", "l": "1999", "c": "2000.5"},
+                "timestamp": base_ts + 60,
+                "Open": 2000.0,
+                "High": 2001.0,
+                "Low": 1999.0,
+                "Close": 2000.5,
+                "Volume": 0.0,
             },
             {
-                "complete": True,
-                "volume": 50,
-                "time": _iso_from_ts(base_ts + 120),
-                "mid": {"o": "2000", "h": "1990", "l": "1995", "c": "1992"},
+                "timestamp": base_ts + 120,
+                "Open": 2000.0,
+                "High": 1990.0,
+                "Low": 1995.0,
+                "Close": 1992.0,
+                "Volume": 50.0,
             },
         ]
 
-        with patch("src.ingestion.oanda.requests.get") as mocked_get:
-            mocked_get.return_value = _mock_oanda_response(candles_payload)
+        with patch("src.ingestion.yahoo_client.yf.download") as mocked_get:
+            mocked_get.return_value = _mock_yahoo_frame(candles_payload)
             result = client.fetch_latest_candles("XAUUSD", "M1")
 
         assert len(result) == 1, f"Expected 1 valid candle, got {len(result)}"

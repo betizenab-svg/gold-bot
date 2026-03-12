@@ -1,5 +1,5 @@
 from config.database import get_connection
-from src.ingestion.oanda import OandaClient
+from src.ingestion.yahoo_client import YahooFinanceClient
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 
@@ -9,7 +9,7 @@ def main() -> int:
     try:
         SchemaInitializer(connection).initialize()
         repository = Repository(connection)
-        client = OandaClient(repository)
+        client = YahooFinanceClient(repository)
 
         symbol = "XAUUSD"
         timeframe = "H1"
