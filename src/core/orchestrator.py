@@ -3,11 +3,16 @@ from __future__ import annotations
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Callable, List, Optional
+
+import pandas as pd
 
 from config.database import get_connection
 from src.core.telemetry import MemoryProfiler
+from src.analysis.regime import RegimeDetector
 from src.ingestion.factory import get_market_data_client
+from src.ingestion.macro_client import FredMacroClient, MacroDataError
 from src.ingestion.twelvedata import DataIngestionError as TwelveDataIngestionError
 from src.ingestion.yahoo_client import DataIngestionError as YahooDataIngestionError
 from src.persistence.repository import Repository
@@ -17,16 +22,24 @@ from src.domain.candle import Candle
 from config.settings import TIMEFRAME_SECONDS
 
 
+MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
+MACRO_HISTORY_DAYS = 90
+
+
 class PulseOrchestrator:
     def __init__(
         self,
         repository_factory: Optional[Callable[[], Repository]] = None,
         client_factory: Optional[Callable[[Repository], object]] = None,
         memory_profiler: Optional[MemoryProfiler] = None,
+        macro_client: Optional[FredMacroClient] = None,
+        regime_detector: Optional[RegimeDetector] = None,
     ) -> None:
         self.repository_factory = repository_factory or self._default_repository_factory
         self.client_factory = client_factory or get_market_data_client
         self.memory_profiler = memory_profiler or MemoryProfiler()
+        self.macro_client = macro_client or FredMacroClient()
+        self.regime_detector = regime_detector or RegimeDetector()
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
@@ -72,6 +85,68 @@ class PulseOrchestrator:
 
         return MockClient()
 
+    def _fetch_gold_daily_closes(self, repository: Repository) -> pd.Series:
+        """Aggregate H1 candles from market_data into daily closes."""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=MACRO_HISTORY_DAYS)
+        cutoff_ts = int(cutoff.timestamp())
+
+        rows = repository.connection.execute(
+            """
+            SELECT timestamp, close FROM market_data
+            WHERE symbol = 'XAUUSD' AND timestamp >= ?
+            ORDER BY timestamp ASC;
+            """,
+            (cutoff_ts,),
+        ).fetchall()
+
+        if not rows:
+            return pd.Series(dtype=float)
+
+        timestamps = [datetime.fromtimestamp(r[0], tz=timezone.utc).date() for r in rows]
+        closes = [float(r[1]) for r in rows]
+
+        frame = pd.DataFrame({"date": timestamps, "close": closes})
+        daily = frame.groupby("date")["close"].last()
+        daily.index = pd.to_datetime(daily.index)
+
+        return daily
+
+    def _run_macro_regime_check(self, repository: Repository) -> None:
+        """Run the macro regime detection, gated behind a 24-hour cache."""
+        now = int(time.time())
+
+        last_update_raw = repository.get_kv("last_macro_update_timestamp")
+        if last_update_raw is not None:
+            try:
+                last_update = int(last_update_raw)
+            except ValueError:
+                last_update = 0
+            if (now - last_update) < MACRO_CACHE_TTL_SECONDS:
+                logging.info("Macro regime cache is fresh; skipping update")
+                return
+
+        logging.info("Running macro regime detection...")
+
+        gold_series = self._fetch_gold_daily_closes(repository)
+        if gold_series.empty:
+            logging.warning("No Gold daily data available for regime detection")
+            return
+
+        tips_series = self.macro_client.fetch_10y_tips_yield(days=MACRO_HISTORY_DAYS)
+
+        correlation = self.regime_detector.calculate_correlation(
+            gold_series, tips_series
+        )
+        regime = self.regime_detector.determine_regime(correlation)
+
+        repository.set_kv("macro_regime", regime)
+        repository.set_kv("macro_tips_correlation", str(correlation))
+        repository.set_kv("last_macro_update_timestamp", str(now))
+
+        logging.info(
+            "Macro regime updated: %s (correlation=%.4f)", regime, correlation
+        )
+
     def run(self) -> None:
         logging.info("---- Pulse started ----")
         start_time = time.time()
@@ -79,6 +154,13 @@ class PulseOrchestrator:
 
         repository = self.repository_factory()
         try:
+            # --- Macro Regime Check (24-hour gated) ---
+            try:
+                self._run_macro_regime_check(repository)
+            except MacroDataError as exc:
+                logging.error("Macro regime check failed: %s", exc)
+            except Exception as exc:
+                logging.error("Unexpected macro regime error: %s", exc)
             if os.getenv("MOCK_INGESTION") == "1":
                 client = self._mock_client(repository)
             else:
