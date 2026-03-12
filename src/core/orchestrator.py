@@ -11,6 +11,7 @@ import pandas as pd
 from config.database import get_connection
 from src.core.telemetry import MemoryProfiler
 from src.analysis.regime import RegimeDetector
+from src.analysis.sovereign import SovereignProxy
 from src.ingestion.factory import get_market_data_client
 from src.ingestion.macro_client import FredMacroClient, MacroDataError
 from src.ingestion.twelvedata import DataIngestionError as TwelveDataIngestionError
@@ -34,12 +35,14 @@ class PulseOrchestrator:
         memory_profiler: Optional[MemoryProfiler] = None,
         macro_client: Optional[FredMacroClient] = None,
         regime_detector: Optional[RegimeDetector] = None,
+        sovereign_proxy: Optional[SovereignProxy] = None,
     ) -> None:
         self.repository_factory = repository_factory or self._default_repository_factory
         self.client_factory = client_factory or get_market_data_client
         self.memory_profiler = memory_profiler or MemoryProfiler()
         self.macro_client = macro_client or FredMacroClient()
         self.regime_detector = regime_detector or RegimeDetector()
+        self.sovereign_proxy = sovereign_proxy or SovereignProxy()
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
@@ -145,6 +148,16 @@ class PulseOrchestrator:
 
         logging.info(
             "Macro regime updated: %s (correlation=%.4f)", regime, correlation
+        )
+
+        # --- Sovereign Demand Proxy ---
+        net_purchases = self.sovereign_proxy.get_net_purchases(repository)
+        multiplier = self.sovereign_proxy.calculate_multiplier(net_purchases)
+        repository.set_kv("macro_long_bias_multiplier", str(multiplier))
+        logging.info(
+            "Sovereign proxy: net_purchases=%.1f, long_bias_multiplier=%.2f",
+            net_purchases,
+            multiplier,
         )
 
     def run(self) -> None:
