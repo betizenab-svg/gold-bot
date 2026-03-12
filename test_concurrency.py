@@ -24,6 +24,7 @@ def main() -> int:
 
     env = os.environ.copy()
     env["BOT_RUNNER_SLEEP_SECONDS"] = "5"
+    env["MOCK_INGESTION"] = "1"
 
     before_lines = read_log_lines(log_path)
 

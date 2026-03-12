@@ -40,3 +40,125 @@
 [INFO] Pulse finished in 0.01s
 [INFO] ---- Pulse ended ----
 [INFO] Lock released | 2026-03-12T17:25:54Z
+[INFO] Lock acquired | 2026-03-12T18:15:48Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[ERROR] 
+1 Failed download:
+[ERROR] ['GC=F']: TypeError("'NoneType' object is not subscriptable")
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 0, valid: 0
+[INFO] No valid candles to persist; pulse stopping
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:15:59Z
+[INFO] Lock acquired | 2026-03-12T18:29:15Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 1.65s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:29:17Z
+[INFO] Lock acquired | 2026-03-12T18:31:52Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 4.87s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:31:57Z
+[INFO] Lock acquisition failed | 2026-03-12T18:33:26Z
+[INFO] Lock acquired | 2026-03-12T18:33:26Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 1.47s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:33:32Z
+[INFO] Lock acquired | 2026-03-12T18:33:33Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Lock acquisition failed | 2026-03-12T18:33:33Z
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 1.45s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:33:39Z
+[INFO] Lock acquired | 2026-03-12T18:36:51Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Lock acquisition failed | 2026-03-12T18:36:51Z
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 2.43s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:36:59Z
+[INFO] Lock acquisition failed | 2026-03-12T18:41:19Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 2.16s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:41:26Z
+[INFO] Lock acquired | 2026-03-12T18:42:43Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: YahooFinanceClient
+[INFO] Dropped 43 invalid candles
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 916, valid: 916
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 1.56s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:42:53Z
+[INFO] Lock acquired | 2026-03-12T18:43:09Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: MockClient
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 1, valid: 1
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 0.02s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:43:18Z
+[INFO] Lock acquired | 2026-03-12T18:49:00Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: MockClient
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 1, valid: 1
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 0.03s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:49:10Z
+[INFO] Lock acquired | 2026-03-12T18:49:20Z
+[INFO] ---- Pulse started ----
+[INFO] Pulse start: Memory usage unavailable on this platform
+[INFO] Selected ingestion client: MockClient
+[INFO] Post-ingestion: Memory usage unavailable on this platform
+[INFO] Candles received: 1, valid: 1
+[INFO] Pulse end: Memory usage unavailable on this platform
+[INFO] Pulse finished in 0.02s
+[INFO] ---- Pulse ended ----
+[INFO] Lock released | 2026-03-12T18:49:28Z

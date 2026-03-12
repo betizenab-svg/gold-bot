@@ -1,7 +1,7 @@
 import os
 import time
 from typing import Optional
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -16,6 +16,20 @@ def _set_kv(repository: Repository, key: str, value: str) -> None:
 
 def _get_kv(repository: Repository, key: str) -> Optional[str]:
     return repository.get_kv(key)
+
+
+def _valid_yahoo_frame() -> pd.DataFrame:
+    index = pd.DatetimeIndex([pd.Timestamp("2026-03-12T12:00:00Z")])
+    return pd.DataFrame(
+        {
+            "Open": [2900.0],
+            "High": [2905.0],
+            "Low": [2898.0],
+            "Close": [2903.0],
+            "Volume": [1000.0],
+        },
+        index=index,
+    )
 
 
 def main() -> int:
@@ -38,7 +52,10 @@ def main() -> int:
         timeframe = "H1"
 
         with patch("src.ingestion.yahoo_client.yf.download") as mocked_get:
-            mocked_get.side_effect = RuntimeError("network down")
+            mocked_get.return_value = pd.DataFrame(
+                columns=["Open", "High", "Low", "Close", "Volume"],
+                index=pd.DatetimeIndex([], tz="UTC"),
+            )
 
             for expected in (1, 2, 3):
                 try:
@@ -63,10 +80,7 @@ def main() -> int:
 
             mocked_get.reset_mock()
             mocked_get.side_effect = None
-            mocked_get.return_value = pd.DataFrame(
-                columns=["Open", "High", "Low", "Close", "Volume"],
-                index=pd.DatetimeIndex([], tz="UTC"),
-            )
+            mocked_get.return_value = _valid_yahoo_frame()
 
             client.fetch_latest_candles(symbol, timeframe)
 

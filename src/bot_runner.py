@@ -20,8 +20,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from config.settings import LOCK_FILE_PATH, LOG_FILE_PATH
-from src.core.orchestrator import PulseOrchestrator
+LOCK_FILE_PATH = str(ROOT_DIR / "data" / "bot.lock")
+LOG_FILE_PATH = str(ROOT_DIR / "logs" / "daily-run.log")
 
 
 def setup_logging() -> None:
@@ -40,6 +40,8 @@ def log_event(message: str) -> None:
 
 
 def run_pulse() -> None:
+    from src.core.orchestrator import PulseOrchestrator
+
     orchestrator = PulseOrchestrator()
     orchestrator.run()
 
@@ -69,7 +71,7 @@ def acquire_lock(lock_file) -> bool:
     try:
         lock_file.seek(0, os.SEEK_END)
         if lock_file.tell() == 0:
-            lock_file.write("0")
+            lock_file.write(b"0")
             lock_file.flush()
             os.fsync(lock_file.fileno())
         lock_file.seek(0)
@@ -91,19 +93,20 @@ def release_lock(lock_file) -> None:
 
 
 def main() -> int:
-    setup_logging()
     lock_path = Path(LOCK_FILE_PATH)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    lock_file = open(lock_path, "a+", encoding="utf-8")
+    # Use binary mode to ensure Windows file locking works reliably.
+    lock_file = open(lock_path, "a+b")
     try:
         if not acquire_lock(lock_file):
-            log_event("Lock acquisition failed")
             return 0
+
+        setup_logging()
 
         lock_file.seek(0)
         lock_file.truncate()
-        lock_file.write(str(os.getpid()))
+        lock_file.write(str(os.getpid()).encode("utf-8"))
         lock_file.flush()
         os.fsync(lock_file.fileno())
 

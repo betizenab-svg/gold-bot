@@ -126,8 +126,9 @@ class YahooFinanceClient:
             raise DataIngestionError("Yahoo Finance request failed") from exc
 
         if frame is None or frame.empty:
-            self.circuit_breaker.record_success("YAHOO")
-            return []
+            message = f"Yahoo Finance returned empty data for {provider_symbol}"
+            self.circuit_breaker.record_failure("YAHOO", "EMPTY_RESPONSE", message)
+            raise DataIngestionError(message)
 
         normalized = self._normalize_columns(frame)
         normalized = self._normalize_index_to_utc(normalized)
