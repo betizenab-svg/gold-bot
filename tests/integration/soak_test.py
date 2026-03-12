@@ -1,11 +1,14 @@
 import os
 import random
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
 
 workspace = Path(__file__).resolve().parents[2]
+if str(workspace) not in sys.path:
+    sys.path.insert(0, str(workspace))
 db_path = workspace / "tests" / "test_trading_engine.db"
 os.environ["DB_PATH"] = str(db_path)
 

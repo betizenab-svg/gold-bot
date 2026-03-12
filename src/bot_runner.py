@@ -39,6 +39,14 @@ def log_event(message: str) -> None:
     logging.info(f"{message} | {timestamp}")
 
 
+def write_log_line(message: str) -> None:
+    log_path = Path(LOG_FILE_PATH)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(f"[INFO] {message} | {timestamp}\n")
+
+
 def run_pulse() -> None:
     from src.core.orchestrator import PulseOrchestrator
 
@@ -100,6 +108,7 @@ def main() -> int:
     lock_file = open(lock_path, "a+b")
     try:
         if not acquire_lock(lock_file):
+            write_log_line("Lock acquisition failed")
             return 0
 
         setup_logging()
