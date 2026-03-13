@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Optional, cast
 
+import numpy as np
 import pandas as pd
 
 from config.database import get_connection
@@ -167,6 +168,19 @@ class PulseOrchestrator:
         logging.info("Fetched %d DXY daily closes", len(closes))
         return closes
 
+    @staticmethod
+    def _align_series(values: List[float], target_length: int) -> List[float]:
+        if target_length <= 0 or not values:
+            return []
+        if len(values) >= target_length:
+            return values[-target_length:]
+        if len(values) == 1:
+            return values * target_length
+
+        x_src = np.arange(len(values), dtype=float)
+        x_dst = np.linspace(0.0, float(len(values) - 1), num=target_length)
+        return list(np.interp(x_dst, x_src, np.array(values, dtype=float)))
+
     def _run_macro_regime_check(self, repository: Repository) -> None:
         """Run the macro regime detection, gated behind a 24-hour cache."""
         now = int(time.time())
@@ -233,7 +247,7 @@ class PulseOrchestrator:
 
         # --- Commitment of Traders (COT) Index ---
         try:
-            cot_client = CotClient()
+            cot_client = CotClient(repository=repository)
             historical_nets = cot_client.fetch_historical_net_positions()
             
             if historical_nets:
@@ -250,8 +264,9 @@ class PulseOrchestrator:
             logging.error("Failed to update COT Index: %s", exc)
 
         # --- Consensus Variance (Surprise Factor) ---
+        surprise_observations: List[float] = []
         try:
-            cal_client = EconomicCalendarClient()
+            cal_client = EconomicCalendarClient(repository=repository)
             events = cal_client.fetch_latest_events()
             engine = SurpriseFactorEngine()
 
@@ -265,6 +280,7 @@ class PulseOrchestrator:
                     float(event["forecast"]),
                     float(event["historical_sigma"]),
                 )
+                surprise_observations.append(surprise)
                 if abs(surprise) > max_abs_surprise:
                     max_abs_surprise = abs(surprise)
                 if state != "NEUTRAL":
@@ -283,17 +299,17 @@ class PulseOrchestrator:
             if not gold_series.empty:
                 fsr_gold = gold_series.tail(FSR_LOOKBACK_PERIOD).tolist()
                 if len(fsr_gold) == FSR_LOOKBACK_PERIOD:
-                    # Mock Economic Surprise Index data (20 floats)
-                    surprise_mock = [0.1, 0.2, 0.15, 0.05, -0.1, 0.3, 0.4, 0.2, -0.2, 0.1,
-                                     0.5, 0.6, 0.3, 0.1, -0.1, 0.2, 0.25, 0.3, 0.35, 0.4]
-                    
-                    fsr_engine = FSREngine()
-                    fsr_value = fsr_engine.calculate_fsr(fsr_gold, surprise_mock)
-                    fsr_state = fsr_engine.evaluate_fsr_state(fsr_value)
-                    
-                    repository.set_kv("macro_fsr_value", f"{fsr_value:.4f}")
-                    repository.set_kv("macro_fsr_state", fsr_state)
-                    logging.info("FSR Engine: value=%.4f, state=%s", fsr_value, fsr_state)
+                    if len(surprise_observations) < 2:
+                        logging.info("FSR Engine skipped: insufficient surprise observations (%d)", len(surprise_observations))
+                    else:
+                        aligned_surprise = self._align_series(surprise_observations, FSR_LOOKBACK_PERIOD)
+                        fsr_engine = FSREngine()
+                        fsr_value = fsr_engine.calculate_fsr(fsr_gold, aligned_surprise)
+                        fsr_state = fsr_engine.evaluate_fsr_state(fsr_value)
+
+                        repository.set_kv("macro_fsr_value", f"{fsr_value:.4f}")
+                        repository.set_kv("macro_fsr_state", fsr_state)
+                        logging.info("FSR Engine: value=%.4f, state=%s", fsr_value, fsr_state)
                 else:
                     logging.info("FSR Engine skipped: Not enough gold series data (%d < %d)", len(fsr_gold), FSR_LOOKBACK_PERIOD)
             else:

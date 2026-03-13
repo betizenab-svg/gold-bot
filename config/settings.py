@@ -10,8 +10,11 @@ load_dotenv(BASE_DIR / ".env")
 LOCK_FILE_PATH = str(BASE_DIR / "data" / "bot.lock")
 LOG_FILE_PATH = str(BASE_DIR / "logs" / "daily-run.log")
 
-TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY", "")
+# Primary ingestion path (Yahoo + FRED) is keyless.
+# TwelveData is an optional fallback only.
+TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 TWELVEDATA_BASE_URL = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 SYMBOL_MAP = {"XAUUSD": "XAU/USD"}
 YAHOO_SYMBOL_MAP = {"XAUUSD": "GC=F"}
@@ -48,11 +51,6 @@ COT_CAPITULATION_THRESHOLD = 20.0
 
 # --- Consensus Variance (Surprise Factor) ---
 SURPRISE_FACTOR_THRESHOLD = 2.0
-HIGH_IMPACT_EVENTS = [
-    {"event_name": "NFP", "forecast": 180.0, "actual": -50.0, "historical_sigma": 45.0, "usd_impact_direction": 1},
-    {"event_name": "CPI", "forecast": 0.3, "actual": 0.5, "historical_sigma": 0.1, "usd_impact_direction": 1},
-    {"event_name": "FOMC", "forecast": -0.25, "actual": 0.25, "historical_sigma": 0.15, "usd_impact_direction": -1},
-]
 
 # --- Fundamental Shift Rate (FSR) ---
 FSR_LOOKBACK_PERIOD = 20
