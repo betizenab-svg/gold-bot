@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# pyre-ignore[21]
+from dotenv import load_dotenv
+
 _fcntl: Any = None
 _msvcrt: Any = None
 
@@ -26,18 +29,28 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+load_dotenv(ROOT_DIR / ".env")
+
 LOCK_FILE_PATH = str(ROOT_DIR / "data" / "bot.lock")
 LOG_FILE_PATH = str(ROOT_DIR / "logs" / "daily-run.log")
+
+
+def _resolve_log_level() -> int:
+    raw = os.getenv("BOT_LOG_LEVEL", "INFO").strip().upper()
+    return getattr(logging, raw, logging.INFO)
 
 
 def setup_logging() -> None:
     log_path = Path(LOG_FILE_PATH)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    level = _resolve_log_level()
     logging.basicConfig(
-        level=logging.INFO,
-        format="[%(levelname)s] %(message)s",
+        level=level,
+        format="[%(levelname)s] %(asctime)sZ %(name)s %(funcName)s:%(lineno)d | %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
         handlers=[logging.FileHandler(log_path, encoding="utf-8")],
     )
+    logging.getLogger(__name__).info("Logging initialized at level=%s", logging.getLevelName(level))
 
 
 def log_event(message: str) -> None:

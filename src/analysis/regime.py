@@ -45,7 +45,7 @@ class RegimeDetector:
         ).dropna()
 
         if len(merged) < 2:
-            logging.warning(
+            logging.info(
                 "Insufficient aligned data points for correlation: %d", len(merged)
             )
             return float("nan")

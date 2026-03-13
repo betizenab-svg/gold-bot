@@ -7,6 +7,7 @@ from typing import List, Optional
 import requests
 
 from config.settings import COT_LOOKBACK_WEEKS
+from src.ingestion.proxy_http import ProxyAwareHttpClient
 from src.persistence.repository import Repository
 
 class CotClient:
@@ -55,13 +56,17 @@ class CotClient:
         """
         params = {
             "cftc_contract_market_code": self.GOLD_MARKET_CODE,
-            "$select": "report_date_as_yyyy_mm_dd,noncomm_positions_long_all,noncomm_positions_short_all",
+            "$select": "report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all",
             "$order": "report_date_as_yyyy_mm_dd DESC",
             "$limit": str(COT_LOOKBACK_WEEKS * 3),
         }
 
         try:
-            response = requests.get(self.CFTC_SOCRATA_URL, params=params, timeout=15)
+            response = ProxyAwareHttpClient(self.logger).get(
+                self.CFTC_SOCRATA_URL,
+                params=params,
+                timeout=15,
+            )
             response.raise_for_status()
             payload = response.json()
         except (requests.RequestException, ValueError) as exc:
@@ -77,8 +82,8 @@ class CotClient:
             if not isinstance(row, dict):
                 continue
 
-            long_raw = row.get("noncomm_positions_long_all")
-            short_raw = row.get("noncomm_positions_short_all")
+            long_raw = row.get("m_money_positions_long_all")
+            short_raw = row.get("m_money_positions_short_all")
             try:
                 long_val = float(long_raw)
                 short_val = float(short_raw)

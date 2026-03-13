@@ -41,7 +41,7 @@ class CrisisDetector:
         ).dropna()
 
         if len(merged) < 2:
-            logging.warning(
+            logging.info(
                 "Insufficient aligned data for DXY correlation: %d points",
                 len(merged),
             )

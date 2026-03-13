@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
+
+def _env_bool(name: str, default: bool) -> bool:
+	raw = os.getenv(name)
+	if raw is None:
+		return default
+	return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 LOCK_FILE_PATH = str(BASE_DIR / "data" / "bot.lock")
 LOG_FILE_PATH = str(BASE_DIR / "logs" / "daily-run.log")
 
@@ -15,6 +22,14 @@ LOG_FILE_PATH = str(BASE_DIR / "logs" / "daily-run.log")
 TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 TWELVEDATA_BASE_URL = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+PROXY_FALLBACK_ENABLED = _env_bool("PROXY_FALLBACK_ENABLED", True)
+PROXY_FALLBACK_MAX_PROXIES = int(os.getenv("PROXY_FALLBACK_MAX_PROXIES", "8"))
+PROXY_REQUEST_TIMEOUT_SECONDS = int(os.getenv("PROXY_REQUEST_TIMEOUT_SECONDS", "15"))
+PROXYSCRAPE_ENDPOINT = os.getenv(
+	"PROXYSCRAPE_ENDPOINT",
+	"https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=ipport&format=text&timeout=6000",
+)
 
 SYMBOL_MAP = {"XAUUSD": "XAU/USD"}
 YAHOO_SYMBOL_MAP = {"XAUUSD": "GC=F"}
@@ -41,7 +56,7 @@ LONG_BIAS_MULTIPLIER_INACTIVE = 1.0
 
 # --- Crisis Filter (DXY) ---
 # Trigger linter
-DXY_TICKER = 'DX-Y.NYB'
+DXY_TICKER = 'DX=F'
 DXY_CORRELATION_WINDOW = 20
 
 # --- Commitment of Traders (COT) ---

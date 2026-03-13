@@ -135,22 +135,36 @@ class PulseOrchestrator:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=DXY_HISTORY_DAYS)
 
-        try:
-            frame = yf.download(
-                tickers=DXY_TICKER,
-                start=start,
-                end=end,
-                interval="1d",
-                progress=False,
-                auto_adjust=False,
-                threads=False,
-            )
-        except Exception as exc:
-            logging.error("DXY data fetch failed: %s", exc)
-            return pd.Series(dtype=float)
+        candidates = [DXY_TICKER, "DX=F", "DX-Y.NYB"]
+        frame: pd.DataFrame | None = None
+        selected_symbol = ""
+
+        logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
+        for ticker in candidates:
+            try:
+                candidate_frame = yf.download(
+                    tickers=ticker,
+                    start=start,
+                    end=end,
+                    interval="1d",
+                    progress=False,
+                    auto_adjust=False,
+                    threads=False,
+                )
+            except Exception as exc:
+                logging.info("DXY fetch failed for %s: %s", ticker, exc)
+                continue
+
+            if candidate_frame is None or candidate_frame.empty:
+                continue
+
+            frame = candidate_frame
+            selected_symbol = ticker
+            break
 
         if frame is None or frame.empty:
-            logging.warning("Yahoo Finance returned empty DXY data")
+            logging.info("Yahoo Finance returned empty DXY data across all symbols")
             return pd.Series(dtype=float)
 
         if isinstance(frame.columns, pd.MultiIndex):
@@ -165,7 +179,7 @@ class PulseOrchestrator:
         normalized_dates: Any = pd.to_datetime(closes.index)
         closes.index = pd.DatetimeIndex(normalized_dates.floor("D"))
 
-        logging.info("Fetched %d DXY daily closes", len(closes))
+        logging.info("Fetched %d DXY daily closes via %s", len(closes), selected_symbol)
         return closes
 
     @staticmethod
@@ -199,7 +213,7 @@ class PulseOrchestrator:
 
         gold_series = self._fetch_gold_daily_closes(repository)
         if gold_series.empty:
-            logging.warning("No Gold daily data available for regime detection")
+            logging.info("No Gold daily data available for regime detection")
             return
 
         tips_series = self.macro_client.fetch_10y_tips_yield(days=MACRO_HISTORY_DAYS)
@@ -243,7 +257,7 @@ class PulseOrchestrator:
                 crisis_mode,
             )
         else:
-            logging.warning("Insufficient data for crisis filter")
+            logging.info("Insufficient data for crisis filter")
 
         # --- Commitment of Traders (COT) Index ---
         try:
