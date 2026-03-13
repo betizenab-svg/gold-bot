@@ -3,10 +3,12 @@
 The system is a stateless, cron-driven Pulse architecture. Every run of `src/bot_runner.py` performs one atomic pulse, persists validated data to SQLite (WAL mode), computes macro state, and exits.
 
 Primary live data stack (keyless):
+
 - Market data: Yahoo Finance (`yfinance`) for XAUUSD and DXY.
 - Macro yield data: FRED (`pandas-datareader`) for U.S. 10Y TIPS (`DFII10`).
 
 Optional fallback and future integrations:
+
 - TwelveData API key is only used as a secondary fallback provider.
 - Telegram token is reserved for future sprints.
 
@@ -42,6 +44,7 @@ pip install -r requirements.txt
 ```
 
 Required packages include:
+
 - `yfinance`
 - `pandas`
 - `pandas-datareader`
@@ -65,6 +68,7 @@ cp .env.example .env
 ```
 
 Edit `.env` and set values as needed. Important:
+
 - Primary Yahoo/FRED path is keyless and works without API keys.
 - `TWELVEDATA_API_KEY` is optional fallback only.
 
@@ -94,6 +98,7 @@ python init_db.py
 ```
 
 Expected database location:
+
 - `data/trading_engine.db`
 
 Verify core tables:
@@ -106,6 +111,7 @@ ORDER BY name;
 ```
 
 You should see at least:
+
 - `market_data`
 - `kv_store`
 - `signals`
@@ -123,9 +129,11 @@ python src/bot_runner.py
 ### 3.2 Check runtime log
 
 Open:
+
 - `logs/daily-run.log`
 
 Confirm log indicators:
+
 - Pulse started and completed.
 - Memory snapshot line (`Pulse start` / `Pulse end`).
 - Yahoo ingestion selected or successful fetch behavior.
@@ -144,6 +152,7 @@ LIMIT 20;
 ```
 
 Validation expectations:
+
 - `timestamp` values are real UTC Unix integers.
 - `open/high/low/close/volume` are numeric floats.
 - Data is not synthetic/mock.
@@ -151,6 +160,7 @@ Validation expectations:
 ## Step 4: Phase 2 Verification (Macro Engine)
 
 Macro computation is gated to a 24-hour loop (cache TTL). During macro update, the orchestrator:
+
 - Pulls FRED 10Y TIPS yield (`DFII10`).
 - Pulls DXY daily closes from Yahoo Finance.
 - Computes and stores macro state values in `kv_store`.
@@ -181,6 +191,7 @@ ORDER BY key;
 ```
 
 Validation expectations:
+
 - `macro_regime` is populated (string regime label).
 - `macro_dxy_correlation` is a real float value.
 - `macro_long_bias_multiplier` is a real float value.
@@ -195,6 +206,7 @@ python scripts/calibrate_regime.py
 ```
 
 Verify output file exists:
+
 - `data/calibration_report.csv`
 
 Check most recent rows include dates up to current period:
@@ -209,6 +221,7 @@ PY
 ```
 
 Expected result:
+
 - Report is generated successfully.
 - Final rows are current and not stale.
 
@@ -227,6 +240,7 @@ Example (replace with your real absolute paths):
 ```
 
 Deployment notes:
+
 - Keep project outside public web root when possible.
 - Keep `.env`, database, and logs private.
 - Ensure write permissions for `data/` and `logs/`.
