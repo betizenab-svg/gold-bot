@@ -171,18 +171,21 @@ python scripts/harden_env.py
 
 - cPanel terminal access or SSH access.
 - Python 3.9+ available on host.
-- Ability to create cron jobs.
+- Ability to create cron jobs and configure a cPanel Python app.
 - Telegram bot token and destination chat ID.
 
-### Step 1: Upload Files
+### Bot Deployment (Step by Step)
 
-1. Upload project to target path, for example:
+1. Upload project files to your hosting path, for example:
 
 - /home/USERNAME/public_html/gold_trading_bot
 
-2. Ensure hidden files are included (.env, .htaccess where relevant).
+2. Ensure hidden files are present:
 
-### Step 2: Create Virtual Environment
+- .env
+- .htaccess files in protected folders
+
+3. Create and activate the virtual environment:
 
 ```bash
 cd /home/USERNAME/public_html/gold_trading_bot
@@ -191,117 +194,151 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Step 3: Prepare Directories
+4. Create required runtime directories:
 
 ```bash
 mkdir -p data/backups logs config
 ```
 
-### Step 4: Configure Environment Variables
-
-Create .env with production values:
+5. Configure .env with production values:
 
 - TELEGRAM_BOT_TOKEN
 - TELEGRAM_CHAT_ID
 - UAT_MODE=False
 - Optional provider settings
 
-### Step 5: Initialize Database
+6. Initialize SQLite schema:
 
 ```bash
 python init_db.py
 ```
 
-### Step 6: Apply Hardening
+7. Apply permission hardening:
 
 ```bash
 python scripts/harden_env.py
 ```
 
-### Step 7: Verify Health
+8. Run health checks:
 
 ```bash
 python scripts/health_check.py
 ```
 
-All checks should return [OK].
-
-### Step 8: Configure Cron
-
-Use 1-minute interval:
+9. Configure cron (every minute):
 
 ```cron
 * * * * * cd /home/USERNAME/public_html/gold_trading_bot && /home/USERNAME/public_html/gold_trading_bot/venv/bin/python src/bot_runner.py >> logs/cron.log 2>&1
 ```
 
-### Step 9: Final Verification
+10. Validate bot deployment:
 
-- Confirm market_data rows are updating.
-- Confirm signals and lifecycle updates are being recorded.
-- Confirm Telegram thread replies are grouped under original signal messages.
+- Confirm new rows in market_data.
+- Confirm new signal records in signals.
+- Confirm threaded Telegram lifecycle updates are arriving.
 
-### Step 10: Enable Passenger WSGI Dashboard (cPanel)
+### UI Deployment (Step by Step, Passenger WSGI)
 
-1. Ensure these files exist:
-  - `passenger_wsgi.py`
-  - `src/dashboard/app.py`
-  - `src/dashboard/templates/*`
-  - `src/dashboard/static/custom.css`
-2. In cPanel Python app configuration, set startup file to `passenger_wsgi.py`.
-3. Ensure Passenger points to the project root and Python virtual environment.
-4. Restart the Python application from cPanel.
-5. Open the dashboard URL and sign in with default admin credentials.
+1. Confirm UI files are present:
 
-### Troubleshooting Tips
+- passenger_wsgi.py
+- src/dashboard/app.py
+- src/dashboard/auth.py
+- src/dashboard/templates/
+- src/dashboard/static/custom.css
 
-- DB lock issues: run scripts/reset_state.py and check lock file behavior.
-- Missing alerts: validate TELEGRAM_BOT_TOKEN and chat ID, run health_check.
-- Empty ingestion: validate host network egress and Yahoo availability.
-- Permission issues: rerun harden_env and check owner/group permissions.
+2. In cPanel, create or open the Python Application for this project path.
+3. Set startup file to passenger_wsgi.py.
+4. Set application entry point to application.
+5. Point the app to the same project virtual environment used by the bot.
+6. Restart the Python application from cPanel.
+7. Open the dashboard URL in browser.
+8. Sign in using default credentials:
+
+- Username: Machete
+- Password: @Machete1231
+
+9. Confirm route protection by opening / without login in a fresh browser session.
+10. Confirm dashboard pages load:
+
+- /
+- /signals
+- /logs
+- /config
+
+### Post-Deployment Troubleshooting
+
+- DB lock issues: run scripts/reset_state.py and verify lock file behavior.
+- Missing alerts: validate TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, then run scripts/health_check.py.
+- Empty ingestion: validate host network egress and Yahoo/FRED accessibility.
+- UI import errors in Passenger: ensure virtual environment packages are installed and app restarted.
+- Permission issues: rerun scripts/harden_env.py and verify file ownership.
 
 ## User Manual
 
-### 1. Access and Startup
+### Bot User Manual
 
-1. Ensure cron is configured and enabled.
-2. Monitor logs:
+#### Daily Operation
+
+1. Confirm cron is active.
+2. Check runtime logs:
 
 ```bash
 tail -f logs/cron.log
 ```
 
-### 2. Configure the Platform
+3. Confirm Telegram signal flow is healthy.
 
-1. Edit .env for production or UAT mode.
-2. Run init_db.py for first-time schema setup.
-3. Run harden_env.py after deployment or permission drift.
+#### Routine Maintenance
 
-### 3. Use Major Features
+1. Run health diagnostics before market sessions:
 
-- Live signal generation: automatic via cron pulse.
-- Lifecycle tracking: TP/SL updates posted as threaded replies.
-- Backup: run scripts/backup_db.py.
-- Health diagnostics: run scripts/health_check.py.
-- Emergency reset: run scripts/reset_state.py.
-- Strategy calibration: run scripts/optimize_params.py on historical CSV input.
+```bash
+python scripts/health_check.py
+```
 
-### 4. Example Workflow
+2. Create periodic backups:
 
-1. Deploy to cPanel and configure cron.
-2. Run health_check and confirm all [OK].
-3. Observe first alerts in Telegram.
-4. Run periodic backup_db jobs.
-5. In anomaly scenarios, execute reset_state and verify recovery.
+```bash
+python scripts/backup_db.py
+```
 
-### 5. Best Practices
+3. Use state reset only during incidents:
+
+```bash
+python scripts/reset_state.py
+```
+
+#### Bot Best Practices
 
 - Keep UAT and production chat IDs separate.
 - Keep UAT_MODE=False in production runtime.
 - Schedule recurring backups and off-site retention.
-- Review logs daily and health checks before market sessions.
 - Avoid manual DB edits except controlled DR procedures.
 
-### 6. FAQ
+### UI User Manual
+
+#### Login and Access
+
+1. Open the dashboard URL.
+2. Sign in using default admin credentials.
+3. If not authenticated, protected pages automatically redirect to /login.
+
+#### Page-by-Page Usage
+
+1. Dashboard (/): review signal totals, open/closed counts, macro status, and recent signals.
+2. Signals (/signals): inspect full signal ledger in descending order.
+3. Logs (/logs): review last 100 lines of daily-run.log and telemetry.jsonl.
+4. Config (/config): update kv_store keys and values from the web form.
+5. Logout (/logout): terminate current session.
+
+#### UI Safety Notes
+
+- Configuration updates in /config write directly to kv_store.
+- Make small, intentional config edits and validate bot behavior after each change.
+- Use /logs to confirm runtime impact of configuration changes.
+
+### FAQ
 
 Q: Can I run the bot continuously instead of cron?
 A: Use cron-based stateless execution for shared-host reliability and lock safety.
@@ -311,6 +348,9 @@ A: WAL gives strong local durability and low operational complexity for cPanel c
 
 Q: How do I test without polluting production?
 A: Enable UAT_MODE and configure UAT_TELEGRAM_CHAT_ID before dry runs.
+
+Q: How do I verify WSGI and authentication quickly?
+A: Run python test_sprint42.py and follow the manual UI checklist it prints.
 
 ## Strategy Summary
 

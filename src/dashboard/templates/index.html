@@ -1,76 +1,95 @@
-{% extends "base.html" %}
-
-{% block title %}Dashboard | XAUUSD Intelligence{% endblock %}
-{% block page_title %}Pulse Overview{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Dashboard | XAUUSD Intelligence{%
+endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
+%}
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <article class="metric-card metric-cyan">
-        <p class="metric-label">Total Signals</p>
-        <p class="metric-value">{{ signals_total }}</p>
-    </article>
-    <article class="metric-card metric-gold">
-        <p class="metric-label">Open Signals</p>
-        <p class="metric-value">{{ open_signals }}</p>
-    </article>
-    <article class="metric-card">
-        <p class="metric-label">Closed Signals</p>
-        <p class="metric-value">{{ closed_signals }}</p>
-    </article>
-    <article class="metric-card">
-        <p class="metric-label">Latest Signal Time</p>
-        <p class="text-lg font-semibold tracking-tight">{{ latest_signal_time }}</p>
-    </article>
+  <article class="metric-card metric-cyan">
+    <p class="metric-label">Total Signals</p>
+    <p class="metric-value">{{ signals_total }}</p>
+  </article>
+  <article class="metric-card metric-gold">
+    <p class="metric-label">Open Signals</p>
+    <p class="metric-value">{{ open_signals }}</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">Closed Signals</p>
+    <p class="metric-value">{{ closed_signals }}</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">Latest Signal Time</p>
+    <p class="text-lg font-semibold tracking-tight">{{ latest_signal_time }}</p>
+  </article>
 </div>
 
 <div class="mt-6 grid gap-6 xl:grid-cols-3">
-    <section class="xl:col-span-2 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Recent Signals</h3>
-            <a href="{{ url_for('signals') }}" class="text-sm text-cyanlux hover:text-goldlux transition-colors">View all</a>
-        </div>
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full min-w-[640px] text-sm">
-                <thead class="text-slate-400 border-b border-white/10">
-                <tr>
-                    <th class="py-2 text-left font-medium">ID</th>
-                    <th class="py-2 text-left font-medium">Symbol</th>
-                    <th class="py-2 text-left font-medium">Direction</th>
-                    <th class="py-2 text-left font-medium">Score</th>
-                    <th class="py-2 text-left font-medium">Status</th>
-                    <th class="py-2 text-left font-medium">Timestamp</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for row in recent_signals %}
-                <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                    <td class="py-3">{{ row.id }}</td>
-                    <td class="py-3">{{ row.symbol or 'N/A' }}</td>
-                    <td class="py-3">{{ row.direction or 'N/A' }}</td>
-                    <td class="py-3">{{ row.score if row.score is not none else 'N/A' }}</td>
-                    <td class="py-3">{{ row.status or 'N/A' }}</td>
-                    <td class="py-3">{{ row.timestamp or 'N/A' }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="py-6 text-slate-400 text-center">No signals found.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
+  <section
+    class="xl:col-span-2 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe"
+  >
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Recent Signals</h3>
+      <a
+        href="{{ url_for('signals') }}"
+        class="text-sm text-cyanlux hover:text-goldlux transition-colors"
+        >View all</a
+      >
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full min-w-[640px] text-sm">
+        <thead class="text-slate-400 border-b border-white/10">
+          <tr>
+            <th class="py-2 text-left font-medium">ID</th>
+            <th class="py-2 text-left font-medium">Symbol</th>
+            <th class="py-2 text-left font-medium">Direction</th>
+            <th class="py-2 text-left font-medium">Score</th>
+            <th class="py-2 text-left font-medium">Status</th>
+            <th class="py-2 text-left font-medium">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in recent_signals %}
+          <tr
+            class="border-b border-white/5 hover:bg-white/[0.03] transition-colors"
+          >
+            <td class="py-3">{{ row.id }}</td>
+            <td class="py-3">{{ row.symbol or 'N/A' }}</td>
+            <td class="py-3">{{ row.direction or 'N/A' }}</td>
+            <td class="py-3">
+              {{ row.score if row.score is not none else 'N/A' }}
+            </td>
+            <td class="py-3">{{ row.status or 'N/A' }}</td>
+            <td class="py-3">{{ row.timestamp or 'N/A' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="py-6 text-slate-400 text-center">
+              No signals found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-    <section class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe space-y-5">
-        <div>
-            <p class="text-xs uppercase tracking-[0.22em] text-slate-400">Macro Bias</p>
-            <p class="mt-2 text-2xl font-semibold">{{ macro_bias }}</p>
-        </div>
-        <div class="h-px bg-white/10"></div>
-        <div>
-            <p class="text-xs uppercase tracking-[0.22em] text-slate-400">Setup Classification</p>
-            <p class="mt-2 text-2xl font-semibold">{{ setup_classification }}</p>
-        </div>
-        <div class="h-px bg-white/10"></div>
-        <p class="text-xs text-slate-400">All database reads are short-lived and lock-safe for cron co-execution.</p>
-    </section>
+  <section
+    class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe space-y-5"
+  >
+    <div>
+      <p class="text-xs uppercase tracking-[0.22em] text-slate-400">
+        Macro Bias
+      </p>
+      <p class="mt-2 text-2xl font-semibold">{{ macro_bias }}</p>
+    </div>
+    <div class="h-px bg-white/10"></div>
+    <div>
+      <p class="text-xs uppercase tracking-[0.22em] text-slate-400">
+        Setup Classification
+      </p>
+      <p class="mt-2 text-2xl font-semibold">{{ setup_classification }}</p>
+    </div>
+    <div class="h-px bg-white/10"></div>
+    <p class="text-xs text-slate-400">
+      All database reads are short-lived and lock-safe for cron co-execution.
+    </p>
+  </section>
 </div>
 {% endblock %}

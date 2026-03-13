@@ -1,49 +1,74 @@
-{% extends "base.html" %}
-
-{% block title %}Config | XAUUSD Intelligence{% endblock %}
-{% block page_title %}Configuration Console{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Config | XAUUSD Intelligence{%
+endblock %} {% block page_title %}Configuration Console{% endblock %} {% block
+content %}
 <div class="grid gap-6 xl:grid-cols-3">
-    <section class="xl:col-span-1 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-        <h3 class="text-lg font-semibold">Update kv_store</h3>
-        <p class="mt-2 text-sm text-slate-400">Write-through updates are immediate and use short-lived SQLite connections.</p>
-        <form method="post" class="mt-5 space-y-4">
-            <div>
-                <label class="block text-xs uppercase tracking-[0.2em] text-slate-400">Key</label>
-                <input type="text" name="key" required class="input-luxe mt-2" placeholder="macro_bias_state">
-            </div>
-            <div>
-                <label class="block text-xs uppercase tracking-[0.2em] text-slate-400">Value</label>
-                <textarea name="value" rows="4" class="input-luxe mt-2" placeholder="BIAS_LONG"></textarea>
-            </div>
-            <button type="submit" class="btn-luxe w-full">Save Value</button>
-        </form>
-    </section>
+  <section
+    class="xl:col-span-1 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe"
+  >
+    <h3 class="text-lg font-semibold">Update kv_store</h3>
+    <p class="mt-2 text-sm text-slate-400">
+      Write-through updates are immediate and use short-lived SQLite
+      connections.
+    </p>
+    <form method="post" class="mt-5 space-y-4">
+      <div>
+        <label class="block text-xs uppercase tracking-[0.2em] text-slate-400"
+          >Key</label
+        >
+        <input
+          type="text"
+          name="key"
+          required
+          class="input-luxe mt-2"
+          placeholder="macro_bias_state"
+        />
+      </div>
+      <div>
+        <label class="block text-xs uppercase tracking-[0.2em] text-slate-400"
+          >Value</label
+        >
+        <textarea
+          name="value"
+          rows="4"
+          class="input-luxe mt-2"
+          placeholder="BIAS_LONG"
+        ></textarea>
+      </div>
+      <button type="submit" class="btn-luxe w-full">Save Value</button>
+    </form>
+  </section>
 
-    <section class="xl:col-span-2 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[760px] text-sm">
-                <thead class="border-b border-white/10 text-slate-400">
-                <tr>
-                    <th class="py-2 text-left font-medium">Key</th>
-                    <th class="py-2 text-left font-medium">Value</th>
-                    <th class="py-2 text-left font-medium">Updated At (Unix)</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for row in kv_rows %}
-                <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                    <td class="py-3 font-mono text-xs text-cyanlux">{{ row.key }}</td>
-                    <td class="py-3 break-all">{{ row.value }}</td>
-                    <td class="py-3">{{ row.updated_at or 'N/A' }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="py-8 text-center text-slate-400">No kv_store rows found.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
+  <section
+    class="xl:col-span-2 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe"
+  >
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[760px] text-sm">
+        <thead class="border-b border-white/10 text-slate-400">
+          <tr>
+            <th class="py-2 text-left font-medium">Key</th>
+            <th class="py-2 text-left font-medium">Value</th>
+            <th class="py-2 text-left font-medium">Updated At (Unix)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in kv_rows %}
+          <tr
+            class="border-b border-white/5 hover:bg-white/[0.03] transition-colors"
+          >
+            <td class="py-3 font-mono text-xs text-cyanlux">{{ row.key }}</td>
+            <td class="py-3 break-all">{{ row.value }}</td>
+            <td class="py-3">{{ row.updated_at or 'N/A' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" class="py-8 text-center text-slate-400">
+              No kv_store rows found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 {% endblock %}
