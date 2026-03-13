@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+# pyre-ignore[21]
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -36,6 +37,7 @@ LONG_BIAS_MULTIPLIER_ACTIVE = 1.25
 LONG_BIAS_MULTIPLIER_INACTIVE = 1.0
 
 # --- Crisis Filter (DXY) ---
+# Trigger linter
 DXY_TICKER = 'DX-Y.NYB'
 DXY_CORRELATION_WINDOW = 20
 
@@ -51,3 +53,18 @@ HIGH_IMPACT_EVENTS = [
     {"event_name": "CPI", "forecast": 0.3, "actual": 0.5, "historical_sigma": 0.1, "usd_impact_direction": 1},
     {"event_name": "FOMC", "forecast": -0.25, "actual": 0.25, "historical_sigma": 0.15, "usd_impact_direction": -1},
 ]
+
+# --- Fundamental Shift Rate (FSR) ---
+FSR_LOOKBACK_PERIOD = 20
+FSR_HIGH_MOMENTUM_THRESHOLD = 0.5
+FSR_MEAN_REVERSION_THRESHOLD = -0.5
+
+# --- Macro-Bias Aggregation ---
+SCORE_CRISIS_MODE = 25
+SCORE_COT_BULLISH = 20
+SCORE_COT_BEARISH = -20
+SCORE_CONSENSUS_BULLISH = 30
+SCORE_CONSENSUS_BEARISH = -30
+
+BIAS_LONG_THRESHOLD = 25
+BIAS_SHORT_THRESHOLD = -25

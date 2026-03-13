@@ -22,5 +22,5 @@ reportMissingModuleSource = false
 
 [tool.pyre]
 source_directories = ["."]
-search_path = ["."]
-exclude = [".venv", "*.egg-info", "__pycache__"]
+search_path = [".", "src", "config", ".venv/Lib/site-packages"]
+exclude = ["*.egg-info", "__pycache__"]
