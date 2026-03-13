@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Secure Login | XAUUSD Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        obsidian: "#090B10",
+                        slatecore: "#101722",
+                        slateedge: "#1A2433",
+                        cyanlux: "#49D7FF",
+                        goldlux: "#E6C174"
+                    }
+                }
+            }
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='custom.css') }}">
+</head>
+<body class="min-h-full font-sans text-slate-100 login-bg antialiased">
+<div class="min-h-screen flex items-center justify-center px-4 py-10">
+    <div class="w-full max-w-md rounded-3xl border border-white/10 bg-slatecore/75 p-8 shadow-luxe backdrop-blur-xl card-float">
+        <p class="text-[11px] uppercase tracking-[0.34em] text-cyanlux/80">Secure Access</p>
+        <h1 class="mt-2 text-3xl font-extrabold tracking-tight">XAUUSD Dashboard</h1>
+        <p class="mt-2 text-sm text-slate-400">Institutional-grade monitoring console</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mt-5 space-y-2">
+                {% for category, message in messages %}
+                    <div class="rounded-xl border px-4 py-3 text-sm {% if category == 'error' %}border-red-400/40 bg-red-950/40 text-red-100{% else %}border-cyanlux/40 bg-cyan-900/25 text-cyan-100{% endif %}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="post" class="mt-6 space-y-4">
+            <div>
+                <label for="username" class="block text-xs uppercase tracking-[0.2em] text-slate-400">Username</label>
+                <input id="username" name="username" type="text" required class="input-luxe mt-2" placeholder="Enter username">
+            </div>
+            <div>
+                <label for="password" class="block text-xs uppercase tracking-[0.2em] text-slate-400">Password</label>
+                <input id="password" name="password" type="password" required class="input-luxe mt-2" placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn-luxe w-full">Enter Control Room</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

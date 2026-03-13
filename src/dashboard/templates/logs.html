@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Logs | XAUUSD Intelligence{% endblock %}
+{% block page_title %}Runtime Logs{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-2">
+    <section class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+        <h3 class="text-lg font-semibold">daily-run.log (last 100 lines)</h3>
+        <div class="mt-4 rounded-xl border border-white/10 bg-obsidian/70 p-4 overflow-auto max-h-[520px]">
+            <pre class="font-mono text-xs leading-6 text-slate-200">{% for line in daily_lines %}{{ line }}
+{% endfor %}</pre>
+        </div>
+    </section>
+
+    <section class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+        <h3 class="text-lg font-semibold">telemetry.jsonl (last 100 lines)</h3>
+        <div class="mt-4 rounded-xl border border-white/10 bg-obsidian/70 p-4 overflow-auto max-h-[520px]">
+            <pre class="font-mono text-xs leading-6 text-slate-200">{% for line in telemetry_lines %}{{ line }}
+{% endfor %}</pre>
+        </div>
+    </section>
+</div>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <h3 class="text-lg font-semibold">Telemetry Snapshot</h3>
+    <div class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-[780px] text-sm">
+            <thead class="border-b border-white/10 text-slate-400">
+            <tr>
+                <th class="py-2 text-left font-medium">Timestamp</th>
+                <th class="py-2 text-left font-medium">Execution (ms)</th>
+                <th class="py-2 text-left font-medium">Peak Memory (MB)</th>
+                <th class="py-2 text-left font-medium">Signals</th>
+                <th class="py-2 text-left font-medium">Errors</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in parsed_telemetry|reverse %}
+            <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                <td class="py-3">{{ item.timestamp or 'N/A' }}</td>
+                <td class="py-3">{{ item.execution_time_ms or 'N/A' }}</td>
+                <td class="py-3">{{ item.peak_memory_mb or 'N/A' }}</td>
+                <td class="py-3">{{ item.signals_generated or 'N/A' }}</td>
+                <td class="py-3">{{ item.errors_encountered or 'N/A' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="py-8 text-center text-slate-400">No parseable telemetry records found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

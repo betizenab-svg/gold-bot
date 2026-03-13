@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Signals | XAUUSD Intelligence{% endblock %}
+{% block page_title %}Signal Ledger{% endblock %}
+
+{% block content %}
+<section class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1100px] text-sm">
+            <thead class="border-b border-white/10 text-slate-400">
+            <tr>
+                <th class="py-2 text-left font-medium">ID</th>
+                <th class="py-2 text-left font-medium">Hash</th>
+                <th class="py-2 text-left font-medium">Symbol</th>
+                <th class="py-2 text-left font-medium">Direction</th>
+                <th class="py-2 text-left font-medium">Entry</th>
+                <th class="py-2 text-left font-medium">SL</th>
+                <th class="py-2 text-left font-medium">TP1</th>
+                <th class="py-2 text-left font-medium">TP2</th>
+                <th class="py-2 text-left font-medium">Score</th>
+                <th class="py-2 text-left font-medium">Status</th>
+                <th class="py-2 text-left font-medium">Timestamp</th>
+                <th class="py-2 text-left font-medium">Closure</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+            <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                <td class="py-3">{{ row.id }}</td>
+                <td class="py-3 font-mono text-xs text-cyanlux">{{ row.signal_hash or 'N/A' }}</td>
+                <td class="py-3">{{ row.symbol or 'N/A' }}</td>
+                <td class="py-3">{{ row.direction or 'N/A' }}</td>
+                <td class="py-3">{{ "%.2f"|format(row.entry_price) if row.entry_price is not none else 'N/A' }}</td>
+                <td class="py-3">{{ "%.2f"|format(row.sl_price) if row.sl_price is not none else 'N/A' }}</td>
+                <td class="py-3">{{ "%.2f"|format(row.tp1_price) if row.tp1_price is not none else 'N/A' }}</td>
+                <td class="py-3">{{ "%.2f"|format(row.tp2_price) if row.tp2_price is not none else 'N/A' }}</td>
+                <td class="py-3">{{ row.score if row.score is not none else 'N/A' }}</td>
+                <td class="py-3">{{ row.status or 'N/A' }}</td>
+                <td class="py-3">{{ row.timestamp or 'N/A' }}</td>
+                <td class="py-3">{{ row.closure_reason or 'N/A' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="12" class="py-8 text-center text-slate-400">No signal rows available.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

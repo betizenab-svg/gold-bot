@@ -76,11 +76,48 @@ Primary tables:
 ## Technology Stack
 
 - Language: Python 3.9+
+- Web UI: Flask + Flask-Login (Passenger WSGI)
 - Database: SQLite (WAL mode)
 - Data sources: yfinance, FRED data pipelines
 - Messaging: Telegram Bot API
 - Hosting target: cPanel shared hosting (Linux)
 - Tooling: argparse, requests, pandas, numpy
+
+## Premium Web Dashboard (Sprint 42)
+
+Sprint 42 adds a secure Flask dashboard for cPanel hosting via Passenger WSGI while preserving cron-based signal execution.
+
+### Authentication Model
+
+- Session authentication via Flask-Login.
+- All dashboard routes require authentication.
+- Unauthenticated requests redirect to `/login`.
+- Default admin credentials:
+  - Username: `Machete`
+  - Password: `@Machete1231`
+
+### Dashboard Routes
+
+- `GET /login` and `POST /login`: premium login UI + credential check.
+- `GET /logout`: terminate authenticated session.
+- `GET /`: summary cards and recent signal overview.
+- `GET /signals`: signal ledger from `signals` table in descending order.
+- `GET /logs`: last 100 lines from `logs/daily-run.log` and `logs/telemetry.jsonl`.
+- `GET /config` and `POST /config`: inspect and update `kv_store` keys.
+
+### Database Lock Safety in UI
+
+All dashboard SQL reads/writes are performed with short-lived context-managed connections:
+
+- `with sqlite3.connect(DB_PATH, timeout=5) as conn:`
+- Each request opens and closes immediately.
+- This reduces lock contention against cron pulse writes.
+
+### UI Design Direction
+
+- Tailwind CSS via CDN (no local Node/NPM build required).
+- High-end hedge-fund visual language: obsidian backgrounds, slate surfaces, cyan/gold accents.
+- Premium typography, smooth transitions, responsive layout, and polished interaction states.
 
 ## Folder Structure
 
@@ -203,6 +240,18 @@ Use 1-minute interval:
 - Confirm signals and lifecycle updates are being recorded.
 - Confirm Telegram thread replies are grouped under original signal messages.
 
+### Step 10: Enable Passenger WSGI Dashboard (cPanel)
+
+1. Ensure these files exist:
+  - `passenger_wsgi.py`
+  - `src/dashboard/app.py`
+  - `src/dashboard/templates/*`
+  - `src/dashboard/static/custom.css`
+2. In cPanel Python app configuration, set startup file to `passenger_wsgi.py`.
+3. Ensure Passenger points to the project root and Python virtual environment.
+4. Restart the Python application from cPanel.
+5. Open the dashboard URL and sign in with default admin credentials.
+
 ### Troubleshooting Tips
 
 - DB lock issues: run scripts/reset_state.py and check lock file behavior.
@@ -276,3 +325,19 @@ The system is engineered for cPanel-like operational constraints:
 
 - Approximate memory budget: 128MB.
 - Pulse runtime target: complete within 60 seconds.
+
+## Sprint 42 Verification
+
+Run:
+
+```bash
+python test_sprint42.py
+```
+
+The script validates:
+
+- Passenger entry import (`application` is a Flask app).
+- Route protection on `/` for unauthenticated users.
+- Successful authentication with default credentials.
+- Failed authentication with incorrect credentials.
+- Manual UI inspection checklist for premium Tailwind styling and micro-interactions.
