@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, Iterable, List, Optional
 
 from src.domain.candle import Candle
+from src.domain.signal import Signal
 
 
 class Repository:
@@ -57,6 +58,41 @@ class Repository:
             payload,
         )
         self.connection.commit()
+
+    def get_recent_candles(
+        self, symbol: str, timeframe: str, limit: int = 100
+    ) -> List[Candle]:
+        if limit <= 0:
+            return []
+
+        cursor = self.connection.execute(
+            """
+            SELECT symbol, timeframe, timestamp, open, high, low, close, volume
+            FROM (
+                SELECT symbol, timeframe, timestamp, open, high, low, close, volume
+                FROM market_data
+                WHERE symbol = ? AND timeframe = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            )
+            ORDER BY timestamp ASC;
+            """,
+            (symbol, timeframe, limit),
+        )
+        rows = cursor.fetchall()
+        return [
+            Candle(
+                symbol=row[0],
+                timeframe=row[1],
+                timestamp=int(row[2]),
+                open=float(row[3]),
+                high=float(row[4]),
+                low=float(row[5]),
+                close=float(row[6]),
+                volume=float(row[7]),
+            )
+            for row in rows
+        ]
 
     def get_kv(self, key: str) -> Optional[str]:
         cursor = self.connection.execute(
@@ -113,12 +149,122 @@ class Repository:
         except sqlite3.IntegrityError:
             return False
 
+    def is_signal_duplicate(self, signal_hash: str) -> bool:
+        cursor = self.connection.execute(
+            "SELECT 1 FROM signals WHERE signal_hash = ? LIMIT 1;",
+            (signal_hash,),
+        )
+        return cursor.fetchone() is not None
+
+    def save_signal(self, signal: Signal) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO signals (
+                signal_hash,
+                symbol,
+                type,
+                signal_type,
+                entry,
+                entry_price,
+                sl,
+                sl_price,
+                tp1,
+                tp1_price,
+                tp2,
+                tp2_price,
+                score,
+                reasoning,
+                timestamp,
+                telegram_message_id,
+                telegram_chat_id,
+                closure_reason,
+                created_at,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                signal.signal_hash,
+                signal.symbol,
+                signal.signal_type,
+                signal.signal_type,
+                signal.entry_price,
+                signal.entry_price,
+                signal.sl_price,
+                signal.sl_price,
+                signal.tp1_price,
+                signal.tp1_price,
+                signal.tp2_price,
+                signal.tp2_price,
+                signal.score,
+                signal.reasoning,
+                signal.timestamp,
+                signal.telegram_message_id,
+                signal.telegram_chat_id,
+                signal.closure_reason,
+                signal.timestamp,
+                "PENDING",
+            ),
+        )
+        self.connection.commit()
+
+    def update_signal_telegram_metadata(
+        self,
+        signal_hash: str,
+        telegram_message_id: str,
+        telegram_chat_id: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE signals
+            SET telegram_message_id = ?, telegram_chat_id = ?
+            WHERE signal_hash = ?;
+            """,
+            (str(telegram_message_id), str(telegram_chat_id), signal_hash),
+        )
+        self.connection.commit()
+
+    def update_signal_closure(
+        self,
+        signal_hash: str,
+        closure_reason: str,
+        status: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE signals
+            SET closure_reason = ?, status = ?
+            WHERE signal_hash = ?;
+            """,
+            (closure_reason, status, signal_hash),
+        )
+        self.connection.commit()
+
+    def save_zone(self, zone: Dict[str, Any]) -> None:
+        created_at = int(zone.get("created_at", int(time.time())))
+        self.connection.execute(
+            """
+            INSERT INTO zones (
+                symbol, timeframe, type, price_top, price_bottom, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                zone.get("symbol"),
+                zone.get("timeframe"),
+                zone.get("type"),
+                zone.get("price_top"),
+                zone.get("price_bottom"),
+                zone.get("status"),
+                created_at,
+            ),
+        )
+        self.connection.commit()
+
     def get_active_zones(self, symbol: str) -> List[Dict[str, Any]]:
         cursor = self.connection.execute(
             """
             SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
             FROM zones
-            WHERE symbol = ? AND status = 'ACTIVE'
+            WHERE symbol = ? AND status IN ('ACTIVE', 'UNMITIGATED')
             ORDER BY created_at DESC;
             """,
             (symbol,),
@@ -137,6 +283,28 @@ class Repository:
             }
             for row in rows
         ]
+
+    def update_zone_statuses(self, updated_zones: List[Dict[str, Any]]) -> None:
+        payload = [
+            (
+                str(zone.get("status")),
+                int(zone.get("id")),
+            )
+            for zone in updated_zones
+            if zone.get("id") is not None and zone.get("status") is not None
+        ]
+        if not payload:
+            return
+
+        self.connection.executemany(
+            """
+            UPDATE zones
+            SET status = ?
+            WHERE id = ?;
+            """,
+            payload,
+        )
+        self.connection.commit()
 
     def log_error(self, provider: str, error_code: str, message: str, timestamp: int) -> None:
         self.connection.execute(

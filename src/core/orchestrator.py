@@ -2,6 +2,7 @@
 # pyright: reportMissingImports=false
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -19,6 +20,17 @@ from src.analysis.regime import RegimeDetector
 from src.analysis.sovereign import SovereignProxy
 from src.analysis.cot_index import CotAnalyzer
 from src.analysis.consensus import SurpriseFactorEngine
+from src.analysis.atr import ATREngine
+from src.analysis.displacement import DisplacementEngine
+from src.analysis.filters import PermissionEngine
+from src.analysis.fractals import FractalDetector
+from src.analysis.fvg import FVGScanner
+from src.analysis.liquidity import LiquiditySweepDetector
+from src.analysis.mitigation import ZoneLifecycleManager
+from src.analysis.order_block import OrderBlockScanner
+from src.analysis.signal_factory import SignalFactory
+from src.analysis.scoring import ScoringEngine
+from src.analysis.structure import MarketStructureEngine
 from src.ingestion.factory import get_market_data_client
 from src.ingestion.macro_client import FredMacroClient, MacroDataError
 from src.ingestion.cot_client import CotClient
@@ -32,6 +44,8 @@ from src.domain.candle import Candle
 from config.settings import DXY_TICKER, DXY_CORRELATION_WINDOW, TIMEFRAME_SECONDS, FSR_LOOKBACK_PERIOD
 from src.analysis.fsr_engine import FSREngine
 from src.analysis.bias_engine import MacroBiasAggregator
+from src.strategies.inside_bar_trap import InsideBarTrapStrategy
+from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
 
 
 MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
@@ -103,7 +117,7 @@ class PulseOrchestrator:
         return MockClient()
 
     def _fetch_gold_daily_closes(self, repository: Repository) -> pd.Series:
-        """Aggregate H1 candles from market_data into daily closes."""
+        """Aggregate stored XAUUSD candles from market_data into daily closes."""
         cutoff = datetime.now(timezone.utc) - timedelta(days=MACRO_HISTORY_DAYS)
         cutoff_ts = int(cutoff.timestamp())
 
@@ -194,6 +208,423 @@ class PulseOrchestrator:
         x_src = np.arange(len(values), dtype=float)
         x_dst = np.linspace(0.0, float(len(values) - 1), num=target_length)
         return list(np.interp(x_dst, x_src, np.array(values, dtype=float)))
+
+    @staticmethod
+    def _parse_swing_point(raw_value: Optional[str]) -> Optional[dict[str, float | int]]:
+        if not raw_value:
+            return None
+
+        try:
+            payload = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(payload, dict):
+            return None
+
+        if "timestamp" not in payload or "price" not in payload:
+            return None
+
+        try:
+            return {
+                "timestamp": int(payload["timestamp"]),
+                "price": float(payload["price"]),
+            }
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_liquidity_sweep(raw_value: Optional[str]) -> Optional[dict[str, Any]]:
+        if not raw_value:
+            return None
+
+        try:
+            payload = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(payload, dict):
+            return None
+
+        if "timestamp" not in payload or "type" not in payload:
+            return None
+
+        try:
+            return {
+                "timestamp": int(payload["timestamp"]),
+                "type": str(payload["type"]),
+            }
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _zone_bounce_direction(current_candle: Candle, zone: dict[str, Any]) -> Optional[str]:
+        zone_type = str(zone.get("type", "")).upper()
+        status = str(zone.get("status", "")).upper()
+        if status not in {"ACTIVE", "UNMITIGATED", "MITIGATED"}:
+            return None
+
+        try:
+            price_top = float(zone.get("price_top"))
+            price_bottom = float(zone.get("price_bottom"))
+        except (TypeError, ValueError):
+            return None
+
+        if "OB_BULLISH" in zone_type:
+            touched_zone = float(current_candle.low) <= price_top
+            bounced = float(current_candle.close) >= price_top
+            if touched_zone and bounced:
+                return "LONG"
+
+        if "OB_BEARISH" in zone_type:
+            touched_zone = float(current_candle.high) >= price_bottom
+            bounced = float(current_candle.close) <= price_bottom
+            if touched_zone and bounced:
+                return "SHORT"
+
+        return None
+
+    def _detect_trade_setup(
+        self,
+        repository: Repository,
+        symbol: str,
+        current_candle: Candle,
+        recent_candles: List[Candle],
+    ) -> Optional[dict[str, Any]]:
+        active_zones = repository.get_active_zones(symbol)
+        pin_bar_strategy = PinBarRejectionStrategy()
+        pin_bar_setup = pin_bar_strategy.detect_setup(recent_candles, active_zones)
+        if pin_bar_setup is not None:
+            return pin_bar_setup
+
+        inside_bar_strategy = InsideBarTrapStrategy()
+        inside_bar_setup = inside_bar_strategy.detect_setup(recent_candles)
+        if inside_bar_setup is not None:
+            return inside_bar_setup
+
+        try:
+            rows = repository.connection.execute(
+                """
+                SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
+                FROM zones
+                WHERE symbol = ?
+                  AND status IN ('ACTIVE', 'UNMITIGATED', 'MITIGATED')
+                  AND type IN ('OB_BULLISH', 'OB_BEARISH')
+                ORDER BY created_at DESC
+                LIMIT 20;
+                """,
+                (symbol,),
+            ).fetchall()
+        except Exception:
+            return None
+
+        order_blocks = [
+            {
+                "id": row[0],
+                "symbol": row[1],
+                "timeframe": row[2],
+                "type": row[3],
+                "price_top": float(row[4]),
+                "price_bottom": float(row[5]),
+                "status": row[6],
+                "created_at": int(row[7]),
+            }
+            for row in rows
+        ]
+        if not order_blocks:
+            return None
+
+        for zone in order_blocks:
+            trade_direction = self._zone_bounce_direction(current_candle, zone)
+            if trade_direction is None:
+                continue
+            return {
+                "trade_direction": trade_direction,
+                "zone": zone,
+            }
+
+        return None
+
+    @staticmethod
+    def _build_macro_permission_context(repository: Repository) -> dict[str, Any]:
+        return {
+            "macro_cot_state": repository.get_kv("macro_cot_state"),
+            "macro_consensus_state": repository.get_kv("macro_consensus_state"),
+            "macro_long_bias_multiplier": repository.get_kv("macro_long_bias_multiplier"),
+        }
+
+    @staticmethod
+    def _has_recent_directional_sweep(
+        trade_direction: str,
+        current_timestamp: int,
+        timeframe: str,
+        latest_sweep: Optional[dict[str, Any]],
+    ) -> bool:
+        if latest_sweep is None:
+            return False
+
+        sweep_type = str(latest_sweep.get("type", "")).upper()
+        sweep_timestamp = latest_sweep.get("timestamp")
+        if not isinstance(sweep_timestamp, int):
+            return False
+
+        step_seconds = int(TIMEFRAME_SECONDS.get(timeframe, 60))
+        max_age_seconds = 15 * step_seconds
+        if current_timestamp - sweep_timestamp > max_age_seconds:
+            return False
+
+        return (trade_direction.upper() == "LONG" and sweep_type == "LIQUIDITY_SWEEP_LONG") or (
+            trade_direction.upper() == "SHORT" and sweep_type == "LIQUIDITY_SWEEP_SHORT"
+        )
+
+    def _persist_latest_fractals(
+        self,
+        repository: Repository,
+        latest_fractals: dict[str, Any],
+    ) -> None:
+        repository.set_kv("smc_latest_fractals", json.dumps(latest_fractals))
+
+        swing_high = latest_fractals.get("swing_high")
+        swing_low = latest_fractals.get("swing_low")
+
+        if swing_high is not None:
+            repository.set_kv("last_swing_high", swing_high)
+        if swing_low is not None:
+            repository.set_kv("last_swing_low", swing_low)
+
+    def _evaluate_zone_lifecycle(
+        self,
+        repository: Repository,
+        symbol: str,
+        current_candle: Candle,
+    ) -> None:
+        lifecycle_manager = ZoneLifecycleManager()
+        active_zones = repository.get_active_zones(symbol)
+        updated_zones = lifecycle_manager.evaluate_zones(current_candle, active_zones)
+        if not updated_zones:
+            return
+
+        repository.update_zone_statuses(updated_zones)
+        logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
+
+    def _evaluate_market_structure(
+        self,
+        repository: Repository,
+        current_candle: Candle,
+    ) -> Optional[str]:
+        structure_engine = MarketStructureEngine()
+
+        stored_trend = repository.get_kv("current_structure_state")
+        current_trend = stored_trend.upper() if stored_trend else "BULLISH"
+        if stored_trend is None:
+            repository.set_kv("current_structure_state", current_trend)
+
+        last_swing_high = self._parse_swing_point(repository.get_kv("last_swing_high"))
+        last_swing_low = self._parse_swing_point(repository.get_kv("last_swing_low"))
+
+        counter_trend_swing = last_swing_low if current_trend == "BULLISH" else last_swing_high
+        new_trend = structure_engine.detect_choch(
+            current_candle=current_candle,
+            last_counter_trend_swing=counter_trend_swing,
+            current_trend=current_trend,
+        )
+        if new_trend is not None:
+            repository.set_kv("current_structure_state", new_trend)
+            logging.info(
+                "CHOCH detected: %s -> %s at timestamp=%s close=%.2f",
+                current_trend,
+                new_trend,
+                current_candle.timestamp,
+                current_candle.close,
+            )
+            return None
+
+        trend_swing = last_swing_high if current_trend == "BULLISH" else last_swing_low
+        if structure_engine.detect_bos(
+            current_candle=current_candle,
+            last_swing_point=trend_swing,
+            current_trend=current_trend,
+        ):
+            logging.info(
+                "BOS detected: trend=%s timestamp=%s close=%.2f",
+                current_trend,
+                current_candle.timestamp,
+                current_candle.close,
+            )
+            return current_trend
+
+        return None
+
+    def _evaluate_liquidity_sweep(
+        self,
+        repository: Repository,
+        recent_candles: List[Candle],
+        current_candle: Candle,
+    ) -> None:
+        if not recent_candles:
+            return
+
+        last_swing_high_point = self._parse_swing_point(repository.get_kv("last_swing_high"))
+        last_swing_low_point = self._parse_swing_point(repository.get_kv("last_swing_low"))
+        if last_swing_high_point is None or last_swing_low_point is None:
+            return
+
+        detector = LiquiditySweepDetector()
+        avg_volume = detector.calculate_average_volume(recent_candles, period=14)
+        sweep = detector.detect_sweep(
+            current_candle=current_candle,
+            avg_volume=avg_volume,
+            last_swing_high=float(last_swing_high_point["price"]),
+            last_swing_low=float(last_swing_low_point["price"]),
+        )
+        if sweep is None:
+            return
+
+        repository.set_kv("latest_liquidity_sweep", json.dumps(sweep))
+        logging.info(
+            "Liquidity sweep detected: type=%s sweep_price=%.2f timestamp=%s",
+            sweep["type"],
+            sweep["sweep_price"],
+            sweep["timestamp"],
+        )
+
+    def _load_recent_fvgs(
+        self,
+        repository: Repository,
+        symbol: str,
+        timeframe: str,
+        limit: int = 10,
+    ) -> List[dict[str, Any]]:
+        try:
+            rows = repository.connection.execute(
+                """
+                SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
+                FROM zones
+                WHERE symbol = ?
+                  AND timeframe = ?
+                  AND status = 'UNMITIGATED'
+                  AND type IN ('FVG_BULLISH', 'FVG_BEARISH')
+                ORDER BY created_at DESC
+                LIMIT ?;
+                """,
+                (symbol, timeframe, limit),
+            ).fetchall()
+        except Exception:
+            return []
+
+        if not isinstance(rows, list):
+            return []
+
+        return [
+            {
+                "id": row[0],
+                "symbol": row[1],
+                "timeframe": row[2],
+                "type": row[3],
+                "price_top": float(row[4]),
+                "price_bottom": float(row[5]),
+                "status": row[6],
+                "created_at": int(row[7]),
+            }
+            for row in rows
+        ]
+
+    def _scan_for_fvg_zones(
+        self,
+        repository: Repository,
+        recent_candles: List[Candle],
+    ) -> List[dict[str, Any]]:
+        if not recent_candles:
+            return []
+
+        symbol = recent_candles[-1].symbol
+        timeframe = recent_candles[-1].timeframe
+        fvg_window = recent_candles[-15:]
+        atr_engine = ATREngine()
+        current_atr = atr_engine.calculate_atr(fvg_window, period=14)
+
+        scanner = FVGScanner()
+        zone = scanner.detect_fvg(fvg_window, current_atr)
+        if zone is None:
+            return self._load_recent_fvgs(repository, symbol, timeframe)
+
+        zone["created_at"] = int(fvg_window[-1].timestamp)
+        repository.save_zone(zone)
+        logging.info(
+            "FVG detected: type=%s top=%.2f bottom=%.2f status=%s",
+            zone["type"],
+            zone["price_top"],
+            zone["price_bottom"],
+            zone["status"],
+        )
+        return self._load_recent_fvgs(repository, symbol, timeframe)
+
+    def _scan_for_order_blocks(
+        self,
+        repository: Repository,
+        recent_candles: List[Candle],
+        recent_bos_type: Optional[str],
+        recent_fvgs: List[dict[str, Any]],
+    ) -> None:
+        if recent_bos_type is None or not recent_candles:
+            return
+
+        displacement_engine = DisplacementEngine()
+        avg_body = displacement_engine.calculate_average_body(recent_candles, period=14)
+        scanner = OrderBlockScanner()
+        zone = scanner.detect_order_block(
+            candles=recent_candles,
+            recent_bos_type=recent_bos_type,
+            recent_fvgs=recent_fvgs,
+            avg_body=avg_body,
+        )
+        if zone is None:
+            return
+
+        zone["created_at"] = int(recent_candles[-1].timestamp)
+        repository.save_zone(zone)
+        logging.info(
+            "Order block detected: type=%s top=%.2f bottom=%.2f status=%s",
+            zone["type"],
+            zone["price_top"],
+            zone["price_bottom"],
+            zone["status"],
+        )
+
+    def _persist_actionable_signal(
+        self,
+        repository: Repository,
+        potential_setup: dict[str, Any],
+        recent_candles: List[Candle],
+        current_candle: Candle,
+        total_score: int,
+    ) -> None:
+        zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
+        trade_direction = str(potential_setup["trade_direction"])
+        signal_context: dict[str, Any] = dict(zone)
+        for key in ("entry_price", "sl_price", "strategy", "trigger", "zone_id"):
+            if key in potential_setup:
+                signal_context[key] = potential_setup[key]
+        if "id" not in signal_context and "zone_id" in potential_setup:
+            signal_context["id"] = potential_setup["zone_id"]
+
+        signal_factory = SignalFactory()
+        atr_value = ATREngine().calculate_atr(recent_candles[-15:], period=14)
+        signal = signal_factory.build_signal(
+            symbol=current_candle.symbol,
+            trade_direction=trade_direction,
+            zone_dict=signal_context,
+            atr=atr_value,
+            score=total_score,
+            timestamp=int(current_candle.timestamp),
+        )
+
+        if repository.is_signal_duplicate(signal.signal_hash):
+            logging.info("Skipped duplicate signal: %s", signal.signal_hash)
+            return
+
+        repository.save_signal(signal)
+        logging.info("Saved actionable signal: %s", signal.signal_hash)
 
     def _run_macro_regime_check(self, repository: Repository) -> None:
         """Run the macro regime detection, gated behind a 24-hour cache."""
@@ -352,6 +783,8 @@ class PulseOrchestrator:
         start_time = time.time()
         self.memory_profiler.log_snapshot("Pulse start")
 
+        symbol = "XAUUSD"
+        timeframe = "M1"
         repository = self.repository_factory()
         try:
             # --- Macro Regime Check (24-hour gated) ---
@@ -369,7 +802,7 @@ class PulseOrchestrator:
             validator = DataValidator()
 
             try:
-                candles = client.fetch_latest_candles("XAUUSD", "H1")
+                candles = client.fetch_latest_candles(symbol, timeframe)
             except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
                 logging.error("Ingestion failed: %s", exc)
                 return
@@ -390,6 +823,94 @@ class PulseOrchestrator:
             repository.save_candles(valid_candles)
             latest_timestamp = max(candle.timestamp for candle in valid_candles)
             repository.set_kv("last_processed_timestamp", latest_timestamp)
+            current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
+            self._evaluate_zone_lifecycle(repository, symbol, current_candle)
+
+            detector = FractalDetector()
+            recent_candles = repository.get_recent_candles(symbol, timeframe, 100)
+            latest_fractals = detector.find_fractals(recent_candles)
+            self._persist_latest_fractals(repository, latest_fractals)
+            self._evaluate_liquidity_sweep(repository, recent_candles, current_candle)
+            recent_bos_type = self._evaluate_market_structure(repository, current_candle)
+            recent_fvgs = self._scan_for_fvg_zones(repository, recent_candles)
+            self._scan_for_order_blocks(
+                repository,
+                recent_candles,
+                recent_bos_type,
+                recent_fvgs,
+            )
+
+            potential_setup = self._detect_trade_setup(
+                repository,
+                symbol,
+                current_candle,
+                recent_candles,
+            )
+            if potential_setup is not None:
+                permission_engine = PermissionEngine()
+                macro_context = self._build_macro_permission_context(repository)
+                is_permitted, permission_reason = permission_engine.is_trade_permitted(
+                    cast(dict[str, Any], potential_setup),
+                    macro_context,
+                )
+                if not is_permitted:
+                    logging.info(
+                        "Setup blocked by permission filter: direction=%s reason=%s",
+                        potential_setup.get("trade_direction"),
+                        permission_reason,
+                    )
+                    elapsed = time.time() - start_time
+                    self.memory_profiler.log_snapshot("Pulse end")
+                    logging.info("Pulse finished in %.2fs", elapsed)
+                    return
+
+                scoring_engine = ScoringEngine()
+
+                raw_macro_bias_state = repository.get_kv("macro_bias_state")
+                if raw_macro_bias_state is None:
+                    raw_macro_bias_state = repository.get_kv("global_macro_bias")
+                macro_bias_state = (
+                    raw_macro_bias_state.upper() if raw_macro_bias_state is not None else "NEUTRAL"
+                )
+
+                raw_structure_state = repository.get_kv("current_structure_state")
+                current_structure_state = (
+                    raw_structure_state.upper() if raw_structure_state is not None else "BULLISH"
+                )
+
+                latest_sweep = self._parse_liquidity_sweep(repository.get_kv("latest_liquidity_sweep"))
+                has_recent_sweep = self._has_recent_directional_sweep(
+                    trade_direction=str(potential_setup["trade_direction"]),
+                    current_timestamp=int(current_candle.timestamp),
+                    timeframe=current_candle.timeframe,
+                    latest_sweep=latest_sweep,
+                )
+
+                total_score = scoring_engine.calculate_total_score(
+                    trade_direction=str(potential_setup["trade_direction"]),
+                    macro_bias=macro_bias_state,
+                    current_structure=current_structure_state,
+                    zone_dict=cast(dict[str, Any], potential_setup.get("zone")),
+                    has_recent_sweep=has_recent_sweep,
+                )
+                classification = scoring_engine.classify_score(total_score)
+
+                repository.set_kv("latest_setup_score", total_score)
+                repository.set_kv("latest_setup_classification", classification)
+                logging.info(
+                    "Setup scored: direction=%s score=%d classification=%s",
+                    potential_setup["trade_direction"],
+                    total_score,
+                    classification,
+                )
+                if classification == "ACTIONABLE":
+                    self._persist_actionable_signal(
+                        repository,
+                        cast(dict[str, Any], potential_setup),
+                        recent_candles,
+                        current_candle,
+                        total_score,
+                    )
 
             elapsed = time.time() - start_time
             self.memory_profiler.log_snapshot("Pulse end")

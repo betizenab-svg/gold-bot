@@ -36,10 +36,21 @@ class SchemaInitializer:
                 signal_hash TEXT UNIQUE,
                 symbol TEXT,
                 type TEXT,
+                signal_type TEXT,
                 entry REAL,
+                entry_price REAL,
                 sl REAL,
+                sl_price REAL,
                 tp1 REAL,
+                tp1_price REAL,
                 tp2 REAL,
+                tp2_price REAL,
+                score INTEGER,
+                reasoning TEXT,
+                timestamp INTEGER,
+                telegram_message_id TEXT,
+                telegram_chat_id TEXT,
+                closure_reason TEXT,
                 created_at INTEGER,
                 status TEXT
             );
@@ -69,4 +80,31 @@ class SchemaInitializer:
         cursor = self.connection.cursor()
         for statement in statements:
             cursor.execute(statement)
+        self._ensure_column(cursor, "signals", "signal_type", "TEXT")
+        self._ensure_column(cursor, "signals", "entry_price", "REAL")
+        self._ensure_column(cursor, "signals", "sl_price", "REAL")
+        self._ensure_column(cursor, "signals", "tp1_price", "REAL")
+        self._ensure_column(cursor, "signals", "tp2_price", "REAL")
+        self._ensure_column(cursor, "signals", "score", "INTEGER")
+        self._ensure_column(cursor, "signals", "reasoning", "TEXT")
+        self._ensure_column(cursor, "signals", "timestamp", "INTEGER")
+        self._ensure_column(cursor, "signals", "telegram_message_id", "TEXT")
+        self._ensure_column(cursor, "signals", "telegram_chat_id", "TEXT")
+        self._ensure_column(cursor, "signals", "closure_reason", "TEXT")
         self.connection.commit()
+
+    def _ensure_column(
+        self,
+        cursor: sqlite3.Cursor,
+        table_name: str,
+        column_name: str,
+        column_type: str,
+    ) -> None:
+        rows = cursor.execute(f"PRAGMA table_info({table_name});").fetchall()
+        existing_columns = {row[1] for row in rows}
+        if column_name in existing_columns:
+            return
+
+        cursor.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type};"
+        )
