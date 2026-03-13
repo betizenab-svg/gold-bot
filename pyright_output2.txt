@@ -1,0 +1,106 @@
+﻿c:\Users\SaremTadele\Downloads\gold_trading_bot\src\core\orchestrator.py
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\core\orchestrator.py:119:16 - error: Type "DataFrame | Series" is not assignable to return type "Series"
+  ┬á┬áType "DataFrame | Series" is not assignable to type "Series"
+  ┬á┬á┬á┬á"DataFrame" is not assignable to "Series" (reportReturnType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\core\orchestrator.py:155:55 - error: Cannot access attribute "normalize" for class "DatetimeIndex"
+  ┬á┬áAttribute "normalize" is unknown (reportAttributeAccessIssue)
+c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:144:44 - error: Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "frame" of type "DataFrame" in function "_aggregate_frame"
+  ┬á┬áType "Series | Unknown | DataFrame" is not assignable to type "DataFrame"
+  ┬á┬á┬á┬á"Series" is not assignable to "DataFrame" (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:153:74 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:153:74 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:159:32 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:159:32 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:160:32 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:160:32 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:161:31 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:161:31 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:162:33 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:162:33 - error: Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  ┬á┬áType "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬áType "Series" is not assignable to type "ConvertibleToFloat"
+  ┬á┬á┬á┬á┬á┬á"Series" is not assignable to "str"
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "Buffer"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__buffer__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsFloat"
+  ┬á┬á┬á┬á┬á┬á┬á┬á"__float__" is not present
+  ┬á┬á┬á┬á┬á┬á"Series" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+13 errors, 0 warnings, 0 informations

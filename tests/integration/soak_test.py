@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 workspace = Path(__file__).resolve().parents[2]
 if str(workspace) not in sys.path:
@@ -15,10 +15,13 @@ os.environ["DB_PATH"] = str(db_path)
 from config.database import get_connection
 from src.persistence.schema import SchemaInitializer
 
+_resource: Any = None
+
 try:
-    import resource  # type: ignore
+    import resource as _resource_mod
+    _resource = _resource_mod
 except ImportError:
-    resource = None
+    pass
 
 
 def _cleanup_files(db_path: Path, lock_path: Path) -> None:
@@ -87,9 +90,9 @@ def _check_db_integrity(db_path: Path, symbol: str, timeframe: str, step_seconds
 
 
 def _get_parent_rss_mb() -> Optional[float]:
-    if resource is None:
+    if _resource is None:
         return None
-    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    usage = _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss
     if os.name == "posix":
         return usage / 1024
     return None

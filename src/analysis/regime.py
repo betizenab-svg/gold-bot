@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from typing import cast
 
 import pandas as pd
 
@@ -52,7 +53,7 @@ class RegimeDetector:
         # Take the trailing CORRELATION_WINDOW rows
         window = merged.tail(self.CORRELATION_WINDOW)
 
-        correlation = window["gold"].corr(window["tips"])
+        correlation: float = cast(float, cast(pd.Series, window["gold"]).corr(cast(pd.Series, window["tips"])))
 
         logging.info(
             "Regime correlation: %.4f (computed over %d aligned days)",

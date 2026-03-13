@@ -34,3 +34,20 @@ TIMEFRAME_SECONDS = {
 SOVEREIGN_ACCUMULATION_THRESHOLD = 350.0  # tonnes per quarter
 LONG_BIAS_MULTIPLIER_ACTIVE = 1.25
 LONG_BIAS_MULTIPLIER_INACTIVE = 1.0
+
+# --- Crisis Filter (DXY) ---
+DXY_TICKER = 'DX-Y.NYB'
+DXY_CORRELATION_WINDOW = 20
+
+# --- Commitment of Traders (COT) ---
+COT_LOOKBACK_WEEKS = 26
+COT_OVERCROWDED_THRESHOLD = 80.0
+COT_CAPITULATION_THRESHOLD = 20.0
+
+# --- Consensus Variance (Surprise Factor) ---
+SURPRISE_FACTOR_THRESHOLD = 2.0
+HIGH_IMPACT_EVENTS = [
+    {"event_name": "NFP", "forecast": 180.0, "actual": -50.0, "historical_sigma": 45.0, "usd_impact_direction": 1},
+    {"event_name": "CPI", "forecast": 0.3, "actual": 0.5, "historical_sigma": 0.1, "usd_impact_direction": 1},
+    {"event_name": "FOMC", "forecast": -0.25, "actual": 0.25, "historical_sigma": 0.15, "usd_impact_direction": -1},
+]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 import logging
 
 import pandas as pd
@@ -81,10 +81,11 @@ class YahooFinanceClient:
 
     def _normalize_index_to_utc(self, frame: pd.DataFrame) -> pd.DataFrame:
         normalized = frame.copy()
-        if getattr(normalized.index, "tz", None) is None:
-            normalized.index = normalized.index.tz_localize("UTC")
+        dti = pd.DatetimeIndex(normalized.index)
+        if getattr(dti, "tz", None) is None:
+            normalized.index = dti.tz_localize("UTC")
         else:
-            normalized.index = normalized.index.tz_convert("UTC")
+            normalized.index = dti.tz_convert("UTC")
         return normalized.sort_index()
 
     def _aggregate_frame(self, frame: pd.DataFrame, resample_rule: Optional[str]) -> pd.DataFrame:
@@ -100,7 +101,9 @@ class YahooFinanceClient:
                 "Volume": "sum",
             }
         )
-        return aggregated.dropna(subset=["Open", "High", "Low", "Close"]).sort_index()
+        cols = ["Open", "High", "Low", "Close"]
+        mask: Any = cast(pd.DataFrame, aggregated[cols]).notna().all(axis=1)
+        return cast(pd.DataFrame, aggregated[mask]).sort_index()
 
     def fetch_latest_candles(self, symbol: str, timeframe: str) -> List[Candle]:
         if self.circuit_breaker.is_open("YAHOO"):
@@ -139,26 +142,28 @@ class YahooFinanceClient:
             self.circuit_breaker.record_failure("YAHOO", "MALFORMED_RESPONSE", ",".join(missing_columns))
             raise DataIngestionError(f"Yahoo Finance response missing columns: {', '.join(missing_columns)}")
 
-        normalized = normalized[required_columns]
+        normalized = cast(pd.DataFrame, normalized[required_columns])
         normalized = self._aggregate_frame(normalized, resample_rule)
-        normalized = normalized.dropna(subset=["Open", "High", "Low", "Close"])
+        ohlc_cols = ["Open", "High", "Low", "Close"]
+        normalized = normalized[normalized[ohlc_cols].notna().all(axis=1)]
 
         candles: List[Candle] = []
         for timestamp, row in normalized.iterrows():
-            epoch_timestamp = int(timestamp.timestamp())
+            row_data: Any = row
+            epoch_timestamp = int(cast(Any, timestamp).timestamp())
             if epoch_timestamp <= last_timestamp:
                 continue
 
-            volume = 0.0 if pd.isna(row["Volume"]) else float(row["Volume"])
+            volume = 0.0 if pd.isna(row_data["Volume"]) else float(row_data["Volume"])
             candles.append(
                 Candle(
                     symbol=symbol,
                     timeframe=timeframe,
                     timestamp=epoch_timestamp,
-                    open=float(row["Open"]),
-                    high=float(row["High"]),
-                    low=float(row["Low"]),
-                    close=float(row["Close"]),
+                    open=float(row_data["Open"]),
+                    high=float(row_data["High"]),
+                    low=float(row_data["Low"]),
+                    close=float(row_data["Close"]),
                     volume=volume,
                 )
             )

@@ -1,0 +1,12 @@
+﻿c:\Users\SaremTadele\Downloads\gold_trading_bot\src\core\orchestrator.py
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\core\orchestrator.py:159:70 - error: Cannot access attribute "floor" for class "DatetimeIndex"
+  ┬á┬áAttribute "floor" is unknown (reportAttributeAccessIssue)
+c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:105:16 - error: Type "Series | DataFrame | Any | Unknown" is not assignable to return type "DataFrame"
+  ┬á┬áType "Series | DataFrame | Any | Unknown" is not assignable to type "DataFrame"
+  ┬á┬á┬á┬á"Series" is not assignable to "DataFrame" (reportReturnType)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:105:44 - error: Cannot access attribute "notna" for class "ndarray[_AnyShape, dtype[Any]]"
+  ┬á┬áAttribute "notna" is unknown (reportAttributeAccessIssue)
+  c:\Users\SaremTadele\Downloads\gold_trading_bot\src\ingestion\yahoo_client.py:105:65 - error: Cannot access attribute "sort_index" for class "ndarray[_AnyShape, dtype[Any]]"
+  ┬á┬áAttribute "sort_index" is unknown (reportAttributeAccessIssue)
+4 errors, 0 warnings, 0 informations

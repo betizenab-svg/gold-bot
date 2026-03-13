@@ -4,38 +4,45 @@ import logging
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
 import pandas as pd
 
 from config.database import get_connection
 from src.core.telemetry import MemoryProfiler
+from src.analysis.crisis import CrisisDetector
 from src.analysis.regime import RegimeDetector
 from src.analysis.sovereign import SovereignProxy
+from src.analysis.cot_index import CotAnalyzer
+from src.analysis.consensus import SurpriseFactorEngine
 from src.ingestion.factory import get_market_data_client
 from src.ingestion.macro_client import FredMacroClient, MacroDataError
+from src.ingestion.cot_client import CotClient
+from src.ingestion.calendar_client import EconomicCalendarClient
 from src.ingestion.twelvedata import DataIngestionError as TwelveDataIngestionError
 from src.ingestion.yahoo_client import DataIngestionError as YahooDataIngestionError
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
-from config.settings import TIMEFRAME_SECONDS
+from config.settings import DXY_TICKER, DXY_CORRELATION_WINDOW, TIMEFRAME_SECONDS
 
 
 MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
 MACRO_HISTORY_DAYS = 90
+DXY_HISTORY_DAYS = 30
 
 
 class PulseOrchestrator:
     def __init__(
         self,
         repository_factory: Optional[Callable[[], Repository]] = None,
-        client_factory: Optional[Callable[[Repository], object]] = None,
+        client_factory: Optional[Callable[[Repository], Any]] = None,
         memory_profiler: Optional[MemoryProfiler] = None,
         macro_client: Optional[FredMacroClient] = None,
         regime_detector: Optional[RegimeDetector] = None,
         sovereign_proxy: Optional[SovereignProxy] = None,
+        crisis_detector: Optional[CrisisDetector] = None,
     ) -> None:
         self.repository_factory = repository_factory or self._default_repository_factory
         self.client_factory = client_factory or get_market_data_client
@@ -43,6 +50,7 @@ class PulseOrchestrator:
         self.macro_client = macro_client or FredMacroClient()
         self.regime_detector = regime_detector or RegimeDetector()
         self.sovereign_proxy = sovereign_proxy or SovereignProxy()
+        self.crisis_detector = crisis_detector or CrisisDetector()
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
@@ -110,9 +118,49 @@ class PulseOrchestrator:
 
         frame = pd.DataFrame({"date": timestamps, "close": closes})
         daily = frame.groupby("date")["close"].last()
-        daily.index = pd.to_datetime(daily.index)
+        daily.index = pd.DatetimeIndex(daily.index)
 
-        return daily
+        return cast(pd.Series, daily)
+
+    def _fetch_dxy_daily_closes(self) -> pd.Series:
+        """Fetch DXY daily closing prices from Yahoo Finance."""
+        import yfinance as yf
+
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=DXY_HISTORY_DAYS)
+
+        try:
+            frame = yf.download(
+                tickers=DXY_TICKER,
+                start=start,
+                end=end,
+                interval="1d",
+                progress=False,
+                auto_adjust=False,
+                threads=False,
+            )
+        except Exception as exc:
+            logging.error("DXY data fetch failed: %s", exc)
+            return pd.Series(dtype=float)
+
+        if frame is None or frame.empty:
+            logging.warning("Yahoo Finance returned empty DXY data")
+            return pd.Series(dtype=float)
+
+        if isinstance(frame.columns, pd.MultiIndex):
+            frame.columns = frame.columns.get_level_values(0)
+
+        closes: pd.Series = cast(pd.Series, frame["Close"]).dropna()
+
+        dti = pd.DatetimeIndex(closes.index)
+        if hasattr(dti, "tz") and dti.tz is not None:
+            closes.index = dti.tz_localize(None)
+
+        normalized_dates: Any = pd.to_datetime(closes.index)
+        closes.index = pd.DatetimeIndex(normalized_dates.floor("D"))
+
+        logging.info("Fetched %d DXY daily closes", len(closes))
+        return closes
 
     def _run_macro_regime_check(self, repository: Repository) -> None:
         """Run the macro regime detection, gated behind a 24-hour cache."""
@@ -160,6 +208,71 @@ class PulseOrchestrator:
             multiplier,
         )
 
+        # --- Crisis Filter (DXY Correlation) ---
+        gold_daily_for_dxy = self._fetch_gold_daily_closes(repository)
+        dxy_series = self._fetch_dxy_daily_closes()
+        if not gold_daily_for_dxy.empty and not dxy_series.empty:
+            dxy_corr = self.crisis_detector.calculate_dxy_correlation(
+                gold_daily_for_dxy, dxy_series
+            )
+            crisis_mode = self.crisis_detector.evaluate_crisis_mode(dxy_corr)
+            repository.set_kv("macro_dxy_correlation", str(dxy_corr))
+            repository.set_kv("macro_crisis_mode", str(int(crisis_mode)))
+            logging.info(
+                "Crisis filter: dxy_correlation=%.4f, crisis_mode=%s",
+                dxy_corr,
+                crisis_mode,
+            )
+        else:
+            logging.warning("Insufficient data for crisis filter")
+
+        # --- Commitment of Traders (COT) Index ---
+        try:
+            cot_client = CotClient()
+            historical_nets = cot_client.fetch_historical_net_positions()
+            
+            if historical_nets:
+                current_net = historical_nets[-1]
+                analyzer = CotAnalyzer()
+                
+                index_val = analyzer.calculate_index(current_net, historical_nets)
+                positioning_state = analyzer.evaluate_positioning(index_val)
+                
+                repository.set_kv("macro_cot_index", f"{index_val:.2f}")
+                repository.set_kv("macro_cot_state", positioning_state)
+                logging.info("COT Index: %.2f (%s)", index_val, positioning_state)
+        except Exception as exc:
+            logging.error("Failed to update COT Index: %s", exc)
+
+        # --- Consensus Variance (Surprise Factor) ---
+        try:
+            cal_client = EconomicCalendarClient()
+            events = cal_client.fetch_latest_events()
+            engine = SurpriseFactorEngine()
+
+            max_abs_surprise = 0.0
+            overall_state = "NEUTRAL"
+
+            for event in events:
+                state = engine.evaluate_double_whammy(event)
+                surprise = engine.calculate_surprise_factor(
+                    float(event["actual"]),
+                    float(event["forecast"]),
+                    float(event["historical_sigma"]),
+                )
+                if abs(surprise) > max_abs_surprise:
+                    max_abs_surprise = abs(surprise)
+                if state != "NEUTRAL":
+                    overall_state = state
+
+            repository.set_kv("macro_surprise_factor", f"{max_abs_surprise:.2f}")
+            repository.set_kv("macro_consensus_state", overall_state)
+            logging.info(
+                "Surprise Factor: %.2f (%s)", max_abs_surprise, overall_state
+            )
+        except Exception as exc:
+            logging.error("Failed to update Surprise Factor: %s", exc)
+
     def run(self) -> None:
         logging.info("---- Pulse started ----")
         start_time = time.time()
@@ -175,7 +288,7 @@ class PulseOrchestrator:
             except Exception as exc:
                 logging.error("Unexpected macro regime error: %s", exc)
             if os.getenv("MOCK_INGESTION") == "1":
-                client = self._mock_client(repository)
+                client: Any = self._mock_client(repository)
             else:
                 client = self.client_factory(repository)
             logging.info("Selected ingestion client: %s", client.__class__.__name__)

@@ -1,0 +1,26 @@
+[project]
+name = "gold-trading-bot"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+include = ["src*", "config*"]
+
+[tool.setuptools]
+# This makes the project root the import root so that
+# `from src.core.orchestrator import ...` and
+# `from config.settings import ...` both resolve correctly.
+py-modules = []
+
+[tool.pyright]
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+reportMissingImports = false
+reportMissingModuleSource = false
+
+[tool.pyre]
+source_directories = ["."]
+search_path = ["."]
+exclude = [".venv", "*.egg-info", "__pycache__"]

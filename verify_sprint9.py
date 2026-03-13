@@ -16,14 +16,13 @@ import sys
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import numpy as np
 
-# Ensure project root is on the path
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 
 from src.analysis.regime import RegimeDetector
 from src.ingestion.macro_client import FredMacroClient, DFII10_SERIES
@@ -174,7 +173,8 @@ class TestMacroCacheGating(unittest.TestCase):
         tips_series = pd.Series(
             [2.0 - i * 0.01 for i in range(60)], index=tips_dates
         )
-        tips_series.index = tips_series.index.tz_localize(None)
+        dti = pd.DatetimeIndex(tips_series.index)
+        tips_series.index = dti.tz_localize(None)
 
         mock_macro = MagicMock(spec=FredMacroClient)
         mock_macro.fetch_10y_tips_yield.return_value = tips_series
@@ -194,13 +194,13 @@ class TestMacroCacheGating(unittest.TestCase):
 
         corr_str = repo.get_kv("macro_tips_correlation")
         self.assertIsNotNone(corr_str)
-        corr_val = float(corr_str)
+        corr_val = float(str(corr_str))
         self.assertGreaterEqual(corr_val, -1.0)
         self.assertLessEqual(corr_val, 1.0)
 
         ts_str = repo.get_kv("last_macro_update_timestamp")
         self.assertIsNotNone(ts_str)
-        self.assertGreater(int(ts_str), stale)
+        self.assertGreater(int(str(ts_str)), stale)
 
     def test_no_previous_timestamp_triggers_update(self):
         repo = _make_in_memory_repo()
@@ -222,7 +222,8 @@ class TestMacroCacheGating(unittest.TestCase):
             freq="D",
         )
         tips_series = pd.Series([2.0] * 60, index=tips_dates)
-        tips_series.index = tips_series.index.tz_localize(None)
+        dti = pd.DatetimeIndex(tips_series.index)
+        tips_series.index = dti.tz_localize(None)
 
         mock_macro = MagicMock(spec=FredMacroClient)
         mock_macro.fetch_10y_tips_yield.return_value = tips_series

@@ -5,16 +5,22 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+_fcntl: Any = None
+_msvcrt: Any = None
 
 try:
-    import fcntl  # type: ignore
+    import fcntl as _fcntl_mod
+    _fcntl = _fcntl_mod
 except ImportError:
-    fcntl = None
+    pass
 
 try:
-    import msvcrt  # type: ignore
+    import msvcrt as _msvcrt_mod
+    _msvcrt = _msvcrt_mod
 except ImportError:
-    msvcrt = None
+    pass
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -63,17 +69,17 @@ def run_pulse() -> None:
             time.sleep(delay)
 
 
-def acquire_lock(lock_file) -> bool:
-    if fcntl is not None:
+def acquire_lock(lock_file: Any) -> bool:
+    if _fcntl is not None:
         try:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _fcntl.flock(lock_file.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
             return True
         except OSError as exc:
             if exc.errno in (errno.EACCES, errno.EAGAIN):
                 return False
             raise
 
-    if msvcrt is None:
+    if _msvcrt is None:
         raise RuntimeError("No supported file lock mechanism available")
 
     try:
@@ -83,7 +89,7 @@ def acquire_lock(lock_file) -> bool:
             lock_file.flush()
             os.fsync(lock_file.fileno())
         lock_file.seek(0)
-        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        _msvcrt.locking(lock_file.fileno(), _msvcrt.LK_NBLCK, 1)
         return True
     except OSError as exc:
         if exc.errno in (errno.EACCES, errno.EAGAIN) or getattr(exc, "winerror", None) == 33:
@@ -91,13 +97,13 @@ def acquire_lock(lock_file) -> bool:
         raise
 
 
-def release_lock(lock_file) -> None:
-    if fcntl is not None:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+def release_lock(lock_file: Any) -> None:
+    if _fcntl is not None:
+        _fcntl.flock(lock_file.fileno(), _fcntl.LOCK_UN)
         return
-    if msvcrt is not None:
+    if _msvcrt is not None:
         lock_file.seek(0)
-        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        _msvcrt.locking(lock_file.fileno(), _msvcrt.LK_UNLCK, 1)
 
 
 def main() -> int:

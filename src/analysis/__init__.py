@@ -1,3 +1,3 @@
-from src.analysis.regime import RegimeDetector
+from .regime import RegimeDetector
 
 __all__ = ["RegimeDetector"]

@@ -14,7 +14,8 @@ def _recent_weekday_base() -> pd.Timestamp:
     base = pd.Timestamp.now(tz="UTC").floor("h") - pd.Timedelta(hours=3)
     while base.weekday() >= 5:
         base -= pd.Timedelta(days=1)
-    return base
+    from typing import cast
+    return cast(pd.Timestamp, base)
 
 
 def _repository_getter(last_fetch_timestamp: int):
@@ -54,17 +55,13 @@ def main() -> int:
     last_fetch_timestamp = int(base_timestamp.timestamp())
     expected_start = datetime.fromtimestamp(last_fetch_timestamp, timezone.utc)
 
-    class DummyRepository:
-        def __init__(self) -> None:
-            self.get_kv = _repository_getter(last_fetch_timestamp)
-
-        def set_kv(self, key: str, value):
-            return None
-
-        def log_error(self, provider: str, error_code: str, message: str, timestamp: int):
-            return None
-
-    repository = DummyRepository()
+    from unittest.mock import MagicMock
+    from src.persistence.repository import Repository
+    
+    repository = MagicMock(spec=Repository)
+    repository.get_kv.side_effect = _repository_getter(last_fetch_timestamp)
+    repository.set_kv.return_value = None
+    repository.log_error.return_value = None
     mock_frame = _build_mock_frame(base_timestamp)
 
     with patch("src.ingestion.yahoo_client.yf.download", return_value=mock_frame) as mocked_download:

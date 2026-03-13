@@ -6,15 +6,12 @@ Test 3: Orchestrator persistence — macro_long_bias_multiplier written as 1.25
 """
 
 import sqlite3
-import sys
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from unittest.mock import MagicMock, call
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src.analysis.sovereign import SovereignProxy
 from src.ingestion.macro_client import FredMacroClient
@@ -87,7 +84,8 @@ def test_orchestrator_persistence():
         freq="D",
     )
     tips_series = pd.Series([4.0 - i * 0.05 for i in range(60)], index=tips_dates)
-    tips_series.index = tips_series.index.tz_localize(None)
+    dti = pd.DatetimeIndex(tips_series.index)
+    tips_series.index = dti.tz_localize(None)
 
     mock_macro = MagicMock(spec=FredMacroClient)
     mock_macro.fetch_10y_tips_yield.return_value = tips_series

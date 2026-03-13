@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Optional
+from typing import Any, Optional
+
+_resource: Any = None
 
 try:
-    import resource  # type: ignore
+    import resource as _resource_mod
+    _resource = _resource_mod
 except ImportError:  # pragma: no cover - Windows
-    resource = None
+    pass
 
 
 class MemoryProfiler:
@@ -15,10 +18,10 @@ class MemoryProfiler:
         self.warning_threshold_mb = warning_threshold_mb
 
     def get_usage_mb(self) -> Optional[float]:
-        if resource is None:
+        if _resource is None:
             return None
 
-        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        usage = _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss
         if sys.platform == "darwin":
             # macOS reports bytes
             return usage / (1024 * 1024)
