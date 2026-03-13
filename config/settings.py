@@ -1,11 +1,15 @@
 import os
-from pathlib import Path
 
 # pyre-ignore[21]
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(BASE_DIR / ".env")
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+ENV_PATH = os.path.abspath(os.path.join(BASE_DIR, ".env"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "data"))
+LOGS_DIR = os.path.abspath(os.path.join(BASE_DIR, "logs"))
+
+load_dotenv(ENV_PATH)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -14,14 +18,22 @@ def _env_bool(name: str, default: bool) -> bool:
 		return default
 	return raw.strip().lower() in {"1", "true", "yes", "on"}
 
-LOCK_FILE_PATH = str(BASE_DIR / "data" / "bot.lock")
-LOG_FILE_PATH = str(BASE_DIR / "logs" / "daily-run.log")
+UAT_MODE = _env_bool("UAT_MODE", False)
+UAT_TELEGRAM_CHAT_ID = os.getenv("UAT_TELEGRAM_CHAT_ID")
+
+if UAT_MODE:
+	DB_PATH = os.path.abspath(os.path.join(DATA_DIR, "uat_trading_engine.db"))
+else:
+	DB_PATH = os.path.abspath(os.getenv("DB_PATH", os.path.join(DATA_DIR, "trading_engine.db")))
+LOCK_FILE_PATH = os.path.abspath(os.path.join(DATA_DIR, "bot.lock"))
+LOG_FILE_PATH = os.path.abspath(os.path.join(LOGS_DIR, "daily-run.log"))
 
 # Primary ingestion path (Yahoo + FRED) is keyless.
 # TwelveData is an optional fallback only.
 TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 TWELVEDATA_BASE_URL = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 PROXY_FALLBACK_ENABLED = _env_bool("PROXY_FALLBACK_ENABLED", True)
 PROXY_FALLBACK_MAX_PROXIES = int(os.getenv("PROXY_FALLBACK_MAX_PROXIES", "8"))
@@ -83,5 +95,8 @@ BIAS_LONG_THRESHOLD = 25
 BIAS_SHORT_THRESHOLD = -25
 
 # --- Candlestick Strategies ---
+ATR_SL_MULTIPLIER = 0.50
+VALUE_AREA_SMA = 20
 PIN_BAR_TAIL_RATIO = 0.66
 ENTRY_BUFFER_PTS = 0.50
+INSIDE_BAR_LOOKBACK_CANDLES = 3

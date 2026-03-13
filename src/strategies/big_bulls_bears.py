@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.settings import VALUE_AREA_SMA
 from src.domain.candle import Candle
 
 
@@ -9,14 +10,17 @@ class BigBullsBearsStrategy:
     """Trend-following retracement strategy using SMA value areas and engulfing triggers."""
 
     TREND_PERIOD = 200
-    VALUE_PERIOD = 20
+
+    def __init__(self, trend_period: int = 200, value_period: int = VALUE_AREA_SMA) -> None:
+        self.trend_period = int(trend_period)
+        self.value_period = int(value_period)
 
     def detect_setup(self, candles: list[Candle]) -> Optional[dict[str, Any]]:
-        if len(candles) < self.TREND_PERIOD:
+        if len(candles) < self.trend_period:
             return None
 
         latest_index = len(candles) - 1
-        sma_200 = self._calculate_sma(candles, latest_index, self.TREND_PERIOD)
+        sma_200 = self._calculate_sma(candles, latest_index, self.trend_period)
         if sma_200 is None:
             return None
 
@@ -100,7 +104,7 @@ class BigBullsBearsStrategy:
 
     def _find_touch_sma(self, candles: list[Candle], engulfing_index: int) -> Optional[float]:
         for candidate_index in (engulfing_index, engulfing_index - 1):
-            sma = self._calculate_sma(candles, candidate_index, self.VALUE_PERIOD)
+            sma = self._calculate_sma(candles, candidate_index, self.value_period)
             if sma is None:
                 continue
             if self._touches_sma(candles[candidate_index], sma):

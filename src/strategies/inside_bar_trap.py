@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.settings import INSIDE_BAR_LOOKBACK_CANDLES
 from src.domain.candle import Candle
 
 
 class InsideBarTrapStrategy:
     """Detect false breakouts of a mother-bar / inside-bar structure."""
 
+    def __init__(self, lookback_candles: int = INSIDE_BAR_LOOKBACK_CANDLES) -> None:
+        self.lookback_candles = int(lookback_candles)
+
     def detect_setup(self, candles: list[Candle]) -> Optional[dict[str, Any]]:
-        if len(candles) < 3:
+        if len(candles) < self.lookback_candles:
             return None
 
         mother_bar = candles[-3]

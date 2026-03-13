@@ -16,9 +16,10 @@ class Signal:
     reasoning: str
     timestamp: int
     signal_hash: str
-    telegram_message_id: str | None = None
+    telegram_message_id: int | str | None = None
     telegram_chat_id: str | None = None
     closure_reason: str | None = None
+    status: str = "PENDING"
 
     def __post_init__(self) -> None:
         timestamp = self.timestamp
@@ -29,6 +30,15 @@ class Signal:
         else:
             timestamp_value = int(timestamp)
         object.__setattr__(self, "timestamp", timestamp_value)
+
+        telegram_message_id = self.telegram_message_id
+        if telegram_message_id not in (None, ""):
+            try:
+                object.__setattr__(self, "telegram_message_id", int(telegram_message_id))
+            except (TypeError, ValueError):
+                object.__setattr__(self, "telegram_message_id", telegram_message_id)
+
+        object.__setattr__(self, "status", str(self.status).upper())
 
     @property
     def entry(self) -> float:

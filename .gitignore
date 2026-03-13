@@ -2,3 +2,11 @@
 .venv/
 __pycache__/
 *.pyc
+logs/*.log
+logs/*.jsonl
+data/backups/
+*.db-shm
+*.db-wal
+pyright_*.txt
+pyright_*.json
+sprint*_result.txt

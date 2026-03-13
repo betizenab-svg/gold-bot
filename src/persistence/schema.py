@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from typing import Iterable
+from urllib.parse import quote
+
+
+def build_local_sqlite_uri(db_path: str) -> str:
+    absolute_path = os.path.abspath(db_path)
+    normalized_path = absolute_path.replace("\\", "/")
+    escaped_path = quote(normalized_path, safe="/:")
+    # Restrict connection to a local rwc file target with no external URI params.
+    return f"file:{escaped_path}?mode=rwc"
 
 
 class SchemaInitializer:
@@ -75,6 +85,22 @@ class SchemaInitializer:
                 message TEXT,
                 timestamp INTEGER
             );
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS market_data_timestamp
+            ON market_data (timestamp);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS signals_status
+            ON signals (status, signal_hash);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS zones_status
+            ON zones (status);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS kv_store_key
+            ON kv_store (key);
             """,
         )
         cursor = self.connection.cursor()

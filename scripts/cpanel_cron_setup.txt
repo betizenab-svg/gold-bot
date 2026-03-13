@@ -1,0 +1,17 @@
+cPanel Cron Job (run once per minute)
+* * * * * cd /home/USERNAME/public_html/gold_trading_bot && /home/USERNAME/public_html/gold_trading_bot/venv/bin/python src/bot_runner.py >> logs/cron.log 2>&1
+
+Deployment Checklist
+1. Confirm the virtual environment Python path is correct:
+   /home/USERNAME/public_html/gold_trading_bot/venv/bin/python
+2. Confirm project root path is correct in cron command:
+   /home/USERNAME/public_html/gold_trading_bot
+3. Ensure executable/script permissions are owner-only where required:
+   chmod 700 src/bot_runner.py
+   chmod 700 scripts
+4. Ensure sensitive files are permission-hardened:
+   python scripts/harden_env.py
+5. Run a dry invocation before enabling cron:
+   /home/USERNAME/public_html/gold_trading_bot/venv/bin/python src/bot_runner.py
+6. Enable cron and monitor logs:
+   tail -f logs/cron.log

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from contextlib import closing
 from typing import Any, Dict, Iterable, List, Optional
 
 from src.domain.candle import Candle
@@ -11,10 +12,111 @@ from src.domain.signal import Signal
 
 class Repository:
     def __init__(self, connection: sqlite3.Connection) -> None:
-        self.connection = connection
+        self.connection: Optional[sqlite3.Connection] = None
+        self._db_path: Optional[str] = None
+        self._shared_connection_mode = False
+
+        db_path = self._extract_db_path(connection)
+        if db_path in {"", ":memory:"}:
+            self.connection = connection
+            self._shared_connection_mode = True
+            self._configure_connection(connection)
+            return
+
+        self._db_path = db_path
+        self._configure_connection(connection)
+        connection.close()
+
+    def _extract_db_path(self, connection: sqlite3.Connection) -> str:
+        try:
+            rows = connection.execute("PRAGMA database_list;").fetchall()
+        except sqlite3.Error:
+            return ""
+
+        if not rows:
+            return ""
+
+        raw_path = rows[0][2]
+        return str(raw_path).strip() if raw_path is not None else ""
+
+    def _configure_connection(self, connection: sqlite3.Connection) -> None:
+        connection.execute("PRAGMA journal_mode=WAL;")
+        connection.execute("PRAGMA foreign_keys=ON;")
+        connection.execute("PRAGMA busy_timeout=3000;")
+
+    def _open_connection(self) -> sqlite3.Connection:
+        if self._shared_connection_mode:
+            if self.connection is None:
+                raise RuntimeError("Repository connection is closed")
+            return self.connection
+
+        if not self._db_path:
+            raise RuntimeError("Repository database path is not configured")
+
+        connection = sqlite3.connect(self._db_path)
+        self._configure_connection(connection)
+        return connection
+
+    def _fetchall(self, query: str, params: Iterable[Any] = ()) -> List[tuple[Any, ...]]:
+        if self._shared_connection_mode:
+            connection = self._open_connection()
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(query, tuple(params))
+                return cursor.fetchall()
+
+        with closing(self._open_connection()) as connection:
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(query, tuple(params))
+                return cursor.fetchall()
+
+    def _fetchone(self, query: str, params: Iterable[Any] = ()) -> Optional[tuple[Any, ...]]:
+        if self._shared_connection_mode:
+            connection = self._open_connection()
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(query, tuple(params))
+                return cursor.fetchone()
+
+        with closing(self._open_connection()) as connection:
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(query, tuple(params))
+                return cursor.fetchone()
+
+    def _execute(self, query: str, params: Iterable[Any] = ()) -> None:
+        if self._shared_connection_mode:
+            connection = self._open_connection()
+            with connection:
+                with closing(connection.cursor()) as cursor:
+                    cursor.execute(query, tuple(params))
+            return
+
+        with closing(self._open_connection()) as connection:
+            with connection:
+                with closing(connection.cursor()) as cursor:
+                    cursor.execute(query, tuple(params))
+
+    def _executemany(self, query: str, payload: List[tuple[Any, ...]]) -> None:
+        if not payload:
+            return
+
+        if self._shared_connection_mode:
+            connection = self._open_connection()
+            with connection:
+                with closing(connection.cursor()) as cursor:
+                    cursor.executemany(query, payload)
+            return
+
+        with closing(self._open_connection()) as connection:
+            with connection:
+                with closing(connection.cursor()) as cursor:
+                    cursor.executemany(query, payload)
+
+    def close(self) -> None:
+        if self._shared_connection_mode and self.connection is not None:
+            self.connection.close()
+            self.connection = None
 
     def save_candle(self, candle: Dict[str, Any]) -> None:
-        self.connection.execute(
+        self._execute(
             """
             INSERT OR REPLACE INTO market_data (
                 symbol, timeframe, timestamp, open, high, low, close, volume
@@ -31,7 +133,6 @@ class Repository:
                 candle.get("volume"),
             ),
         )
-        self.connection.commit()
 
     def save_candles(self, candles: Iterable[Candle]) -> None:
         payload = [
@@ -47,9 +148,7 @@ class Repository:
             )
             for candle in candles
         ]
-        if not payload:
-            return
-        self.connection.executemany(
+        self._executemany(
             """
             INSERT OR REPLACE INTO market_data (
                 symbol, timeframe, timestamp, open, high, low, close, volume
@@ -57,7 +156,6 @@ class Repository:
             """,
             payload,
         )
-        self.connection.commit()
 
     def get_recent_candles(
         self, symbol: str, timeframe: str, limit: int = 100
@@ -65,7 +163,7 @@ class Repository:
         if limit <= 0:
             return []
 
-        cursor = self.connection.execute(
+        rows = self._fetchall(
             """
             SELECT symbol, timeframe, timestamp, open, high, low, close, volume
             FROM (
@@ -79,7 +177,6 @@ class Repository:
             """,
             (symbol, timeframe, limit),
         )
-        rows = cursor.fetchall()
         return [
             Candle(
                 symbol=row[0],
@@ -95,11 +192,10 @@ class Repository:
         ]
 
     def get_kv(self, key: str) -> Optional[str]:
-        cursor = self.connection.execute(
+        row = self._fetchone(
             "SELECT value FROM kv_store WHERE key = ?;",
             (key,),
         )
-        row = cursor.fetchone()
         return row[0] if row else None
 
     def set_kv(self, key: str, value: Any) -> None:
@@ -108,7 +204,7 @@ class Repository:
         else:
             stored_value = str(value)
         updated_at = int(time.time())
-        self.connection.execute(
+        self._execute(
             """
             INSERT INTO kv_store (key, value, updated_at)
             VALUES (?, ?, ?)
@@ -118,7 +214,6 @@ class Repository:
             """,
             (key, stored_value, updated_at),
         )
-        self.connection.commit()
 
     def update_watermark(self, symbol: str, timeframe: str, timestamp: int) -> None:
         key = f"last_fetch_{symbol}_{timeframe}"
@@ -126,7 +221,7 @@ class Repository:
 
     def log_signal(self, signal: Dict[str, Any]) -> bool:
         try:
-            self.connection.execute(
+            self._execute(
                 """
                 INSERT INTO signals (
                     signal_hash, symbol, type, entry, sl, tp1, tp2, created_at, status
@@ -144,20 +239,19 @@ class Repository:
                     signal.get("status"),
                 ),
             )
-            self.connection.commit()
             return True
         except sqlite3.IntegrityError:
             return False
 
     def is_signal_duplicate(self, signal_hash: str) -> bool:
-        cursor = self.connection.execute(
+        row = self._fetchone(
             "SELECT 1 FROM signals WHERE signal_hash = ? LIMIT 1;",
             (signal_hash,),
         )
-        return cursor.fetchone() is not None
+        return row is not None
 
     def save_signal(self, signal: Signal) -> None:
-        self.connection.execute(
+        self._execute(
             """
             INSERT INTO signals (
                 signal_hash,
@@ -202,10 +296,66 @@ class Repository:
                 signal.telegram_chat_id,
                 signal.closure_reason,
                 signal.timestamp,
-                "PENDING",
+                signal.status,
             ),
         )
-        self.connection.commit()
+
+    def get_open_signals(self) -> List[Signal]:
+        rows = self._fetchall(
+            """
+            SELECT
+                signal_hash,
+                symbol,
+                COALESCE(signal_type, type) AS signal_type,
+                COALESCE(entry_price, entry) AS entry_price,
+                COALESCE(sl_price, sl) AS sl_price,
+                COALESCE(tp1_price, tp1) AS tp1_price,
+                COALESCE(tp2_price, tp2) AS tp2_price,
+                COALESCE(score, 0) AS score,
+                COALESCE(reasoning, '') AS reasoning,
+                COALESCE(timestamp, created_at, 0) AS timestamp,
+                telegram_message_id,
+                telegram_chat_id,
+                closure_reason,
+                status
+            FROM signals
+            WHERE status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
+            ORDER BY created_at ASC, id ASC;
+            """
+        )
+        signals: List[Signal] = []
+        for row in rows:
+            if row[0] is None or row[1] is None:
+                continue
+            signals.append(
+                Signal(
+                    signal_hash=str(row[0]),
+                    symbol=str(row[1]),
+                    signal_type=str(row[2] or ""),
+                    entry_price=float(row[3]),
+                    sl_price=float(row[4]),
+                    tp1_price=float(row[5]),
+                    tp2_price=float(row[6]),
+                    score=int(row[7] or 0),
+                    reasoning=str(row[8] or ""),
+                    timestamp=int(row[9] or 0),
+                    telegram_message_id=row[10],
+                    telegram_chat_id=str(row[11]) if row[11] is not None else None,
+                    closure_reason=str(row[12]) if row[12] is not None else None,
+                    status=str(row[13] or "PENDING"),
+                )
+            )
+        return signals
+
+    def update_signal_status(self, signal_hash: str, new_status: str) -> None:
+        self._execute(
+            """
+            UPDATE signals
+            SET status = ?
+            WHERE signal_hash = ?;
+            """,
+            (str(new_status).upper(), signal_hash),
+        )
 
     def update_signal_telegram_metadata(
         self,
@@ -213,7 +363,7 @@ class Repository:
         telegram_message_id: str,
         telegram_chat_id: str,
     ) -> None:
-        self.connection.execute(
+        self._execute(
             """
             UPDATE signals
             SET telegram_message_id = ?, telegram_chat_id = ?
@@ -221,7 +371,30 @@ class Repository:
             """,
             (str(telegram_message_id), str(telegram_chat_id), signal_hash),
         )
-        self.connection.commit()
+
+    def update_signal_message_id(self, signal_hash: str, message_id: int) -> None:
+        self._execute(
+            """
+            UPDATE signals
+            SET telegram_message_id = ?
+            WHERE signal_hash = ?;
+            """,
+            (int(message_id), signal_hash),
+        )
+
+    def get_signal_message_id(self, signal_hash: str) -> int:
+        row = self._fetchone(
+            """
+            SELECT telegram_message_id
+            FROM signals
+            WHERE signal_hash = ?
+            LIMIT 1;
+            """,
+            (signal_hash,),
+        )
+        if row is None or row[0] is None:
+            raise KeyError(f"No telegram_message_id found for signal_hash={signal_hash}")
+        return int(row[0])
 
     def update_signal_closure(
         self,
@@ -229,7 +402,7 @@ class Repository:
         closure_reason: str,
         status: str,
     ) -> None:
-        self.connection.execute(
+        self._execute(
             """
             UPDATE signals
             SET closure_reason = ?, status = ?
@@ -237,11 +410,10 @@ class Repository:
             """,
             (closure_reason, status, signal_hash),
         )
-        self.connection.commit()
 
     def save_zone(self, zone: Dict[str, Any]) -> None:
         created_at = int(zone.get("created_at", int(time.time())))
-        self.connection.execute(
+        self._execute(
             """
             INSERT INTO zones (
                 symbol, timeframe, type, price_top, price_bottom, status, created_at
@@ -257,10 +429,9 @@ class Repository:
                 created_at,
             ),
         )
-        self.connection.commit()
 
     def get_active_zones(self, symbol: str) -> List[Dict[str, Any]]:
-        cursor = self.connection.execute(
+        rows = self._fetchall(
             """
             SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
             FROM zones
@@ -269,7 +440,6 @@ class Repository:
             """,
             (symbol,),
         )
-        rows = cursor.fetchall()
         return [
             {
                 "id": row[0],
@@ -284,19 +454,90 @@ class Repository:
             for row in rows
         ]
 
-    def update_zone_statuses(self, updated_zones: List[Dict[str, Any]]) -> None:
-        payload = [
-            (
-                str(zone.get("status")),
-                int(zone.get("id")),
-            )
-            for zone in updated_zones
-            if zone.get("id") is not None and zone.get("status") is not None
+    def get_recent_order_blocks(self, symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
+        rows = self._fetchall(
+            """
+            SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
+            FROM zones
+            WHERE symbol = ?
+              AND status IN ('ACTIVE', 'UNMITIGATED', 'MITIGATED')
+              AND type IN ('OB_BULLISH', 'OB_BEARISH')
+            ORDER BY created_at DESC
+            LIMIT ?;
+            """,
+            (symbol, limit),
+        )
+        return [
+            {
+                "id": row[0],
+                "symbol": row[1],
+                "timeframe": row[2],
+                "type": row[3],
+                "price_top": float(row[4]),
+                "price_bottom": float(row[5]),
+                "status": row[6],
+                "created_at": int(row[7]),
+            }
+            for row in rows
         ]
-        if not payload:
-            return
 
-        self.connection.executemany(
+    def get_recent_unmitigated_fvgs(
+        self,
+        symbol: str,
+        timeframe: str,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        rows = self._fetchall(
+            """
+            SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
+            FROM zones
+            WHERE symbol = ?
+              AND timeframe = ?
+              AND status = 'UNMITIGATED'
+              AND type IN ('FVG_BULLISH', 'FVG_BEARISH')
+            ORDER BY created_at DESC
+            LIMIT ?;
+            """,
+            (symbol, timeframe, limit),
+        )
+        return [
+            {
+                "id": row[0],
+                "symbol": row[1],
+                "timeframe": row[2],
+                "type": row[3],
+                "price_top": float(row[4]),
+                "price_bottom": float(row[5]),
+                "status": row[6],
+                "created_at": int(row[7]),
+            }
+            for row in rows
+        ]
+
+    def get_gold_closes_since(self, cutoff_timestamp: int) -> List[tuple[int, float]]:
+        rows = self._fetchall(
+            """
+            SELECT timestamp, close
+            FROM market_data
+            WHERE symbol = ? AND timestamp >= ?
+            ORDER BY timestamp ASC;
+            """,
+            ("XAUUSD", cutoff_timestamp),
+        )
+        output: List[tuple[int, float]] = []
+        for row in rows:
+            output.append((int(row[0]), float(row[1])))
+        return output
+
+    def update_zone_statuses(self, updated_zones: List[Dict[str, Any]]) -> None:
+        payload: List[tuple[str, int]] = []
+        for zone in updated_zones:
+            zone_id = zone.get("id")
+            zone_status = zone.get("status")
+            if zone_id is None or zone_status is None:
+                continue
+            payload.append((str(zone_status), int(zone_id)))
+        self._executemany(
             """
             UPDATE zones
             SET status = ?
@@ -304,14 +545,12 @@ class Repository:
             """,
             payload,
         )
-        self.connection.commit()
 
     def log_error(self, provider: str, error_code: str, message: str, timestamp: int) -> None:
-        self.connection.execute(
+        self._execute(
             """
             INSERT INTO errors (provider, error_code, message, timestamp)
             VALUES (?, ?, ?, ?);
             """,
             (provider, error_code, message, timestamp),
         )
-        self.connection.commit()

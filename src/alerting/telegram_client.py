@@ -1,48 +1,76 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Optional
-from urllib import request
 
-from config.settings import TELEGRAM_BOT_TOKEN
+import requests
+
+from config.settings import (
+    TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID,
+    UAT_MODE,
+    UAT_TELEGRAM_CHAT_ID,
+)
+
+
+class TelegramAPIError(RuntimeError):
+    """Raised when the Telegram Bot API request fails or returns an invalid payload."""
 
 
 class TelegramClient:
-    """Minimal Telegram Bot API client with reply-thread support."""
+    """Synchronous Telegram Bot API client for cron-safe alert delivery."""
 
     def __init__(
         self,
         bot_token: Optional[str] = None,
+        chat_id: Optional[str] = None,
         base_url: str = "https://api.telegram.org",
         timeout_seconds: int = 15,
     ) -> None:
         self.bot_token = bot_token or TELEGRAM_BOT_TOKEN
+        default_chat_id = UAT_TELEGRAM_CHAT_ID if UAT_MODE else TELEGRAM_CHAT_ID
+        self.chat_id = chat_id or default_chat_id
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
     def send_message(
         self,
-        chat_id: str,
         text: str,
-        reply_to_message_id: Optional[str] = None,
-    ) -> dict[str, Any]:
+        reply_to_message_id: int | None = None,
+    ) -> int:
         if not self.bot_token:
             raise ValueError("TELEGRAM_BOT_TOKEN is not configured")
+        if not self.chat_id:
+            raise ValueError("TELEGRAM_CHAT_ID is not configured")
 
         payload: dict[str, Any] = {
-            "chat_id": str(chat_id),
+            "chat_id": str(self.chat_id),
             "text": str(text),
+            "parse_mode": "HTML",
         }
         if reply_to_message_id is not None:
-            payload["reply_to_message_id"] = str(reply_to_message_id)
+            payload["reply_to_message_id"] = int(reply_to_message_id)
 
         endpoint = f"{self.base_url}/bot{self.bot_token}/sendMessage"
-        http_request = request.Request(
-            endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with request.urlopen(http_request, timeout=self.timeout_seconds) as response:
-            body = response.read().decode("utf-8")
-        return json.loads(body)
+        try:
+            response = requests.post(
+                endpoint,
+                json=payload,
+                timeout=self.timeout_seconds,
+            )
+        except requests.Timeout as exc:
+            raise TelegramAPIError("Telegram API request timed out") from exc
+        except requests.RequestException as exc:
+            raise TelegramAPIError(f"Telegram API request failed: {exc}") from exc
+
+        if response.status_code != 200:
+            raise TelegramAPIError(
+                f"Telegram API returned status {response.status_code}: {response.text}"
+            )
+
+        try:
+            payload_json = response.json()
+            message_id = int(payload_json["result"]["message_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TelegramAPIError("Telegram API response missing result.message_id") from exc
+
+        return message_id

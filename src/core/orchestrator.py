@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+import gc
 # Trigger linter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Optional, cast
@@ -14,7 +15,10 @@ import numpy as np
 import pandas as pd
 
 from config.database import get_connection
+from src.core.logger import StructuredLogger
 from src.core.telemetry import MemoryProfiler
+from src.alerting.lifecycle_manager import LifecycleManager
+from src.alerting.telegram_client import TelegramAPIError, TelegramClient
 from src.analysis.crisis import CrisisDetector
 from src.analysis.regime import RegimeDetector
 from src.analysis.sovereign import SovereignProxy
@@ -41,7 +45,12 @@ from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
-from config.settings import DXY_TICKER, DXY_CORRELATION_WINDOW, TIMEFRAME_SECONDS, FSR_LOOKBACK_PERIOD
+from config.settings import (
+    DXY_TICKER,
+    DXY_CORRELATION_WINDOW,
+    TIMEFRAME_SECONDS,
+    FSR_LOOKBACK_PERIOD,
+)
 from src.analysis.fsr_engine import FSREngine
 from src.analysis.bias_engine import MacroBiasAggregator
 from src.strategies.inside_bar_trap import InsideBarTrapStrategy
@@ -63,19 +72,39 @@ class PulseOrchestrator:
         regime_detector: Optional[RegimeDetector] = None,
         sovereign_proxy: Optional[SovereignProxy] = None,
         crisis_detector: Optional[CrisisDetector] = None,
+        telegram_client_factory: Optional[Callable[[], TelegramClient]] = None,
+        lifecycle_manager_factory: Optional[Callable[[Repository], LifecycleManager]] = None,
+        structured_logger: Optional[StructuredLogger] = None,
     ) -> None:
         self.repository_factory = repository_factory or self._default_repository_factory
         self.client_factory = client_factory or get_market_data_client
         self.memory_profiler = memory_profiler or MemoryProfiler()
+        self.structured_logger = structured_logger
         self.macro_client = macro_client or FredMacroClient()
         self.regime_detector = regime_detector or RegimeDetector()
         self.sovereign_proxy = sovereign_proxy or SovereignProxy()
         self.crisis_detector = crisis_detector or CrisisDetector()
+        self.telegram_client_factory = telegram_client_factory or self._default_telegram_client_factory
+        self.lifecycle_manager_factory = (
+            lifecycle_manager_factory or self._default_lifecycle_manager_factory
+        )
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
         SchemaInitializer(connection).initialize()
         return Repository(connection)
+
+    def _default_telegram_client_factory(self) -> TelegramClient:
+        return TelegramClient()
+
+    def _default_lifecycle_manager_factory(
+        self,
+        repository: Repository,
+    ) -> LifecycleManager:
+        return LifecycleManager(
+            telegram_client=self.telegram_client_factory(),
+            repository=repository,
+        )
 
     def _mock_client(self, repository: Repository):
         symbol = os.getenv("MOCK_SYMBOL", "XAUUSD")
@@ -121,14 +150,7 @@ class PulseOrchestrator:
         cutoff = datetime.now(timezone.utc) - timedelta(days=MACRO_HISTORY_DAYS)
         cutoff_ts = int(cutoff.timestamp())
 
-        rows = repository.connection.execute(
-            """
-            SELECT timestamp, close FROM market_data
-            WHERE symbol = 'XAUUSD' AND timestamp >= ?
-            ORDER BY timestamp ASC;
-            """,
-            (cutoff_ts,),
-        ).fetchall()
+        rows = repository.get_gold_closes_since(cutoff_ts)
 
         if not rows:
             return pd.Series(dtype=float)
@@ -303,34 +325,9 @@ class PulseOrchestrator:
             return inside_bar_setup
 
         try:
-            rows = repository.connection.execute(
-                """
-                SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
-                FROM zones
-                WHERE symbol = ?
-                  AND status IN ('ACTIVE', 'UNMITIGATED', 'MITIGATED')
-                  AND type IN ('OB_BULLISH', 'OB_BEARISH')
-                ORDER BY created_at DESC
-                LIMIT 20;
-                """,
-                (symbol,),
-            ).fetchall()
+            order_blocks = repository.get_recent_order_blocks(symbol, limit=20)
         except Exception:
             return None
-
-        order_blocks = [
-            {
-                "id": row[0],
-                "symbol": row[1],
-                "timeframe": row[2],
-                "type": row[3],
-                "price_top": float(row[4]),
-                "price_bottom": float(row[5]),
-                "status": row[6],
-                "created_at": int(row[7]),
-            }
-            for row in rows
-        ]
         if not order_blocks:
             return None
 
@@ -406,6 +403,32 @@ class PulseOrchestrator:
 
         repository.update_zone_statuses(updated_zones)
         logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
+
+    def _monitor_open_signals(
+        self,
+        repository: Repository,
+        current_candle: Candle,
+    ) -> None:
+        lifecycle_manager = self.lifecycle_manager_factory(repository)
+        open_signals = repository.get_open_signals()
+        if open_signals is None:
+            return
+        if not isinstance(open_signals, list):
+            try:
+                open_signals = list(open_signals)
+            except TypeError:
+                logging.info("Open signal payload is not iterable; skipping lifecycle monitor")
+                return
+        if not open_signals:
+            return
+
+        lifecycle_manager.process_open_signals(
+            open_signals=open_signals,
+            current_candle=current_candle,
+            telegram_client=lifecycle_manager.telegram_client,
+            repository=repository,
+            formatter=lifecycle_manager.formatter,
+        )
 
     def _evaluate_market_structure(
         self,
@@ -496,38 +519,14 @@ class PulseOrchestrator:
         limit: int = 10,
     ) -> List[dict[str, Any]]:
         try:
-            rows = repository.connection.execute(
-                """
-                SELECT id, symbol, timeframe, type, price_top, price_bottom, status, created_at
-                FROM zones
-                WHERE symbol = ?
-                  AND timeframe = ?
-                  AND status = 'UNMITIGATED'
-                  AND type IN ('FVG_BULLISH', 'FVG_BEARISH')
-                ORDER BY created_at DESC
-                LIMIT ?;
-                """,
-                (symbol, timeframe, limit),
-            ).fetchall()
+            rows = repository.get_recent_unmitigated_fvgs(symbol, timeframe, limit)
         except Exception:
             return []
 
         if not isinstance(rows, list):
             return []
 
-        return [
-            {
-                "id": row[0],
-                "symbol": row[1],
-                "timeframe": row[2],
-                "type": row[3],
-                "price_top": float(row[4]),
-                "price_bottom": float(row[5]),
-                "status": row[6],
-                "created_at": int(row[7]),
-            }
-            for row in rows
-        ]
+        return rows
 
     def _scan_for_fvg_zones(
         self,
@@ -598,7 +597,7 @@ class PulseOrchestrator:
         recent_candles: List[Candle],
         current_candle: Candle,
         total_score: int,
-    ) -> None:
+    ) -> tuple[bool, int]:
         zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
         trade_direction = str(potential_setup["trade_direction"])
         signal_context: dict[str, Any] = dict(zone)
@@ -621,10 +620,41 @@ class PulseOrchestrator:
 
         if repository.is_signal_duplicate(signal.signal_hash):
             logging.info("Skipped duplicate signal: %s", signal.signal_hash)
-            return
+            return False, 0
 
         repository.save_signal(signal)
         logging.info("Saved actionable signal: %s", signal.signal_hash)
+
+        lifecycle_manager = self.lifecycle_manager_factory(repository)
+        target_chat_id = getattr(lifecycle_manager.telegram_client, "chat_id", None)
+        if not target_chat_id:
+            logging.info(
+                "Telegram chat id not configured (including UAT routing); skipping signal dispatch for %s",
+                signal.signal_hash,
+            )
+            return True, 0
+
+        sl_distance_pips = abs(float(signal.entry_price) - float(signal.sl_price))
+        try:
+            initial_message_id, reasoning_message_id = lifecycle_manager.deploy_signal(
+                signal,
+                sl_distance_pips=sl_distance_pips,
+                chat_id=str(target_chat_id),
+            )
+            logging.info(
+                "Telegram signal dispatched: signal=%s initial_message_id=%s reasoning_message_id=%s",
+                signal.signal_hash,
+                initial_message_id,
+                reasoning_message_id,
+            )
+        except (TelegramAPIError, ValueError) as exc:
+            logging.error(
+                "Telegram dispatch failed for signal %s: %s",
+                signal.signal_hash,
+                exc,
+            )
+            return True, 1
+        return True, 0
 
     def _run_macro_regime_check(self, repository: Repository) -> None:
         """Run the macro regime detection, gated behind a 24-hour cache."""
@@ -778,21 +808,48 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.error("Failed to update Global Macro Bias: %s", exc)
 
-    def run(self) -> None:
+    @staticmethod
+    def _build_forced_setup(current_candle: Candle) -> dict[str, Any]:
+        entry_price = round(float(current_candle.close), 2)
+        sl_price = round(entry_price - 2.00, 2)
+        return {
+            "trade_direction": "LONG",
+            "strategy": "UAT_FORCE_SIGNAL",
+            "entry_price": entry_price,
+            "sl_price": sl_price,
+            "zone": {
+                "id": int(current_candle.timestamp),
+                "symbol": current_candle.symbol,
+                "timeframe": current_candle.timeframe,
+                "type": "UAT_OB_BULLISH",
+                "status": "ACTIVE",
+                "entry_price": entry_price,
+                "sl_price": sl_price,
+                "strategy": "UAT_FORCE_SIGNAL",
+            },
+        }
+
+    def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
-        start_time = time.time()
+        structured_logger = self.structured_logger or StructuredLogger()
+        self.memory_profiler.start_timer()
         self.memory_profiler.log_snapshot("Pulse start")
 
         symbol = "XAUUSD"
         timeframe = "M1"
-        repository = self.repository_factory()
+        repository: Optional[Repository] = None
+        signals_generated = 0
+        errors_encountered = 0
         try:
+            repository = self.repository_factory()
             # --- Macro Regime Check (24-hour gated) ---
             try:
                 self._run_macro_regime_check(repository)
             except MacroDataError as exc:
+                errors_encountered += 1
                 logging.error("Macro regime check failed: %s", exc)
             except Exception as exc:
+                errors_encountered += 1
                 logging.error("Unexpected macro regime error: %s", exc)
             if os.getenv("MOCK_INGESTION") == "1":
                 client: Any = self._mock_client(repository)
@@ -804,6 +861,7 @@ class PulseOrchestrator:
             try:
                 candles = client.fetch_latest_candles(symbol, timeframe)
             except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
+                errors_encountered += 1
                 logging.error("Ingestion failed: %s", exc)
                 return
 
@@ -811,6 +869,7 @@ class PulseOrchestrator:
 
             total_count = len(candles)
             valid_candles = validator.filter_candles(candles)
+            del candles
             filtered = total_count - len(valid_candles)
             logging.info("Candles received: %s, valid: %s", total_count, len(valid_candles))
             if filtered:
@@ -824,6 +883,7 @@ class PulseOrchestrator:
             latest_timestamp = max(candle.timestamp for candle in valid_candles)
             repository.set_kv("last_processed_timestamp", latest_timestamp)
             current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
+            self._monitor_open_signals(repository, current_candle)
             self._evaluate_zone_lifecycle(repository, symbol, current_candle)
 
             detector = FractalDetector()
@@ -839,6 +899,25 @@ class PulseOrchestrator:
                 recent_bos_type,
                 recent_fvgs,
             )
+
+            if force_signal:
+                logging.info("UAT force-signal enabled; bypassing permission and scoring engines")
+                forced_setup = self._build_forced_setup(current_candle)
+                try:
+                    signal_saved, signal_errors = self._persist_actionable_signal(
+                        repository,
+                        forced_setup,
+                        recent_candles,
+                        current_candle,
+                        100,
+                    )
+                    if signal_saved:
+                        signals_generated += 1
+                    errors_encountered += signal_errors
+                except Exception as exc:
+                    errors_encountered += 1
+                    logging.error("Failed to persist forced UAT signal: %s", exc)
+                return
 
             potential_setup = self._detect_trade_setup(
                 repository,
@@ -859,9 +938,6 @@ class PulseOrchestrator:
                         potential_setup.get("trade_direction"),
                         permission_reason,
                     )
-                    elapsed = time.time() - start_time
-                    self.memory_profiler.log_snapshot("Pulse end")
-                    logging.info("Pulse finished in %.2fs", elapsed)
                     return
 
                 scoring_engine = ScoringEngine()
@@ -904,18 +980,55 @@ class PulseOrchestrator:
                     classification,
                 )
                 if classification == "ACTIONABLE":
-                    self._persist_actionable_signal(
-                        repository,
-                        cast(dict[str, Any], potential_setup),
-                        recent_candles,
-                        current_candle,
-                        total_score,
-                    )
+                    try:
+                        signal_saved, signal_errors = self._persist_actionable_signal(
+                            repository,
+                            cast(dict[str, Any], potential_setup),
+                            recent_candles,
+                            current_candle,
+                            total_score,
+                        )
+                        if signal_saved:
+                            signals_generated += 1
+                        errors_encountered += signal_errors
+                    except Exception as exc:
+                        errors_encountered += 1
+                        logging.error("Failed to persist actionable signal: %s", exc)
 
-            elapsed = time.time() - start_time
-            self.memory_profiler.log_snapshot("Pulse end")
-            logging.info("Pulse finished in %.2fs", elapsed)
+            # Release large pulse objects before returning control to scheduler.
+            del recent_fvgs
+            del recent_candles
+            del valid_candles
+            gc.collect()
+        except Exception:
+            errors_encountered += 1
+            logging.exception("Pulse failed unexpectedly")
+            raise
         finally:
-            if hasattr(repository, "connection"):
-                repository.connection.close()
+            execution_time_ms_raw = self.memory_profiler.stop_timer()
+            peak_memory_mb_raw = self.memory_profiler.get_peak_memory_mb()
+            try:
+                execution_time_ms = float(execution_time_ms_raw)
+            except (TypeError, ValueError):
+                execution_time_ms = 0.0
+            try:
+                peak_memory_mb = float(peak_memory_mb_raw)
+            except (TypeError, ValueError):
+                peak_memory_mb = 0.0
+            telemetry_data = {
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "execution_time_ms": round(execution_time_ms, 2),
+                "peak_memory_mb": round(peak_memory_mb, 2),
+                "signals_generated": int(signals_generated),
+                "errors_encountered": int(errors_encountered),
+            }
+            try:
+                structured_logger.log_pulse_telemetry(telemetry_data)
+            except Exception as exc:
+                logging.error("Telemetry logging failed: %s", exc)
+
+            self.memory_profiler.log_snapshot("Pulse end")
+            logging.info("Pulse finished in %.2fs", execution_time_ms / 1000.0)
+            if repository is not None and hasattr(repository, "close"):
+                repository.close()
             logging.info("---- Pulse ended ----")

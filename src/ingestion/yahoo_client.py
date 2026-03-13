@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import gc
 from typing import Any, List, Optional, Tuple, cast
 import logging
 
@@ -133,22 +134,22 @@ class YahooFinanceClient:
             self.circuit_breaker.record_failure("YAHOO", "EMPTY_RESPONSE", message)
             raise DataIngestionError(message)
 
-        normalized = self._normalize_columns(frame)
-        normalized = self._normalize_index_to_utc(normalized)
+        df = self._normalize_columns(frame)
+        df = self._normalize_index_to_utc(df)
 
         required_columns = ["Open", "High", "Low", "Close", "Volume"]
-        missing_columns = [column for column in required_columns if column not in normalized.columns]
+        missing_columns = [column for column in required_columns if column not in df.columns]
         if missing_columns:
             self.circuit_breaker.record_failure("YAHOO", "MALFORMED_RESPONSE", ",".join(missing_columns))
             raise DataIngestionError(f"Yahoo Finance response missing columns: {', '.join(missing_columns)}")
 
-        normalized = cast(pd.DataFrame, normalized[required_columns])
-        normalized = self._aggregate_frame(normalized, resample_rule)
+        df = cast(pd.DataFrame, df[required_columns])
+        df = self._aggregate_frame(df, resample_rule)
         ohlc_cols = ["Open", "High", "Low", "Close"]
-        normalized = normalized[normalized[ohlc_cols].notna().all(axis=1)]
+        df = df[df[ohlc_cols].notna().all(axis=1)]
 
         candles: List[Candle] = []
-        for timestamp, row in normalized.iterrows():
+        for timestamp, row in df.iterrows():
             row_data: Any = row
             epoch_timestamp = int(cast(Any, timestamp).timestamp())
             if epoch_timestamp <= last_timestamp:
@@ -167,6 +168,9 @@ class YahooFinanceClient:
                     volume=volume,
                 )
             )
+
+        del df
+        gc.collect()
 
         validator = DataValidator()
         valid_candles = validator.filter_candles(candles)

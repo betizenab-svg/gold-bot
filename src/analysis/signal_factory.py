@@ -4,11 +4,15 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any
 
+from config.settings import ATR_SL_MULTIPLIER
+from src.analysis.position_sizing import LotSizeCalculator
 from src.domain.signal import Signal
 
 
 class SignalFactory:
     """Construct executable signal objects from actionable setups."""
+
+    LOT_SIZE_TABLE_MARKER = "\n\n[LOT_SIZE_TABLE]\n"
 
     def calculate_parameters(
         self,
@@ -37,13 +41,13 @@ class SignalFactory:
 
             if direction == "LONG":
                 entry = price_top
-                sl = price_bottom - (0.5 * atr_value)
+                sl = price_bottom - (ATR_SL_MULTIPLIER * atr_value)
                 risk = entry - sl
                 tp1 = entry + (1.5 * risk)
                 tp2 = entry + (3.0 * risk)
             elif direction == "SHORT":
                 entry = price_bottom
-                sl = price_top + (0.5 * atr_value)
+                sl = price_top + (ATR_SL_MULTIPLIER * atr_value)
                 risk = sl - entry
                 tp1 = entry - (1.5 * risk)
                 tp2 = entry - (3.0 * risk)
@@ -73,7 +77,9 @@ class SignalFactory:
         entry, sl, tp1, tp2 = self.calculate_parameters(signal_type, zone_dict, atr)
         zone_status = str(zone_dict.get("status", "UNKNOWN")).title()
         zone_type = str(zone_dict.get("type", "ZONE")).replace("_", " ")
-        reasoning = f"Score: {int(score)}. Entry off {zone_status} {zone_type}."
+        base_reasoning = f"Score: {int(score)}. Entry off {zone_status} {zone_type}."
+        lot_size_table = LotSizeCalculator().generate_table(entry, sl)
+        reasoning = f"{base_reasoning}{self.LOT_SIZE_TABLE_MARKER}{lot_size_table}"
 
         zone_id = zone_dict.get("id", zone_dict.get("zone_id"))
         strategy_key = zone_dict.get("strategy")

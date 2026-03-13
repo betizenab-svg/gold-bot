@@ -9,7 +9,15 @@ from src.domain.candle import Candle
 class PinBarRejectionStrategy:
     """Detect pin-bar rejection setups around active SMC support or resistance zones."""
 
-    ZONE_PROXIMITY_USD = 1.00
+    def __init__(
+        self,
+        tail_ratio: float = PIN_BAR_TAIL_RATIO,
+        entry_buffer_pts: float = ENTRY_BUFFER_PTS,
+        zone_proximity_usd: float = 1.00,
+    ) -> None:
+        self.tail_ratio = float(tail_ratio)
+        self.entry_buffer_pts = float(entry_buffer_pts)
+        self.zone_proximity_usd = float(zone_proximity_usd)
 
     def is_valid_pin_bar(self, candle: Candle) -> Optional[str]:
         total_length = float(candle.high) - float(candle.low)
@@ -17,7 +25,7 @@ class PinBarRejectionStrategy:
             return None
 
         body_length = abs(float(candle.close) - float(candle.open))
-        required_tail = total_length * PIN_BAR_TAIL_RATIO
+        required_tail = total_length * self.tail_ratio
 
         bullish_tail = min(float(candle.open), float(candle.close)) - float(candle.low)
         if bullish_tail >= required_tail and bullish_tail > body_length:
@@ -52,12 +60,12 @@ class PinBarRejectionStrategy:
 
         if pin_bar_bias == "BULLISH":
             trade_direction = "LONG"
-            entry_price = float(current_candle.high) + ENTRY_BUFFER_PTS
-            sl_price = float(current_candle.low) - ENTRY_BUFFER_PTS
+            entry_price = float(current_candle.high) + self.entry_buffer_pts
+            sl_price = float(current_candle.low) - self.entry_buffer_pts
         else:
             trade_direction = "SHORT"
-            entry_price = float(current_candle.low) - ENTRY_BUFFER_PTS
-            sl_price = float(current_candle.high) + ENTRY_BUFFER_PTS
+            entry_price = float(current_candle.low) - self.entry_buffer_pts
+            sl_price = float(current_candle.high) + self.entry_buffer_pts
 
         return {
             "strategy": "PIN_BAR_REJECTION",
@@ -100,7 +108,7 @@ class PinBarRejectionStrategy:
             near_boundary = min(
                 abs(probe_price - price_top),
                 abs(probe_price - price_bottom),
-            ) < self.ZONE_PROXIMITY_USD
+            ) < self.zone_proximity_usd
 
             if intersects_zone or near_boundary:
                 return zone

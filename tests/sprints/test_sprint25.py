@@ -72,7 +72,7 @@ def test_lot_size_calculator() -> None:
 
     assert "$100" in table
     assert "$50000" in table
-    assert "BASELINE" in table
+    assert "baseline" in table.lower()
 
 
 def test_signal_formatter() -> None:
@@ -91,22 +91,22 @@ def test_signal_formatter() -> None:
     )
 
     initial_signal = formatter.format_initial_signal(signal)
-    expected = (
-        "Market execution/pending order\n"
-        "entry @ 2000.50\n"
-        "sl @ 1990.00\n"
-        "tp 1 @ 2010.00\n"
-        "tp 2 @ 2020.00"
-    )
-    assert initial_signal == expected
+    assert "🚨 <b>Signal Alert</b>" in initial_signal
+    assert "🟡 <b>Status:</b> market execution/pending order" in initial_signal
+    assert "entry @ <code>2000.50</code>" in initial_signal
+    assert "sl @ <code>1990.00</code>" in initial_signal
+    assert "tp 1 @ <code>2010.00</code>" in initial_signal
+    assert "tp 2 @ <code>2020.00</code>" in initial_signal
 
     alert_message, explanation_message = formatter.format_lifecycle_update(
         "TP1_SMASH",
-        "Price hit key resistance",
+        "Hit resistance at 2010.00",
     )
     assert isinstance(alert_message, str)
     assert isinstance(explanation_message, str)
-    assert "Price hit key resistance" in explanation_message
+    assert "TP 1 Smashed" in alert_message
+    assert "<b>Reason:</b>" in explanation_message
+    assert "<code>2010.00</code>" in explanation_message
 
 
 def test_strategy_logic() -> None:

@@ -58,14 +58,31 @@ def test_signal_formatter() -> None:
     )
 
     formatted = formatter.format_initial_signal(signal)
-    expected = (
-        "Market execution/pending order\n"
-        "entry @ 2015.00\n"
-        "sl @ 2008.00\n"
-        "tp 1 @ 2025.50\n"
-        "tp 2 @ 2036.00"
+    assert "🚨 <b>Signal Alert</b>" in formatted
+    assert "🟡 <b>Status:</b> market execution/pending order" in formatted
+    assert "entry @ <code>2015.00</code>" in formatted
+    assert "sl @ <code>2008.00</code>" in formatted
+    assert "tp 1 @ <code>2025.50</code>" in formatted
+    assert "tp 2 @ <code>2036.00</code>" in formatted
+
+    reasoning = formatter.format_trade_reasoning(
+        signal,
+        "Assumed baseline balance for this signal is $100.\n\nBalance   Lot Size",
     )
-    assert formatted == expected
+    assert "🧠 <b>Trade Reasoning</b>" in reasoning
+    assert "📌 <b>Symbol:</b> XAUUSD" in reasoning
+    assert "📈 <b>Direction:</b> LONG" in reasoning
+    assert "🎯 <b>Confluence Score:</b> 81" in reasoning
+    assert "<b>Technical + Fundamental Summary</b>" in reasoning
+    assert "<b>Risk and Position Sizing</b>" in reasoning
+    assert "Assumed baseline balance for this signal is $100." in reasoning
+
+    alert_message, explanation_message = formatter.format_lifecycle_update(
+        "TP1_SMASH",
+        "Hit resistance at 2025.50",
+    )
+    assert "TP 1 Smashed" in alert_message
+    assert "<code>2025.50</code>" in explanation_message
 
 
 def test_lot_size_calculator() -> None:
@@ -75,13 +92,14 @@ def test_lot_size_calculator() -> None:
     for balance in ("$50", "$100", "$200", "$500", "$700", "$1000", "$2000", "$5000", "$10000", "$50000"):
         assert balance in table
     assert "Assumed baseline balance for this signal is $100." in table
+    assert "Balance   Lot Size" in table
 
 
 def test_trade_reasoning_reply_threading() -> None:
     telegram_client = MagicMock()
     telegram_client.send_message.side_effect = [
-        {"result": {"message_id": 12345}},
-        {"result": {"message_id": 12346}},
+        12345,
+        12346,
     ]
     repository = MagicMock()
     lifecycle_manager = LifecycleManager(
@@ -106,7 +124,11 @@ def test_trade_reasoning_reply_threading() -> None:
 
     assert telegram_client.send_message.call_count == 2
     _, reasoning_call = telegram_client.send_message.call_args_list
-    assert reasoning_call.kwargs["reply_to_message_id"] == "12345"
+    assert reasoning_call.kwargs["reply_to_message_id"] == 12345
+    repository.update_signal_message_id.assert_called_once_with(
+        signal_hash="signal-27",
+        message_id=12345,
+    )
     repository.update_signal_telegram_metadata.assert_called_once_with(
         signal_hash="signal-27",
         telegram_message_id="12345",
@@ -117,8 +139,8 @@ def test_trade_reasoning_reply_threading() -> None:
 def test_lifecycle_manager_threading() -> None:
     telegram_client = MagicMock()
     telegram_client.send_message.side_effect = [
-        {"result": {"message_id": 22345}},
-        {"result": {"message_id": 22346}},
+        22345,
+        22346,
     ]
     lifecycle_manager = LifecycleManager(telegram_client=telegram_client)
     signal = Signal(
@@ -144,8 +166,8 @@ def test_lifecycle_manager_threading() -> None:
 
     assert telegram_client.send_message.call_count == 2
     first_call, second_call = telegram_client.send_message.call_args_list
-    assert first_call.kwargs["reply_to_message_id"] == "67890"
-    assert second_call.kwargs["reply_to_message_id"] == "67890"
+    assert first_call.kwargs["reply_to_message_id"] == 67890
+    assert second_call.kwargs["reply_to_message_id"] == 67890
 
 
 def main() -> None:

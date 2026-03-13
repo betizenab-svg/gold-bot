@@ -1,18 +1,15 @@
 import os
-from pathlib import Path
 import sqlite3
 
-from dotenv import load_dotenv
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(BASE_DIR / ".env")
-
-DB_PATH = Path(os.getenv("DB_PATH", BASE_DIR / "data" / "trading_engine.db"))
+from config.settings import DB_PATH
+from src.persistence.schema import build_local_sqlite_uri
 
 
 def get_connection() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    conn = sqlite3.connect(build_local_sqlite_uri(DB_PATH), uri=True)
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("PRAGMA busy_timeout=3000;")
