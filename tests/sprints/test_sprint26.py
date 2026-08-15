@@ -3,6 +3,8 @@ from src.analysis.signal_factory import SignalFactory
 from src.domain.candle import Candle
 from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
 
+import pytest
+
 
 def _make_candle(
     open_price: float,
@@ -23,15 +25,24 @@ def _make_candle(
     )
 
 
-def test_pin_bar_recognition() -> Candle:
-    strategy = PinBarRejectionStrategy()
-
-    bullish_pin_bar = _make_candle(
+def _build_valid_bullish_pin_bar() -> Candle:
+    return _make_candle(
         open_price=2008.00,
         close_price=2010.00,
         high_price=2010.00,
         low_price=2000.00,
     )
+
+
+@pytest.fixture
+def valid_bullish_pin_bar() -> Candle:
+    return _build_valid_bullish_pin_bar()
+
+
+def test_pin_bar_recognition() -> None:
+    strategy = PinBarRejectionStrategy()
+
+    bullish_pin_bar = _build_valid_bullish_pin_bar()
     assert strategy.is_valid_pin_bar(bullish_pin_bar) == "BULLISH"
 
     invalid_pin_bar = _make_candle(
@@ -51,7 +62,6 @@ def test_pin_bar_recognition() -> Candle:
         timestamp=1_700_000_120,
     )
     assert strategy.is_valid_pin_bar(strict_rejection) is None
-    return bullish_pin_bar
 
 
 def test_setup_and_buffer_calculation_long(valid_bullish_pin_bar: Candle) -> None:
@@ -95,7 +105,8 @@ def test_setup_rejection_no_zone(valid_bullish_pin_bar: Candle) -> None:
 def main() -> None:
     assert PIN_BAR_TAIL_RATIO == 0.66
     assert ENTRY_BUFFER_PTS == 0.50
-    valid_bullish_pin_bar = test_pin_bar_recognition()
+    valid_bullish_pin_bar = _build_valid_bullish_pin_bar()
+    test_pin_bar_recognition()
     test_setup_and_buffer_calculation_long(valid_bullish_pin_bar)
     test_setup_rejection_no_zone(valid_bullish_pin_bar)
     print("Sprint 26 Pin Bar Rejection Strategy Verified")

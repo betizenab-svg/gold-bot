@@ -29,7 +29,11 @@ class MarketStructureEngine:
         current_candle: Candle,
         last_swing_point: Optional[Mapping[str, Any]],
         current_trend: str,
+        confirmation_close: Optional[float] = None,
     ) -> bool:
+        """Body-close break of the trend swing. When confirmation_close (the
+        prior candle's close) is provided, both closes must clear the swing
+        (book rule: a break needs two consecutive closes, one bar is a trap)."""
         swing_price = self._extract_swing_price(last_swing_point)
         if swing_price is None:
             return False
@@ -38,9 +42,11 @@ class MarketStructureEngine:
         trend = current_trend.upper()
 
         if trend == "BULLISH":
-            return close_price > swing_price
+            confirmed = confirmation_close is None or float(confirmation_close) > swing_price
+            return close_price > swing_price and confirmed
         if trend == "BEARISH":
-            return close_price < swing_price
+            confirmed = confirmation_close is None or float(confirmation_close) < swing_price
+            return close_price < swing_price and confirmed
         return False
 
     def detect_choch(

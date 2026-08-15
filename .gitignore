@@ -10,3 +10,5 @@ data/backups/
 pyright_*.txt
 pyright_*.json
 sprint*_result.txt
+# Copyrighted reference material - never publish
+books/

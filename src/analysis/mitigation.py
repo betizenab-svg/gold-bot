@@ -21,6 +21,7 @@ class ZoneLifecycleManager:
 
         for zone in active_zones:
             zone_type = str(zone.get("type", ""))
+            current_status = str(zone.get("status", "")).upper()
             price_top = float(zone.get("price_top", 0.0))
             price_bottom = float(zone.get("price_bottom", 0.0))
             new_status: str | None = None
@@ -29,12 +30,14 @@ class ZoneLifecycleManager:
                 if float(current_candle.close) < price_bottom:
                     new_status = "INVALIDATED"
                 elif float(current_candle.low) <= price_top:
-                    new_status = "MITIGATED"
+                    # First touch mitigates; a second touch consumes the zone
+                    # (book consensus: fresh zones only, >=2 touches = dead).
+                    new_status = "INVALIDATED" if current_status == "MITIGATED" else "MITIGATED"
             else:
                 if float(current_candle.close) > price_top:
                     new_status = "INVALIDATED"
                 elif float(current_candle.high) >= price_bottom:
-                    new_status = "MITIGATED"
+                    new_status = "INVALIDATED" if current_status == "MITIGATED" else "MITIGATED"
 
             if new_status is None or new_status == zone.get("status"):
                 continue

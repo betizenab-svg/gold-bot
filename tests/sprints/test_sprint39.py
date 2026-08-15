@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 import scripts.backup_db as backup_db
 import scripts.health_check as health_check
@@ -42,6 +43,41 @@ def _seed_dummy_db(db_path: Path) -> None:
         conn.execute("DELETE FROM signals;")
         conn.execute("INSERT INTO signals (signal_hash, status) VALUES ('dummy-hash', 'ACTIVE');")
         conn.commit()
+
+
+@pytest.fixture
+def data_dir() -> Path:
+    return Path(BASE_DIR) / "data"
+
+
+@pytest.fixture
+def backups_dir(data_dir: Path) -> Path:
+    return data_dir / "backups"
+
+
+@pytest.fixture
+def db_path(data_dir: Path, backups_dir: Path):
+    # These scripts operate on the production DB path, so tests seed a
+    # disposable DB there and restore whatever existed before.
+    target = data_dir / "trading_engine.db"
+    backup_of_original = None
+    if target.exists():
+        backup_of_original = target.read_bytes()
+    _seed_dummy_db(target)
+    yield target
+    try:
+        if backup_of_original is not None:
+            target.write_bytes(backup_of_original)
+        elif target.exists():
+            target.unlink()
+    except PermissionError:
+        pass
+    if backups_dir.exists():
+        for path in backups_dir.glob("trading_engine_*.db"):
+            try:
+                path.unlink()
+            except PermissionError:
+                pass
 
 
 def test_backup_script(db_path: Path, backups_dir: Path) -> None:

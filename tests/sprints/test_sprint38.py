@@ -4,7 +4,15 @@ import os
 from random import uniform
 from unittest.mock import patch
 
+import pytest
+
+from config.settings import BASE_DIR
 from src.domain.candle import Candle
+
+
+@pytest.fixture
+def project_root() -> str:
+    return str(BASE_DIR)
 
 
 def _dummy_candles(count: int = 50) -> list[Candle]:

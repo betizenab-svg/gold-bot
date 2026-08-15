@@ -9,7 +9,7 @@ class LotSizeCalculator:
     BASELINE_BALANCE = 100
     PIP_MULTIPLIER = 10.0
     STANDARD_LOT_PIP_VALUE = 10.0
-    BASELINE_NOTE = "Baseline recommendation: $100 balance is the baseline assumption for these lot sizes."
+    BASELINE_NOTE = "<b>Baseline Assumption ($100):</b>"
     LEGACY_BASELINE_TEXT = "Assumed baseline balance for this signal is $100."
 
     def calculate_pips(self, entry_price: float, sl_price: float) -> float:

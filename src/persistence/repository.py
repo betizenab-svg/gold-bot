@@ -32,12 +32,21 @@ class Repository:
             rows = connection.execute("PRAGMA database_list;").fetchall()
         except sqlite3.Error:
             return ""
-
-        if not rows:
+        except Exception:
+            # Non-sqlite doubles (test mocks) fall back to shared-connection mode.
             return ""
 
-        raw_path = rows[0][2]
-        return str(raw_path).strip() if raw_path is not None else ""
+        if not isinstance(rows, list) or not rows:
+            return ""
+
+        try:
+            raw_path = rows[0][2]
+        except (TypeError, IndexError, KeyError):
+            return ""
+
+        if not isinstance(raw_path, str):
+            return ""
+        return raw_path.strip()
 
     def _configure_connection(self, connection: sqlite3.Connection) -> None:
         connection.execute("PRAGMA journal_mode=WAL;")
@@ -100,9 +109,8 @@ class Repository:
 
         if self._shared_connection_mode:
             connection = self._open_connection()
-            with connection:
-                with closing(connection.cursor()) as cursor:
-                    cursor.executemany(query, payload)
+            connection.executemany(query, payload)
+            connection.commit()
             return
 
         with closing(self._open_connection()) as connection:
@@ -273,8 +281,10 @@ class Repository:
                 telegram_chat_id,
                 closure_reason,
                 created_at,
-                status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                status,
+                order_type,
+                strategy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 signal.signal_hash,
@@ -297,6 +307,8 @@ class Repository:
                 signal.closure_reason,
                 signal.timestamp,
                 signal.status,
+                getattr(signal, "order_type", "LIMIT"),
+                getattr(signal, "strategy", None),
             ),
         )
 
@@ -317,7 +329,9 @@ class Repository:
                 telegram_message_id,
                 telegram_chat_id,
                 closure_reason,
-                status
+                status,
+                COALESCE(order_type, 'LIMIT') AS order_type,
+                strategy
             FROM signals
             WHERE status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
             ORDER BY created_at ASC, id ASC;
@@ -343,6 +357,8 @@ class Repository:
                     telegram_chat_id=str(row[11]) if row[11] is not None else None,
                     closure_reason=str(row[12]) if row[12] is not None else None,
                     status=str(row[13] or "PENDING"),
+                    order_type=str(row[14] or "LIMIT"),
+                    strategy=str(row[15]) if row[15] is not None else None,
                 )
             )
         return signals
@@ -553,4 +569,55 @@ class Repository:
             VALUES (?, ?, ?, ?);
             """,
             (provider, error_code, message, timestamp),
+        )
+
+    def count_signals_since(self, cutoff_timestamp: int) -> int:
+        row = self._fetchone(
+            """
+            SELECT COUNT(*)
+            FROM signals
+            WHERE COALESCE(timestamp, created_at, 0) >= ?;
+            """,
+            (int(cutoff_timestamp),),
+        )
+        if row is None or row[0] is None:
+            return 0
+        return int(row[0])
+
+    def get_strategy_outcomes(self, strategy: str, limit: int = 30) -> List[str]:
+        rows = self._fetchall(
+            """
+            SELECT status
+            FROM signals
+            WHERE strategy = ?
+              AND status IN ('CLOSED_TP2', 'CLOSED_SL', 'CLOSED_BE')
+            ORDER BY id DESC
+            LIMIT ?;
+            """,
+            (str(strategy), int(limit)),
+        )
+        return [str(row[0]) for row in rows if row and row[0] is not None]
+
+    def update_signal_excursions(self, signal_hash: str, mfe_r: float, mae_r: float) -> None:
+        """Ratchet max favorable/adverse excursion (in R) for open signals."""
+        self._execute(
+            """
+            UPDATE signals
+            SET mfe_r = MAX(COALESCE(mfe_r, 0.0), ?),
+                mae_r = MAX(COALESCE(mae_r, 0.0), ?)
+            WHERE signal_hash = ?;
+            """,
+            (round(float(mfe_r), 4), round(float(mae_r), 4), signal_hash),
+        )
+
+    def prune_market_data(self, retention_days: int) -> None:
+        # Anchor to the newest stored candle (not wall clock) so backfilled or
+        # historical datasets are never wiped wholesale.
+        row = self._fetchone("SELECT MAX(timestamp) FROM market_data;")
+        if row is None or row[0] is None:
+            return
+        cutoff = int(row[0]) - int(retention_days) * 86400
+        self._execute(
+            "DELETE FROM market_data WHERE timestamp < ?;",
+            (cutoff,),
         )

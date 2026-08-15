@@ -13,7 +13,11 @@ def test_initial_message_sending_and_id_capture() -> None:
     response.json.return_value = {"ok": True, "result": {"message_id": 4455}}
 
     with patch("src.alerting.telegram_client.requests.post", return_value=response) as post_mock:
-        client = TelegramClient(bot_token="token-123", chat_id="chat-123")
+        client = TelegramClient(
+            bot_token="token-123",
+            chat_id="chat-123",
+            base_url="https://api.telegram.org",
+        )
         message_id = client.send_message("Initial Signal")
 
     assert message_id == 4455

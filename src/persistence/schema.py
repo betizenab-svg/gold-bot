@@ -117,6 +117,10 @@ class SchemaInitializer:
         self._ensure_column(cursor, "signals", "telegram_message_id", "TEXT")
         self._ensure_column(cursor, "signals", "telegram_chat_id", "TEXT")
         self._ensure_column(cursor, "signals", "closure_reason", "TEXT")
+        self._ensure_column(cursor, "signals", "order_type", "TEXT")
+        self._ensure_column(cursor, "signals", "strategy", "TEXT")
+        self._ensure_column(cursor, "signals", "mfe_r", "REAL")
+        self._ensure_column(cursor, "signals", "mae_r", "REAL")
         self.connection.commit()
 
     def _ensure_column(

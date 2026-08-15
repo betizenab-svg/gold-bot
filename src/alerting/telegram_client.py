@@ -5,6 +5,7 @@ from typing import Any, Optional
 import requests
 
 from config.settings import (
+    TELEGRAM_API_BASE_URL,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     UAT_MODE,
@@ -23,13 +24,13 @@ class TelegramClient:
         self,
         bot_token: Optional[str] = None,
         chat_id: Optional[str] = None,
-        base_url: str = "https://api.telegram.org",
+        base_url: Optional[str] = None,
         timeout_seconds: int = 15,
     ) -> None:
         self.bot_token = bot_token or TELEGRAM_BOT_TOKEN
         default_chat_id = UAT_TELEGRAM_CHAT_ID if UAT_MODE else TELEGRAM_CHAT_ID
         self.chat_id = chat_id or default_chat_id
-        self.base_url = base_url.rstrip("/")
+        self.base_url = (base_url or TELEGRAM_API_BASE_URL).rstrip("/")
         self.timeout_seconds = timeout_seconds
 
     def send_message(

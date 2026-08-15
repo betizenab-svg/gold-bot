@@ -93,6 +93,15 @@ class SignalFormatter:
                 "🎬 GIF: https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif"
             )
             explanation_title = "Reason"
+        elif normalized_type == "BE_HIT":
+            alert_message = "⚖️ <b>Breakeven Exit</b>\nRunner closed at entry after TP1 was banked."
+            explanation_title = "Reason"
+        elif normalized_type == "EXPIRED":
+            alert_message = "⌛ <b>Signal Expired</b>\nEntry was never triggered; order cancelled."
+            explanation_title = "Reason"
+        elif normalized_type == "TIME_STOP":
+            alert_message = "⏱️ <b>Time Stop</b>\nTrade stalled without reaching TP1; closed flat."
+            explanation_title = "Reason"
         else:
             raise ValueError(f"Unsupported lifecycle update type: {update_type}")
 

@@ -1,0 +1,57 @@
+name: Gold Bot Pulse
+
+# Runs the signal engine every 5 minutes on GitHub's free runners.
+# State (SQLite DB) is committed back to the repo after each pulse so the
+# next run continues where this one stopped.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+# Never allow two pulses to run at the same time (replaces the cPanel file lock).
+concurrency:
+  group: gold-bot-pulse
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository (with state DB)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run one pulse
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          SIGNAL_TIMEFRAME: "M5"
+          BOT_LOG_LEVEL: "INFO"
+        run: python src/bot_runner.py
+
+      - name: Save state back to the repository
+        run: |
+          git config user.name "gold-bot"
+          git config user.email "gold-bot@users.noreply.github.com"
+          git add data/trading_engine.db
+          if git diff --cached --quiet; then
+            echo "No state changes to commit."
+            exit 0
+          fi
+          git commit -m "pulse: state update [skip ci]"
+          # Retry push once after rebasing, in case a manual commit landed meanwhile.
+          git push || (git pull --rebase && git push)

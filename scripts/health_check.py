@@ -36,9 +36,7 @@ def check_yahoo() -> bool:
 
 
 def check_telegram() -> bool:
-    if not TELEGRAM_BOT_TOKEN:
-        return False
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN or ''}/getMe"
     response = requests.get(url, timeout=15)
     return response.status_code == 200
 
@@ -61,9 +59,7 @@ def main() -> int:
         if not ok:
             all_ok = False
 
-    if not all_ok:
-        sys.exit(1)
-    return 0
+    return 0 if all_ok else 1
 
 
 if __name__ == "__main__":

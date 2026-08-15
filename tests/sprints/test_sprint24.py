@@ -52,10 +52,11 @@ def test_parameter_math_long() -> None:
         atr=4.00,
     )
 
+    # SL = zone bottom - 1.5*ATR; TP1/TP2 = 1.5R/3R from the widened stop.
     assert entry == 2000.00
-    assert sl == 1988.00
-    assert tp1 == 2018.00
-    assert tp2 == 2036.00
+    assert sl == 1984.00
+    assert tp1 == 2024.00
+    assert tp2 == 2048.00
 
 
 def test_parameter_math_short() -> None:
@@ -67,9 +68,9 @@ def test_parameter_math_short() -> None:
     )
 
     assert entry == 2010.00
-    assert sl == 2023.00
-    assert tp1 == 1990.50
-    assert tp2 == 1971.00
+    assert sl == 2029.00
+    assert tp1 == 1981.50
+    assert tp2 == 1953.00
 
 
 def test_hash_deduplication() -> None:

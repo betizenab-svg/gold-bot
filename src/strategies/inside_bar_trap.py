@@ -73,6 +73,7 @@ class InsideBarTrapStrategy:
             "timeframe": trigger_candle.timeframe,
             "strategy": "INSIDE_BAR_TRAP",
             "trade_direction": trade_direction,
+            "order_type": "STOP",
             "trigger": trigger,
             "entry_price": round(float(entry_price), 2),
             "sl_price": round(float(sl_price), 2),

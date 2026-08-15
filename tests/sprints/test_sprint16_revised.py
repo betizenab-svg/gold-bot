@@ -3,8 +3,10 @@ import datetime
 import pandas as pd
 from unittest.mock import patch, MagicMock
 
+from config.settings import BASE_DIR
+
 def test_dynamic_calibration():
-    report_path = os.path.join(os.path.dirname(__file__), "data", "calibration_report.csv")
+    report_path = os.path.join(BASE_DIR, "data", "calibration_report.csv")
     if os.path.exists(report_path):
         os.remove(report_path) # Clean state
         

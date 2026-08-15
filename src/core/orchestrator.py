@@ -46,13 +46,19 @@ from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
 from config.settings import (
+    ANALYSIS_LOOKBACK_CANDLES,
     DXY_TICKER,
     DXY_CORRELATION_WINDOW,
+    MARKET_DATA_RETENTION_DAYS,
+    SIGNAL_TIMEFRAME,
     TIMEFRAME_SECONDS,
     FSR_LOOKBACK_PERIOD,
 )
 from src.analysis.fsr_engine import FSREngine
 from src.analysis.bias_engine import MacroBiasAggregator
+from src.analysis.confluence import ConfluenceEngineV2
+from src.analysis.risk_governor import RiskGovernor
+from src.analysis.trendline import TrendlineEngine
 from src.strategies.inside_bar_trap import InsideBarTrapStrategy
 from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
 
@@ -108,7 +114,7 @@ class PulseOrchestrator:
 
     def _mock_client(self, repository: Repository):
         symbol = os.getenv("MOCK_SYMBOL", "XAUUSD")
-        timeframe = os.getenv("MOCK_TIMEFRAME", "M1")
+        timeframe = os.getenv("MOCK_TIMEFRAME", SIGNAL_TIMEFRAME)
         candles_per_run = int(os.getenv("MOCK_CANDLES_PER_RUN", "1"))
         delay_seconds = float(os.getenv("MOCK_DELAY_SECONDS", "0"))
         start_timestamp = int(os.getenv("MOCK_START_TIMESTAMP", str(int(time.time()))))
@@ -230,6 +236,40 @@ class PulseOrchestrator:
         x_src = np.arange(len(values), dtype=float)
         x_dst = np.linspace(0.0, float(len(values) - 1), num=target_length)
         return list(np.interp(x_dst, x_src, np.array(values, dtype=float)))
+
+    @staticmethod
+    def _calculate_smt_state(
+        gold_series: pd.Series,
+        dxy_series: pd.Series,
+        window: int = 20,
+    ) -> tuple[Optional[str], float]:
+        """Z-score of gold's spread vs inverted DXY. |z| >= 2 flags a stretched
+        divergence that historically mean-reverts (SMT / correlation books)."""
+        if gold_series.empty or dxy_series.empty:
+            return None, 0.0
+
+        common_dates = gold_series.index.intersection(dxy_series.index)
+        if len(common_dates) < 10:
+            return None, 0.0
+
+        gold = gold_series.loc[common_dates].tail(window).astype(float)
+        dxy = dxy_series.loc[common_dates].tail(window).astype(float)
+        if len(gold) < 10 or float(gold.iloc[0]) == 0 or float(dxy.iloc[0]) == 0:
+            return None, 0.0
+
+        gold_norm = gold / float(gold.iloc[0])
+        dxy_inverted = 2.0 - (dxy / float(dxy.iloc[0]))
+        spread = gold_norm - dxy_inverted
+        std = float(spread.std())
+        if std <= 0:
+            return "NEUTRAL", 0.0
+
+        z_score = (float(spread.iloc[-1]) - float(spread.mean())) / std
+        if z_score >= 2.0:
+            return "GOLD_RICH", z_score
+        if z_score <= -2.0:
+            return "GOLD_CHEAP", z_score
+        return "NEUTRAL", z_score
 
     @staticmethod
     def _parse_swing_point(raw_value: Optional[str]) -> Optional[dict[str, float | int]]:
@@ -389,6 +429,17 @@ class PulseOrchestrator:
         if swing_low is not None:
             repository.set_kv("last_swing_low", swing_low)
 
+        # Rolling pivot history feeds the Brooks trendline gate.
+        try:
+            raw_history = repository.get_kv("swing_history")
+            history = TrendlineEngine.update_history(
+                raw_history if isinstance(raw_history, str) else None,
+                latest_fractals,
+            )
+            repository.set_kv("swing_history", json.dumps(history))
+        except Exception as exc:
+            logging.debug("Swing history update skipped: %s", exc)
+
     def _evaluate_zone_lifecycle(
         self,
         repository: Repository,
@@ -397,7 +448,21 @@ class PulseOrchestrator:
     ) -> None:
         lifecycle_manager = ZoneLifecycleManager()
         active_zones = repository.get_active_zones(symbol)
-        updated_zones = lifecycle_manager.evaluate_zones(current_candle, active_zones)
+        zones_to_check = list(active_zones) if isinstance(active_zones, list) else []
+
+        # Include once-touched (MITIGATED) order blocks so a second touch
+        # consumes them (fresh-zones-only book rule).
+        try:
+            recent_obs = repository.get_recent_order_blocks(symbol, limit=20)
+        except Exception:
+            recent_obs = []
+        if isinstance(recent_obs, list):
+            seen_ids = {zone.get("id") for zone in zones_to_check}
+            for zone in recent_obs:
+                if str(zone.get("status", "")).upper() == "MITIGATED" and zone.get("id") not in seen_ids:
+                    zones_to_check.append(zone)
+
+        updated_zones = lifecycle_manager.evaluate_zones(current_candle, zones_to_check)
         if not updated_zones:
             return
 
@@ -434,6 +499,7 @@ class PulseOrchestrator:
         self,
         repository: Repository,
         current_candle: Candle,
+        prev_close: Optional[float] = None,
     ) -> Optional[str]:
         structure_engine = MarketStructureEngine()
 
@@ -467,6 +533,7 @@ class PulseOrchestrator:
             current_candle=current_candle,
             last_swing_point=trend_swing,
             current_trend=current_trend,
+            confirmation_close=prev_close,
         ):
             logging.info(
                 "BOS detected: trend=%s timestamp=%s close=%.2f",
@@ -601,7 +668,16 @@ class PulseOrchestrator:
         zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
         trade_direction = str(potential_setup["trade_direction"])
         signal_context: dict[str, Any] = dict(zone)
-        for key in ("entry_price", "sl_price", "strategy", "trigger", "zone_id"):
+        for key in (
+            "entry_price",
+            "sl_price",
+            "strategy",
+            "trigger",
+            "zone_id",
+            "order_type",
+            "confluence_notes",
+            "measured_move",
+        ):
             if key in potential_setup:
                 signal_context[key] = potential_setup[key]
         if "id" not in signal_context and "zone_id" in potential_setup:
@@ -720,6 +796,16 @@ class PulseOrchestrator:
         else:
             logging.info("Insufficient data for crisis filter")
 
+        # --- SMT divergence (gold stretched vs the dollar) ---
+        try:
+            smt_state, smt_z = self._calculate_smt_state(gold_daily_for_dxy, dxy_series)
+            if smt_state is not None:
+                repository.set_kv("macro_smt_state", smt_state)
+                repository.set_kv("macro_smt_z", f"{smt_z:.2f}")
+                logging.info("SMT divergence: z=%.2f state=%s", smt_z, smt_state)
+        except Exception as exc:
+            logging.error("Failed to update SMT divergence: %s", exc)
+
         # --- Commitment of Traders (COT) Index ---
         try:
             cot_client = CotClient(repository=repository)
@@ -775,16 +861,18 @@ class PulseOrchestrator:
                 fsr_gold = gold_series.tail(FSR_LOOKBACK_PERIOD).tolist()
                 if len(fsr_gold) == FSR_LOOKBACK_PERIOD:
                     if len(surprise_observations) < 2:
-                        logging.info("FSR Engine skipped: insufficient surprise observations (%d)", len(surprise_observations))
+                        # No calendar surprises available: use a flat surprise
+                        # series so FSR still tracks price momentum.
+                        aligned_surprise = [0.0] * FSR_LOOKBACK_PERIOD
                     else:
                         aligned_surprise = self._align_series(surprise_observations, FSR_LOOKBACK_PERIOD)
-                        fsr_engine = FSREngine()
-                        fsr_value = fsr_engine.calculate_fsr(fsr_gold, aligned_surprise)
-                        fsr_state = fsr_engine.evaluate_fsr_state(fsr_value)
+                    fsr_engine = FSREngine()
+                    fsr_value = fsr_engine.calculate_fsr(fsr_gold, aligned_surprise)
+                    fsr_state = fsr_engine.evaluate_fsr_state(fsr_value)
 
-                        repository.set_kv("macro_fsr_value", f"{fsr_value:.4f}")
-                        repository.set_kv("macro_fsr_state", fsr_state)
-                        logging.info("FSR Engine: value=%.4f, state=%s", fsr_value, fsr_state)
+                    repository.set_kv("macro_fsr_value", f"{fsr_value:.4f}")
+                    repository.set_kv("macro_fsr_state", fsr_state)
+                    logging.info("FSR Engine: value=%.4f, state=%s", fsr_value, fsr_state)
                 else:
                     logging.info("FSR Engine skipped: Not enough gold series data (%d < %d)", len(fsr_gold), FSR_LOOKBACK_PERIOD)
             else:
@@ -815,6 +903,7 @@ class PulseOrchestrator:
         return {
             "trade_direction": "LONG",
             "strategy": "UAT_FORCE_SIGNAL",
+            "order_type": "LIMIT",
             "entry_price": entry_price,
             "sl_price": sl_price,
             "zone": {
@@ -829,6 +918,90 @@ class PulseOrchestrator:
             },
         }
 
+    def _maybe_prune_market_data(self, repository: Repository) -> None:
+        """Keep the SQLite file small: prune old candles once per day."""
+        now = int(time.time())
+        try:
+            last_prune = int(repository.get_kv("last_prune_timestamp") or 0)
+        except (TypeError, ValueError):
+            last_prune = 0
+        if now - last_prune < 86400:
+            return
+        try:
+            repository.prune_market_data(MARKET_DATA_RETENTION_DAYS)
+            repository.set_kv("last_prune_timestamp", str(now))
+            logging.info("Pruned market_data older than %d days", MARKET_DATA_RETENTION_DAYS)
+        except Exception as exc:
+            logging.debug("Market data prune skipped: %s", exc)
+
+    # Second attempt at the same level within this bar window scores a bonus
+    # (Brooks: "the second signal is more reliable").
+    SECOND_ATTEMPT_MIN_BARS = 3
+    SECOND_ATTEMPT_MAX_BARS = 20
+    SECOND_ATTEMPT_TOLERANCE_USD = 2.0
+
+    def _is_second_attempt(
+        self,
+        repository: Repository,
+        trade_direction: str,
+        entry_hint: Optional[float],
+        current_candle: Candle,
+    ) -> bool:
+        if entry_hint is None:
+            return False
+        try:
+            raw = repository.get_kv("last_setup_attempt")
+        except Exception:
+            return False
+        if not raw or not isinstance(raw, str):
+            return False
+        try:
+            prior = json.loads(raw)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(prior, dict):
+            return False
+
+        try:
+            prior_price = float(prior["price"])
+            prior_ts = int(prior["timestamp"])
+            prior_direction = str(prior["direction"]).upper()
+        except (KeyError, TypeError, ValueError):
+            return False
+
+        if prior_direction != trade_direction.upper():
+            return False
+
+        step = int(TIMEFRAME_SECONDS.get(current_candle.timeframe, 60))
+        age_bars = (int(current_candle.timestamp) - prior_ts) / step if step else 0
+        if not (self.SECOND_ATTEMPT_MIN_BARS <= age_bars <= self.SECOND_ATTEMPT_MAX_BARS):
+            return False
+
+        return abs(float(entry_hint) - prior_price) <= self.SECOND_ATTEMPT_TOLERANCE_USD
+
+    def _record_setup_attempt(
+        self,
+        repository: Repository,
+        trade_direction: str,
+        entry_hint: Optional[float],
+        current_candle: Candle,
+    ) -> None:
+        if entry_hint is None:
+            return
+        try:
+            repository.set_kv(
+                "last_setup_attempt",
+                json.dumps(
+                    {
+                        "price": float(entry_hint),
+                        "direction": trade_direction.upper(),
+                        "timestamp": int(current_candle.timestamp),
+                    }
+                ),
+            )
+        except Exception as exc:
+            logging.debug("Setup attempt record skipped: %s", exc)
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
@@ -836,7 +1009,7 @@ class PulseOrchestrator:
         self.memory_profiler.log_snapshot("Pulse start")
 
         symbol = "XAUUSD"
-        timeframe = "M1"
+        timeframe = SIGNAL_TIMEFRAME
         repository: Optional[Repository] = None
         signals_generated = 0
         errors_encountered = 0
@@ -883,15 +1056,25 @@ class PulseOrchestrator:
             latest_timestamp = max(candle.timestamp for candle in valid_candles)
             repository.set_kv("last_processed_timestamp", latest_timestamp)
             current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
+            self._maybe_prune_market_data(repository)
             self._monitor_open_signals(repository, current_candle)
             self._evaluate_zone_lifecycle(repository, symbol, current_candle)
 
             detector = FractalDetector()
-            recent_candles = repository.get_recent_candles(symbol, timeframe, 100)
+            recent_candles = repository.get_recent_candles(
+                symbol, timeframe, ANALYSIS_LOOKBACK_CANDLES
+            )
             latest_fractals = detector.find_fractals(recent_candles)
             self._persist_latest_fractals(repository, latest_fractals)
             self._evaluate_liquidity_sweep(repository, recent_candles, current_candle)
-            recent_bos_type = self._evaluate_market_structure(repository, current_candle)
+            prev_close = (
+                float(recent_candles[-2].close)
+                if isinstance(recent_candles, list) and len(recent_candles) >= 2
+                else None
+            )
+            recent_bos_type = self._evaluate_market_structure(
+                repository, current_candle, prev_close
+            )
             recent_fvgs = self._scan_for_fvg_zones(repository, recent_candles)
             self._scan_for_order_blocks(
                 repository,
@@ -940,7 +1123,13 @@ class PulseOrchestrator:
                     )
                     return
 
-                scoring_engine = ScoringEngine()
+                governor = RiskGovernor()
+                trading_allowed, governor_reason = governor.is_trading_allowed(
+                    repository, int(current_candle.timestamp)
+                )
+                if not trading_allowed:
+                    logging.info("Setup blocked: %s", governor_reason)
+                    return
 
                 raw_macro_bias_state = repository.get_kv("macro_bias_state")
                 if raw_macro_bias_state is None:
@@ -962,14 +1151,88 @@ class PulseOrchestrator:
                     latest_sweep=latest_sweep,
                 )
 
-                total_score = scoring_engine.calculate_total_score(
-                    trade_direction=str(potential_setup["trade_direction"]),
-                    macro_bias=macro_bias_state,
-                    current_structure=current_structure_state,
-                    zone_dict=cast(dict[str, Any], potential_setup.get("zone")),
-                    has_recent_sweep=has_recent_sweep,
+                trade_direction = str(potential_setup["trade_direction"])
+                setup_order_type = str(potential_setup.get("order_type", "LIMIT")).upper()
+                setup_strategy = potential_setup.get("strategy")
+                zone_for_scoring = cast(Optional[dict[str, Any]], potential_setup.get("zone"))
+
+                entry_hint: Optional[float] = None
+                raw_entry = potential_setup.get("entry_price")
+                if raw_entry is None and zone_for_scoring:
+                    key = "price_top" if trade_direction.upper() == "LONG" else "price_bottom"
+                    raw_entry = zone_for_scoring.get(key)
+                try:
+                    entry_hint = float(raw_entry) if raw_entry is not None else None
+                except (TypeError, ValueError):
+                    entry_hint = None
+
+                swing_high_point = self._parse_swing_point(repository.get_kv("last_swing_high"))
+                swing_low_point = self._parse_swing_point(repository.get_kv("last_swing_low"))
+                swing_high_price = (
+                    float(swing_high_point["price"]) if swing_high_point else None
                 )
-                classification = scoring_engine.classify_score(total_score)
+                swing_low_price = (
+                    float(swing_low_point["price"]) if swing_low_point else None
+                )
+
+                second_attempt = self._is_second_attempt(
+                    repository, trade_direction, entry_hint, current_candle
+                )
+
+                swing_history: Optional[dict[str, Any]] = None
+                raw_swing_history = repository.get_kv("swing_history")
+                if isinstance(raw_swing_history, str):
+                    try:
+                        parsed_history = json.loads(raw_swing_history)
+                        if isinstance(parsed_history, dict):
+                            swing_history = parsed_history
+                    except (TypeError, ValueError):
+                        swing_history = None
+
+                try:
+                    confluence = ConfluenceEngineV2().evaluate(
+                        trade_direction=trade_direction,
+                        macro_bias=macro_bias_state,
+                        current_structure=current_structure_state,
+                        zone_dict=zone_for_scoring,
+                        has_recent_sweep=has_recent_sweep,
+                        recent_candles=recent_candles,
+                        current_timestamp=int(current_candle.timestamp),
+                        order_type=setup_order_type,
+                        strategy=str(setup_strategy) if setup_strategy else None,
+                        repository=repository,
+                        entry_price=entry_hint,
+                        last_swing_high=swing_high_price,
+                        last_swing_low=swing_low_price,
+                        second_attempt=second_attempt,
+                        swing_history=swing_history,
+                    )
+                    total_score = int(confluence["score"])
+                    classification = str(confluence["classification"])
+                    if confluence.get("vetoes"):
+                        logging.info(
+                            "Confluence vetoes applied: %s", "; ".join(confluence["vetoes"])
+                        )
+                    potential_setup["confluence_notes"] = list(confluence.get("notes", []))
+                except Exception as exc:
+                    logging.error("Confluence v2 failed; using legacy scoring: %s", exc)
+                    scoring_engine = ScoringEngine()
+                    total_score = scoring_engine.calculate_total_score(
+                        trade_direction=trade_direction,
+                        macro_bias=macro_bias_state,
+                        current_structure=current_structure_state,
+                        zone_dict=zone_for_scoring,
+                        has_recent_sweep=has_recent_sweep,
+                    )
+                    classification = scoring_engine.classify_score(total_score)
+
+                self._record_setup_attempt(
+                    repository, trade_direction, entry_hint, current_candle
+                )
+                if swing_high_price is not None and swing_low_price is not None:
+                    leg = abs(swing_high_price - swing_low_price)
+                    if leg > 0:
+                        potential_setup["measured_move"] = round(leg, 2)
 
                 repository.set_kv("latest_setup_score", total_score)
                 repository.set_kv("latest_setup_classification", classification)

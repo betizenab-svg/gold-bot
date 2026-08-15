@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from config.settings import SIGNAL_EXPIRY_MINUTES
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.scoring import ScoringEngine
 from src.analysis.signal_factory import SignalFactory
@@ -131,35 +132,46 @@ class BacktestEngine:
         signal = trade.signal
         status = trade.status
         direction = signal.signal_type.upper()
+        order_type = str(getattr(signal, "order_type", "LIMIT")).upper()
+        candle_high = float(current_candle.high)
+        candle_low = float(current_candle.low)
+        entry = float(signal.entry_price)
+
+        if status == "PENDING":
+            age_seconds = int(current_candle.timestamp) - int(signal.timestamp)
+            if age_seconds > int(SIGNAL_EXPIRY_MINUTES) * 60:
+                return "EXPIRED"
+            if direction == "LONG":
+                triggered = candle_high >= entry if order_type == "STOP" else candle_low <= entry
+            elif direction == "SHORT":
+                triggered = candle_low <= entry if order_type == "STOP" else candle_high >= entry
+            else:
+                return None
+            return "ACTIVATED" if triggered else None
+
+        if status not in {"ACTIVE", "PARTIAL_TP1"}:
+            return None
 
         if direction == "LONG":
-            if status == "PENDING" and float(current_candle.low) <= float(signal.entry_price):
-                return "ACTIVATED"
-            if status == "ACTIVE" and float(current_candle.high) >= float(signal.tp1_price):
-                return "TP1_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.high) >= float(
-                signal.tp2_price
-            ):
-                return "TP2_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.low) <= float(
-                signal.sl_price
-            ):
+            if status == "PARTIAL_TP1" and candle_low <= entry:
+                return "BE_HIT"
+            if status == "ACTIVE" and candle_low <= float(signal.sl_price):
                 return "SL_HIT"
+            if candle_high >= float(signal.tp2_price):
+                return "TP2_SMASH"
+            if status == "ACTIVE" and candle_high >= float(signal.tp1_price):
+                return "TP1_SMASH"
             return None
 
         if direction == "SHORT":
-            if status == "PENDING" and float(current_candle.high) >= float(signal.entry_price):
-                return "ACTIVATED"
-            if status == "ACTIVE" and float(current_candle.low) <= float(signal.tp1_price):
-                return "TP1_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.low) <= float(
-                signal.tp2_price
-            ):
-                return "TP2_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.high) >= float(
-                signal.sl_price
-            ):
+            if status == "PARTIAL_TP1" and candle_high >= entry:
+                return "BE_HIT"
+            if status == "ACTIVE" and candle_high >= float(signal.sl_price):
                 return "SL_HIT"
+            if candle_low <= float(signal.tp2_price):
+                return "TP2_SMASH"
+            if status == "ACTIVE" and candle_low <= float(signal.tp1_price):
+                return "TP1_SMASH"
             return None
 
         return None
@@ -206,6 +218,19 @@ class BacktestEngine:
             trade.realized_pnl_usd -= round(sl_usd, 2)
             self.current_balance = round(self.current_balance - sl_usd, 2)
             trade.outcome = "WIN" if trade.realized_pnl_usd > 0 else "LOSS"
+            return
+
+        if event_type == "BE_HIT":
+            # Runner closed at entry after TP1: banked half stays, runner flat.
+            trade.status = "CLOSED_BE"
+            trade.closed_timestamp = int(current_candle.timestamp)
+            trade.outcome = "WIN" if trade.realized_pnl_usd > 0 else "BREAKEVEN"
+            return
+
+        if event_type == "EXPIRED":
+            trade.status = "CLOSED_EXPIRED"
+            trade.closed_timestamp = int(current_candle.timestamp)
+            trade.outcome = "EXPIRED"
             return
 
         raise ValueError(f"Unsupported backtest event: {event_type}")

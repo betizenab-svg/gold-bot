@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional, Sequence
 
+from config.settings import ACTIVE_MAX_HOLD_HOURS, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
 from src.alerting.telegram_client import TelegramClient
 from src.analysis.position_sizing import LotSizeCalculator
+from src.analysis.risk_governor import RiskGovernor
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
 
@@ -18,6 +20,17 @@ class SignalLifecycleManager:
         "TP1_SMASH": "PARTIAL_TP1",
         "TP2_SMASH": "CLOSED_TP2",
         "SL_HIT": "CLOSED_SL",
+        "BE_HIT": "CLOSED_BE",
+        "EXPIRED": "CANCELLED",
+        "TIME_STOP": "CLOSED_TIME",
+    }
+
+    # Realized R for terminal events (half off at TP1=1.5R, half at TP2=3R).
+    EVENT_R_MAP = {
+        "SL_HIT": -1.0,
+        "BE_HIT": 0.75,
+        "TP2_SMASH": 2.25,
+        "TIME_STOP": 0.0,
     }
 
     def __init__(
@@ -80,30 +93,84 @@ class SignalLifecycleManager:
         tp1_price = float(self._get_required_value(signal, "tp1_price", "tp1"))
         tp2_price = float(self._get_required_value(signal, "tp2_price", "tp2"))
         sl_price = float(self._get_required_value(signal, "sl_price", "sl"))
+        order_type = str(self._get_value(signal, "order_type", default="LIMIT")).upper()
+
+        candle_high = float(current_candle.high)
+        candle_low = float(current_candle.low)
+
+        if direction not in {"LONG", "SHORT"}:
+            return None
+
+        if status == "PENDING":
+            if self._is_pending_expired(signal, current_candle):
+                return "EXPIRED"
+
+            if direction == "LONG":
+                # STOP = breakout buy above market; LIMIT = pullback buy below market.
+                triggered = (
+                    candle_high >= entry_price
+                    if order_type == "STOP"
+                    else candle_low <= entry_price
+                )
+            else:
+                triggered = (
+                    candle_low <= entry_price
+                    if order_type == "STOP"
+                    else candle_high >= entry_price
+                )
+            return "ACTIVATED" if triggered else None
+
+        if status not in {"ACTIVE", "PARTIAL_TP1"}:
+            return None
+
+        # Time stop: an ACTIVE trade that never paid within the window is dead
+        # weight (runner after TP1 is exempt — let winners run).
+        if status == "ACTIVE" and self._is_active_stale(signal, current_candle):
+            return "TIME_STOP"
 
         if direction == "LONG":
-            if status == "PENDING" and float(current_candle.low) <= entry_price:
-                return "ACTIVATED"
-            if status == "ACTIVE" and float(current_candle.high) >= tp1_price:
-                return "TP1_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.high) >= tp2_price:
-                return "TP2_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.low) <= sl_price:
+            # Worst-case first: protective exits take priority over targets.
+            if status == "PARTIAL_TP1" and candle_low <= entry_price:
+                return "BE_HIT"
+            if status == "ACTIVE" and candle_low <= sl_price:
                 return "SL_HIT"
+            if candle_high >= tp2_price:
+                return "TP2_SMASH"
+            if status == "ACTIVE" and candle_high >= tp1_price:
+                return "TP1_SMASH"
             return None
 
-        if direction == "SHORT":
-            if status == "PENDING" and float(current_candle.high) >= entry_price:
-                return "ACTIVATED"
-            if status == "ACTIVE" and float(current_candle.low) <= tp1_price:
-                return "TP1_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.low) <= tp2_price:
-                return "TP2_SMASH"
-            if status in {"ACTIVE", "PARTIAL_TP1"} and float(current_candle.high) >= sl_price:
-                return "SL_HIT"
-            return None
-
+        if status == "PARTIAL_TP1" and candle_high >= entry_price:
+            return "BE_HIT"
+        if status == "ACTIVE" and candle_high >= sl_price:
+            return "SL_HIT"
+        if candle_low <= tp2_price:
+            return "TP2_SMASH"
+        if status == "ACTIVE" and candle_low <= tp1_price:
+            return "TP1_SMASH"
         return None
+
+    def _is_pending_expired(self, signal: Any, current_candle: Candle) -> bool:
+        raw_created = self._get_value(signal, "timestamp", "created_at")
+        try:
+            created_ts = int(raw_created)
+        except (TypeError, ValueError):
+            return False
+        if created_ts <= 0:
+            return False
+        age_seconds = int(current_candle.timestamp) - created_ts
+        return age_seconds > int(SIGNAL_EXPIRY_MINUTES) * 60
+
+    def _is_active_stale(self, signal: Any, current_candle: Candle) -> bool:
+        raw_created = self._get_value(signal, "timestamp", "created_at")
+        try:
+            created_ts = int(raw_created)
+        except (TypeError, ValueError):
+            return False
+        if created_ts <= 0:
+            return False
+        age_seconds = int(current_candle.timestamp) - created_ts
+        return age_seconds > int(ACTIVE_MAX_HOLD_HOURS) * 3600
 
     def process_open_signals(
         self,
@@ -121,6 +188,7 @@ class SignalLifecycleManager:
             raise ValueError("repository is required to process open signals")
 
         for signal in open_signals:
+            self._track_excursions(active_repository, signal, current_candle)
             event_type = self.evaluate_signal(signal, current_candle)
             if event_type is None:
                 continue
@@ -128,6 +196,7 @@ class SignalLifecycleManager:
             signal_hash = str(self._get_required_value(signal, "signal_hash"))
             new_status = self.EVENT_STATUS_MAP[event_type]
             active_repository.update_signal_status(signal_hash, new_status)
+            self._record_risk_outcome(active_repository, event_type, current_candle)
 
             reason = self._build_lifecycle_reason(signal, event_type)
             try:
@@ -206,6 +275,59 @@ class SignalLifecycleManager:
         return int(alert_message_id), int(explanation_message_id)
 
     @staticmethod
+    def _track_excursions(repository: Any, signal: Any, current_candle: Candle) -> None:
+        """Record how far each open trade ran for/against entry (in R). This is
+        the raw data that calibrates stop and target placement over time."""
+        try:
+            status = str(
+                SignalLifecycleManager._get_value(signal, "status", default="")
+            ).upper()
+            if status not in {"ACTIVE", "PARTIAL_TP1"}:
+                return
+            entry = float(
+                SignalLifecycleManager._get_required_value(signal, "entry_price", "entry")
+            )
+            sl = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
+            direction = str(
+                SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")
+            ).upper()
+            risk = abs(entry - sl)
+            if risk <= 0 or direction not in {"LONG", "SHORT"}:
+                return
+
+            high = float(current_candle.high)
+            low = float(current_candle.low)
+            if direction == "LONG":
+                mfe = max(0.0, (high - entry) / risk)
+                mae = max(0.0, (entry - low) / risk)
+            else:
+                mfe = max(0.0, (entry - low) / risk)
+                mae = max(0.0, (high - entry) / risk)
+
+            signal_hash = SignalLifecycleManager._get_optional_value(signal, "signal_hash")
+            if signal_hash is None or repository is None:
+                return
+            if hasattr(repository, "update_signal_excursions"):
+                repository.update_signal_excursions(str(signal_hash), mfe, mae)
+        except Exception as exc:
+            logging.debug("Excursion tracking skipped: %s", exc)
+
+    @staticmethod
+    def _record_risk_outcome(repository: Any, event_type: str, current_candle: Candle) -> None:
+        try:
+            governor = RiskGovernor()
+            event_ts = int(current_candle.timestamp)
+            if event_type == "SL_HIT":
+                governor.record_stop_loss(repository, event_ts)
+            elif event_type in {"TP1_SMASH", "TP2_SMASH"}:
+                governor.record_win(repository)
+            r_delta = SignalLifecycleManager.EVENT_R_MAP.get(event_type)
+            if r_delta is not None:
+                governor.record_result_r(repository, r_delta, event_ts)
+        except Exception as exc:
+            logging.debug("Risk outcome recording skipped: %s", exc)
+
+    @staticmethod
     def _build_lifecycle_reason(signal: Any, event_type: str) -> str:
         normalized = event_type.upper()
         if normalized == "ACTIVATED":
@@ -220,6 +342,14 @@ class SignalLifecycleManager:
         if normalized == "SL_HIT":
             price = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
             return f"Price hit SL at {price:.2f}."
+        if normalized == "BE_HIT":
+            price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
+            return f"Price returned to entry at {price:.2f} after TP1; runner closed at breakeven."
+        if normalized == "EXPIRED":
+            price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
+            return f"Pending entry at {price:.2f} was never triggered; signal cancelled."
+        if normalized == "TIME_STOP":
+            return "Trade never reached TP1 within the holding window; closed as stagnant."
         raise ValueError(f"Unsupported lifecycle event type: {event_type}")
 
     @staticmethod

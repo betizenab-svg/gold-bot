@@ -3,8 +3,15 @@ from __future__ import annotations
 import os
 import stat
 
-from config.settings import DB_PATH, LOG_FILE_PATH
+import pytest
+
+from config.settings import BASE_DIR, DB_PATH, LOG_FILE_PATH
 from scripts.harden_env import enforce_permissions
+
+
+@pytest.fixture
+def project_root() -> str:
+    return str(BASE_DIR)
 
 
 def test_path_resolution() -> None:
@@ -47,7 +54,7 @@ def test_permission_hardening(project_root: str) -> None:
 
 
 def main() -> int:
-    project_root = os.path.abspath(os.path.dirname(__file__))
+    project_root = str(BASE_DIR)
 
     test_path_resolution()
     test_htaccess_generation(project_root)

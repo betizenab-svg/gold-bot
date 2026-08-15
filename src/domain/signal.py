@@ -20,6 +20,8 @@ class Signal:
     telegram_chat_id: str | None = None
     closure_reason: str | None = None
     status: str = "PENDING"
+    order_type: str = "LIMIT"
+    strategy: str | None = None
 
     def __post_init__(self) -> None:
         timestamp = self.timestamp
@@ -39,6 +41,7 @@ class Signal:
                 object.__setattr__(self, "telegram_message_id", telegram_message_id)
 
         object.__setattr__(self, "status", str(self.status).upper())
+        object.__setattr__(self, "order_type", str(self.order_type or "LIMIT").upper())
 
     @property
     def entry(self) -> float:

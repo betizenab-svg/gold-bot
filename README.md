@@ -2,9 +2,21 @@
 
 ## Project Overview
 
-XAUUSD Signal Intelligence System is a stateless, cron-driven trading automation platform for gold (XAUUSD). It ingests live market and macro data, applies Smart Money Concepts (SMC) and macro-fundamental filters, scores opportunities, and publishes threaded Telegram alerts.
+XAUUSD Signal Intelligence System is a stateless, cron-driven trading automation platform for gold (XAUUSD). It ingests live market and macro data, applies Smart Money Concepts (SMC) and macro-fundamental filters, scores opportunities through a multi-engine confluence stack, and publishes threaded Telegram alerts.
 
-The project is optimized for shared cPanel hosting constraints, including strict runtime limits and low memory budgets.
+Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
+
+- Order-type aware execution: breakout signals are STOP orders, zone retests are LIMIT orders, each with correct activation logic.
+- Wider, structure-aware stops: 1.5x ATR with a hard minimum distance and round-number clearance, ending the noise stop-out problem.
+- Full trade lifecycle: TP1 partial, breakeven runner, pending-order expiry, and a time stop for stagnant trades.
+- Confluence engines: session killzones, volatility regime, RSI/EMA momentum with exhaustion vetoes, multi-timeframe bias, barbwire/climax market-state vetoes, and fib OTE confluence.
+- Self-learning: per-strategy weights driven by rolling expectancy (R), not win rate.
+- Risk governor: daily signal caps, stop-loss cooldowns, losing-streak halts, daily -3R circuit breaker, +4R profit lock, and news blackouts.
+- Trendline gate: counter-trend signals are blocked until the trendline through the last two swing pivots is broken by a body close.
+- Evidence loop: every trade records its max favorable/adverse excursion in R; scripts/calibrate_from_history.py turns that into concrete tuning recommendations.
+- Hosting: runs free and permanently on GitHub Actions (docs/hosting.md) - no cPanel required. Default signal timeframe is now M5.
+
+The project remains compatible with any Linux host with cron.
 
 ## Purpose of the Platform
 

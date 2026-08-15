@@ -34,6 +34,7 @@ TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY")
 TWELVEDATA_BASE_URL = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_API_BASE_URL = os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org")
 
 PROXY_FALLBACK_ENABLED = _env_bool("PROXY_FALLBACK_ENABLED", True)
 PROXY_FALLBACK_MAX_PROXIES = int(os.getenv("PROXY_FALLBACK_MAX_PROXIES", "8"))
@@ -95,8 +96,38 @@ BIAS_LONG_THRESHOLD = 25
 BIAS_SHORT_THRESHOLD = -25
 
 # --- Candlestick Strategies ---
-ATR_SL_MULTIPLIER = 0.50
+ATR_SL_MULTIPLIER = float(os.getenv("ATR_SL_MULTIPLIER", "1.5"))
 VALUE_AREA_SMA = 20
 PIN_BAR_TAIL_RATIO = 0.66
 ENTRY_BUFFER_PTS = 0.50
 INSIDE_BAR_LOOKBACK_CANDLES = 3
+
+# --- Signal Quality & Risk (v2) ---
+# Timeframe the strategy engines run on (M1 is too noisy for delayed feeds).
+SIGNAL_TIMEFRAME = os.getenv("SIGNAL_TIMEFRAME", "M5")
+# Minimum stop distance: never risk less than max(SL_MIN_USD, SL_MIN_ATR_MULT * ATR).
+SL_MIN_USD = float(os.getenv("SL_MIN_USD", "3.0"))
+SL_MIN_ATR_MULT = float(os.getenv("SL_MIN_ATR_MULT", "1.0"))
+# Pending signals that never trigger are cancelled after this window.
+SIGNAL_EXPIRY_MINUTES = int(os.getenv("SIGNAL_EXPIRY_MINUTES", "90"))
+# Candle history pulled for the intelligence engines each pulse.
+ANALYSIS_LOOKBACK_CANDLES = int(os.getenv("ANALYSIS_LOOKBACK_CANDLES", "240"))
+# Days of market_data retained in SQLite (keeps the DB small on free hosting).
+MARKET_DATA_RETENTION_DAYS = int(os.getenv("MARKET_DATA_RETENTION_DAYS", "45"))
+
+# --- Risk Governor ---
+RISK_MAX_SIGNALS_PER_DAY = int(os.getenv("RISK_MAX_SIGNALS_PER_DAY", "6"))
+RISK_SL_COOLDOWN_MINUTES = int(os.getenv("RISK_SL_COOLDOWN_MINUTES", "45"))
+RISK_CONSECUTIVE_SL_HALT = int(os.getenv("RISK_CONSECUTIVE_SL_HALT", "3"))
+RISK_HALT_HOURS = int(os.getenv("RISK_HALT_HOURS", "6"))
+RISK_MAX_CONCURRENT_SIGNALS = int(os.getenv("RISK_MAX_CONCURRENT_SIGNALS", "2"))
+# Escalation tier: this many consecutive stop losses suspends signals for 24h.
+RISK_TIER2_CONSECUTIVE_SL = int(os.getenv("RISK_TIER2_CONSECUTIVE_SL", "5"))
+# Daily realized-R circuit breakers (Link/Kiev/Bennett consensus).
+RISK_DAILY_MAX_LOSS_R = float(os.getenv("RISK_DAILY_MAX_LOSS_R", "3.0"))
+RISK_DAILY_PROFIT_LOCK_R = float(os.getenv("RISK_DAILY_PROFIT_LOCK_R", "4.0"))
+# High-impact news blackout window in minutes (before/after event).
+NEWS_BLACKOUT_BEFORE_MIN = int(os.getenv("NEWS_BLACKOUT_BEFORE_MIN", "30"))
+NEWS_BLACKOUT_AFTER_MIN = int(os.getenv("NEWS_BLACKOUT_AFTER_MIN", "15"))
+# Time stop: ACTIVE trades that never reached TP1 are closed after this.
+ACTIVE_MAX_HOLD_HOURS = int(os.getenv("ACTIVE_MAX_HOLD_HOURS", "24"))

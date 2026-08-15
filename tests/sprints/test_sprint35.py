@@ -8,6 +8,7 @@ import gc
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+import pytest
 import yfinance as yf
 
 from src.ingestion.yahoo_client import YahooFinanceClient
@@ -29,6 +30,15 @@ def _init_schema(db_path: str) -> None:
         SchemaInitializer(connection).initialize()
     finally:
         connection.close()
+
+
+@pytest.fixture
+def db_path():
+    path = _create_test_db()
+    _init_schema(path)
+    yield path
+    if os.path.exists(path):
+        os.remove(path)
 
 
 def test_database_indexes(db_path: str) -> None:
