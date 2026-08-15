@@ -447,7 +447,7 @@ def create_app() -> Flask:
                 events = []
         except (TypeError, ValueError):
             events = []
-        events.append({"timestamp": event_ts, "label": label or "high-impact event"})
+        events.append({"timestamp": event_ts, "label": label or "high-impact event", "manual": True})
         events = [e for e in events if _to_int(e.get("timestamp") if isinstance(e, dict) else e) > int(time.time()) - 86400]
         if _set_kv("upcoming_news_events_json", json.dumps(events)):
             flash("News blackout window added (UTC).", "success")

@@ -17,3 +17,6 @@ os.environ.setdefault("TELEGRAM_CHAT_ID", "test-chat")
 os.environ.setdefault("TELEGRAM_API_BASE_URL", "http://127.0.0.1:9")
 # Chart rendering is covered by dedicated tests; keep pulse tests fast.
 os.environ.setdefault("CHART_ALERTS_ENABLED", "0")
+# Network-fetching automations are covered by dedicated unit tests.
+os.environ.setdefault("NEWS_AUTOFETCH_ENABLED", "0")
+os.environ.setdefault("WEEKLY_REPORT_ENABLED", "0")

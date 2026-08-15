@@ -131,5 +131,16 @@ RISK_DAILY_PROFIT_LOCK_R = float(os.getenv("RISK_DAILY_PROFIT_LOCK_R", "4.0"))
 # High-impact news blackout window in minutes (before/after event).
 NEWS_BLACKOUT_BEFORE_MIN = int(os.getenv("NEWS_BLACKOUT_BEFORE_MIN", "30"))
 NEWS_BLACKOUT_AFTER_MIN = int(os.getenv("NEWS_BLACKOUT_AFTER_MIN", "15"))
+# Automatic calendar sync (ForexFactory weekly JSON feed, keyless).
+NEWS_AUTOFETCH_ENABLED = _env_bool("NEWS_AUTOFETCH_ENABLED", True)
+NEWS_CALENDAR_URL = os.getenv(
+    "NEWS_CALENDAR_URL",
+    "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+)
+NEWS_CALENDAR_REFRESH_HOURS = int(os.getenv("NEWS_CALENDAR_REFRESH_HOURS", "12"))
+# Automatic weekly performance report to Telegram.
+WEEKLY_REPORT_ENABLED = _env_bool("WEEKLY_REPORT_ENABLED", True)
+WEEKLY_REPORT_INTERVAL_DAYS = int(os.getenv("WEEKLY_REPORT_INTERVAL_DAYS", "7"))
+WEEKLY_REPORT_MIN_TRADES = int(os.getenv("WEEKLY_REPORT_MIN_TRADES", "10"))
 # Time stop: ACTIVE trades that never reached TP1 are closed after this.
 ACTIVE_MAX_HOLD_HOURS = int(os.getenv("ACTIVE_MAX_HOLD_HOURS", "24"))

@@ -51,9 +51,14 @@ from config.settings import (
     DXY_TICKER,
     DXY_CORRELATION_WINDOW,
     MARKET_DATA_RETENTION_DAYS,
+    NEWS_AUTOFETCH_ENABLED,
+    NEWS_CALENDAR_REFRESH_HOURS,
     SIGNAL_TIMEFRAME,
     TIMEFRAME_SECONDS,
     FSR_LOOKBACK_PERIOD,
+    WEEKLY_REPORT_ENABLED,
+    WEEKLY_REPORT_INTERVAL_DAYS,
+    WEEKLY_REPORT_MIN_TRADES,
 )
 from src.analysis.fsr_engine import FSREngine
 from src.analysis.bias_engine import MacroBiasAggregator
@@ -1043,6 +1048,58 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Setup attempt record skipped: %s", exc)
 
+    def _maybe_refresh_news_calendar(self, repository: Repository) -> None:
+        """Hands-free news blackout: sync high-impact USD events twice a day."""
+        if not NEWS_AUTOFETCH_ENABLED:
+            return
+        now = int(time.time())
+        try:
+            last_refresh = int(repository.get_kv("last_news_calendar_refresh") or 0)
+        except (TypeError, ValueError):
+            last_refresh = 0
+        if now - last_refresh < NEWS_CALENDAR_REFRESH_HOURS * 3600:
+            return
+        try:
+            from src.ingestion.news_calendar import refresh_news_blackouts
+
+            refresh_news_blackouts(repository, now)
+            repository.set_kv("last_news_calendar_refresh", str(now))
+        except Exception as exc:
+            logging.warning("News calendar refresh failed (will retry): %s", exc)
+
+    def _maybe_send_weekly_report(self, repository: Repository) -> None:
+        """Hands-free calibration: post the performance report to Telegram weekly."""
+        if not WEEKLY_REPORT_ENABLED:
+            return
+        now = int(time.time())
+        try:
+            last_sent = int(repository.get_kv("weekly_report_last_sent") or 0)
+        except (TypeError, ValueError):
+            last_sent = 0
+        if now - last_sent < WEEKLY_REPORT_INTERVAL_DAYS * 86400:
+            return
+        try:
+            from config.settings import DB_PATH
+            from scripts.calibrate_from_history import analyze
+            from src.alerting.weekly_report import build_weekly_report
+
+            analysis = analyze(str(DB_PATH))
+            total_trades = sum(
+                int(stats.get("trades", 0))
+                for stats in analysis.get("strategies", {}).values()
+            )
+            if total_trades < WEEKLY_REPORT_MIN_TRADES:
+                return
+
+            message = build_weekly_report(analysis)
+            telegram_client = self.telegram_client_factory()
+            if getattr(telegram_client, "chat_id", None):
+                telegram_client.send_message(message)
+                repository.set_kv("weekly_report_last_sent", str(now))
+                logging.info("Weekly performance report sent (%d trades)", total_trades)
+        except Exception as exc:
+            logging.warning("Weekly report skipped (will retry): %s", exc)
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
@@ -1098,6 +1155,8 @@ class PulseOrchestrator:
             repository.set_kv("last_processed_timestamp", latest_timestamp)
             current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
             self._maybe_prune_market_data(repository)
+            self._maybe_refresh_news_calendar(repository)
+            self._maybe_send_weekly_report(repository)
             self._monitor_open_signals(repository, current_candle)
             self._evaluate_zone_lifecycle(repository, symbol, current_candle)
 
