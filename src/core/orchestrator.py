@@ -60,8 +60,10 @@ from src.analysis.bias_engine import MacroBiasAggregator
 from src.analysis.confluence import ConfluenceEngineV2
 from src.analysis.risk_governor import RiskGovernor
 from src.analysis.trendline import TrendlineEngine
+from src.strategies.engulfing_zone import EngulfingZoneStrategy
 from src.strategies.inside_bar_trap import InsideBarTrapStrategy
 from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
+from src.strategies.pullback_h2 import PullbackH2L2Strategy
 
 
 MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
@@ -359,6 +361,16 @@ class PulseOrchestrator:
         pin_bar_setup = pin_bar_strategy.detect_setup(recent_candles, active_zones)
         if pin_bar_setup is not None:
             return pin_bar_setup
+
+        engulfing_strategy = EngulfingZoneStrategy()
+        engulfing_setup = engulfing_strategy.detect_setup(recent_candles, active_zones)
+        if engulfing_setup is not None:
+            return engulfing_setup
+
+        pullback_strategy = PullbackH2L2Strategy()
+        pullback_setup = pullback_strategy.detect_setup(recent_candles)
+        if pullback_setup is not None:
+            return pullback_setup
 
         inside_bar_strategy = InsideBarTrapStrategy()
         inside_bar_setup = inside_bar_strategy.detect_setup(recent_candles)
@@ -678,6 +690,7 @@ class PulseOrchestrator:
             "order_type",
             "confluence_notes",
             "measured_move",
+            "plan_context",
         ):
             if key in potential_setup:
                 signal_context[key] = potential_setup[key]
@@ -1248,6 +1261,40 @@ class PulseOrchestrator:
                     leg = abs(swing_high_price - swing_low_price)
                     if leg > 0:
                         potential_setup["measured_move"] = round(leg, 2)
+
+                # Assemble the professional trade-plan context for the alert.
+                try:
+                    from src.analysis.pivots import current_session_label
+
+                    sweep_desc = None
+                    if latest_sweep is not None:
+                        step = int(TIMEFRAME_SECONDS.get(current_candle.timeframe, 60))
+                        age_bars = max(
+                            0,
+                            (int(current_candle.timestamp) - int(latest_sweep["timestamp"])) // step,
+                        )
+                        sweep_desc = (
+                            f"{str(latest_sweep.get('type', '')).replace('_', ' ').title()} "
+                            f"{age_bars} bars ago"
+                        )
+                    daily_r_raw = repository.get_kv("risk_daily_r_value")
+                    daily_r: Optional[str] = None
+                    if isinstance(daily_r_raw, (str, int, float)):
+                        try:
+                            daily_r = f"{float(daily_r_raw):+.2f}R"
+                        except (TypeError, ValueError):
+                            daily_r = None
+                    potential_setup["plan_context"] = {
+                        "structure": current_structure_state,
+                        "macro_bias": macro_bias_state,
+                        "regime": repository.get_kv("macro_regime"),
+                        "session": current_session_label(int(current_candle.timestamp)),
+                        "liquidity": sweep_desc,
+                        "daily_r": daily_r,
+                        "notes": list(potential_setup.get("confluence_notes", [])),
+                    }
+                except Exception as exc:
+                    logging.debug("Trade plan context skipped: %s", exc)
 
                 repository.set_kv("latest_setup_score", total_score)
                 repository.set_kv("latest_setup_classification", classification)

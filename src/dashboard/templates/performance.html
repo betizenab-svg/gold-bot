@@ -1,0 +1,121 @@
+{% extends "base.html" %} {% block title %}Performance | XAUUSD Intelligence{%
+endblock %} {% block page_title %}Performance & Calibration{% endblock %} {%
+block content %}
+<section class="grid grid-cols-2 gap-4 md:grid-cols-5">
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Closed trades</p>
+    <p class="mt-1 text-2xl font-semibold">{{ totals.closed }}</p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Net result</p>
+    <p class="mt-1 text-2xl font-semibold {% if totals.net_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      {{ "%+.2f"|format(totals.net_r) }}R
+    </p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Full wins (TP2)</p>
+    <p class="mt-1 text-2xl font-semibold text-emerald-400">{{ totals.wins }}</p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Stop losses</p>
+    <p class="mt-1 text-2xl font-semibold text-rose-400">{{ totals.losses }}</p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Breakeven exits</p>
+    <p class="mt-1 text-2xl font-semibold text-slate-300">{{ totals.breakeven }}</p>
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Equity curve (cumulative R)</h2>
+  {% if curve_values %}
+  <canvas id="equityChart" height="90"></canvas>
+  {% else %}
+  <p class="mt-3 text-sm text-slate-400">No closed trades yet — the curve starts with the first result.</p>
+  {% endif %}
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Per-strategy edge (realized)</h2>
+  <div class="mt-3 overflow-x-auto">
+    <table class="w-full min-w-[720px] text-sm">
+      <thead class="border-b border-white/10 text-slate-400">
+        <tr>
+          <th class="py-2 text-left font-medium">Strategy</th>
+          <th class="py-2 text-left font-medium">Trades</th>
+          <th class="py-2 text-left font-medium">Expectancy (R)</th>
+          <th class="py-2 text-left font-medium">Profit factor</th>
+          <th class="py-2 text-left font-medium">Loser MFE (med)</th>
+          <th class="py-2 text-left font-medium">Winner MAE (med)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, s in strategies.items() %}
+        <tr class="border-b border-white/5">
+          <td class="py-3 font-mono text-xs text-cyanlux">{{ name }}</td>
+          <td class="py-3">{{ s.trades }}</td>
+          <td class="py-3 {% if s.expectancy_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            {{ "%+.2f"|format(s.expectancy_r) }}
+          </td>
+          <td class="py-3">{{ s.profit_factor if s.profit_factor is not none else "∞" }}</td>
+          <td class="py-3">{{ s.median_loser_mfe_r if s.median_loser_mfe_r is not none else "—" }}</td>
+          <td class="py-3">{{ s.median_winner_mae_r if s.median_winner_mae_r is not none else "—" }}</td>
+        </tr>
+        {% else %}
+        <tr><td class="py-3 text-slate-400" colspan="6">No closed trades yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Excursion telemetry (avg MFE / MAE in R)</h2>
+  <div class="mt-3 grid gap-3 md:grid-cols-3">
+    {% for row in excursions %}
+    <div class="rounded-xl bg-white/5 p-4">
+      <p class="font-mono text-xs text-cyanlux">{{ row.strategy }}</p>
+      <p class="mt-1 text-sm text-slate-300">MFE {{ row.avg_mfe }}R · MAE {{ row.avg_mae }}R · n={{ row.n }}</p>
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">No excursion data yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-goldlux/30 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-goldlux">Calibration recommendations (evidence-based)</h2>
+  <ul class="mt-3 space-y-2 text-sm text-slate-300">
+    {% for line in recommendations %}
+    <li class="rounded-lg bg-white/5 px-3 py-2">{{ line }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if curve_values %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+  new Chart(document.getElementById("equityChart"), {
+    type: "line",
+    data: {
+      labels: {{ curve_labels | tojson }},
+      datasets: [{
+        label: "Cumulative R",
+        data: {{ curve_values | tojson }},
+        borderColor: "#22d3ee",
+        backgroundColor: "rgba(34,211,238,0.08)",
+        fill: true,
+        tension: 0.25,
+        pointRadius: 2,
+      }],
+    },
+    options: {
+      plugins: { legend: { labels: { color: "#94a3b8" } } },
+      scales: {
+        x: { ticks: { color: "#64748b" }, grid: { color: "rgba(255,255,255,0.05)" } },
+        y: { ticks: { color: "#64748b" }, grid: { color: "rgba(255,255,255,0.05)" } },
+      },
+    },
+  });
+</script>
+{% endif %} {% endblock %}

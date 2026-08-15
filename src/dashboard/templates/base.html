@@ -75,6 +75,21 @@
               >Signals</a
             >
             <a
+              class="nav-item {% if request.path.startswith('/performance') %}active{% endif %}"
+              href="{{ url_for('performance') }}"
+              >Performance</a
+            >
+            <a
+              class="nav-item {% if request.path.startswith('/risk') %}active{% endif %}"
+              href="{{ url_for('risk') }}"
+              >Risk</a
+            >
+            <a
+              class="nav-item {% if request.path.startswith('/market') %}active{% endif %}"
+              href="{{ url_for('market') }}"
+              >Market</a
+            >
+            <a
               class="nav-item {% if request.path.startswith('/logs') %}active{% endif %}"
               href="{{ url_for('logs') }}"
               >Logs</a

@@ -275,6 +275,243 @@ def create_app() -> Flask:
         )
         return render_template("config.html", kv_rows=kv_rows)
 
+    def _set_kv(key: str, value: str) -> bool:
+        try:
+            with _db_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO kv_store (key, value, updated_at)
+                    VALUES (?, ?, strftime('%s','now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at;
+                    """,
+                    (key, str(value)),
+                )
+                conn.commit()
+            return True
+        except sqlite3.Error:
+            return False
+
+    def _get_kv(key: str, default: Any = None) -> Any:
+        return _query_value(
+            "SELECT value FROM kv_store WHERE key = ?;", (key,), default=default
+        )
+
+    @flask_app.route("/performance")
+    @login_required
+    def performance() -> Any:
+        from scripts.calibrate_from_history import OUTCOME_R, analyze
+
+        # Equity curve: cumulative realized R over closed signals, in order.
+        closed = _query_rows(
+            """
+            SELECT id, timestamp, status, COALESCE(strategy,'UNKNOWN') AS strategy
+            FROM signals
+            WHERE status IN ('CLOSED_TP2','CLOSED_BE','CLOSED_SL','CLOSED_TIME')
+            ORDER BY id ASC;
+            """
+        )
+        cumulative = 0.0
+        curve_labels: list[str] = []
+        curve_values: list[float] = []
+        for row in closed:
+            cumulative += OUTCOME_R.get(str(row.get("status", "")).upper(), 0.0)
+            curve_labels.append(_format_unix_ts(row.get("timestamp"))[:10])
+            curve_values.append(round(cumulative, 2))
+
+        try:
+            report = analyze(str(DB_PATH))
+        except Exception:
+            report = {"strategies": {}, "recommendations": ["Report unavailable."]}
+
+        totals = {
+            "closed": len(closed),
+            "net_r": round(cumulative, 2),
+            "wins": sum(1 for r in closed if str(r.get("status")) == "CLOSED_TP2"),
+            "losses": sum(1 for r in closed if str(r.get("status")) == "CLOSED_SL"),
+            "breakeven": sum(1 for r in closed if str(r.get("status")) == "CLOSED_BE"),
+        }
+
+        excursions = _query_rows(
+            """
+            SELECT COALESCE(strategy,'UNKNOWN') AS strategy,
+                   ROUND(AVG(COALESCE(mfe_r,0)),2) AS avg_mfe,
+                   ROUND(AVG(COALESCE(mae_r,0)),2) AS avg_mae,
+                   COUNT(*) AS n
+            FROM signals
+            WHERE status LIKE 'CLOSED%'
+            GROUP BY COALESCE(strategy,'UNKNOWN');
+            """
+        )
+
+        return render_template(
+            "performance.html",
+            curve_labels=curve_labels,
+            curve_values=curve_values,
+            strategies=report.get("strategies", {}),
+            recommendations=report.get("recommendations", []),
+            totals=totals,
+            excursions=excursions,
+        )
+
+    @flask_app.route("/risk", methods=["GET"])
+    @login_required
+    def risk() -> Any:
+        now = int(time.time())
+        paused = str(_get_kv("trading_paused", "0")) in {"1", "true", "yes"}
+        streak = _to_int(_get_kv("risk_consecutive_sl_count", 0))
+        last_sl_ts = _to_int(_get_kv("risk_last_sl_timestamp", 0))
+        cooldown_left = 0
+        if last_sl_ts > 0:
+            cooldown_left = max(0, (last_sl_ts + 45 * 60) - now)
+
+        daily_r_date = str(_get_kv("risk_daily_r_date", ""))
+        today_key = str(now - (now % 86400))
+        daily_r = 0.0
+        if daily_r_date == today_key:
+            try:
+                daily_r = float(_get_kv("risk_daily_r_value", 0.0))
+            except (TypeError, ValueError):
+                daily_r = 0.0
+
+        news_raw = str(_get_kv("upcoming_news_events_json", "") or "")
+        news_events: list[dict[str, Any]] = []
+        try:
+            parsed = json.loads(news_raw) if news_raw else []
+            if isinstance(parsed, list):
+                for event in parsed:
+                    ts = _to_int(event.get("timestamp") if isinstance(event, dict) else event)
+                    if ts > 0:
+                        label = event.get("label", "") if isinstance(event, dict) else ""
+                        news_events.append(
+                            {"timestamp": ts, "label": label, "when": _format_unix_ts(ts)}
+                        )
+        except (TypeError, ValueError):
+            pass
+
+        signals_today = _to_int(
+            _query_value(
+                "SELECT COUNT(*) FROM signals WHERE COALESCE(timestamp, created_at, 0) >= ?;",
+                (int(today_key),),
+                default=0,
+            )
+        )
+
+        return render_template(
+            "risk.html",
+            paused=paused,
+            streak=streak,
+            cooldown_left_min=cooldown_left // 60,
+            daily_r=round(daily_r, 2),
+            news_events=news_events,
+            signals_today=signals_today,
+            last_sl_time=_format_unix_ts(last_sl_ts) if last_sl_ts else "never",
+        )
+
+    @flask_app.route("/risk/toggle-pause", methods=["POST"])
+    @login_required
+    def toggle_pause() -> Any:
+        currently_paused = str(_get_kv("trading_paused", "0")) in {"1", "true", "yes"}
+        if _set_kv("trading_paused", "0" if currently_paused else "1"):
+            flash(
+                "Trading resumed." if currently_paused else "Trading paused (kill switch on).",
+                "success",
+            )
+        else:
+            flash("Could not update pause state.", "error")
+        return redirect(url_for("risk"))
+
+    @flask_app.route("/risk/news", methods=["POST"])
+    @login_required
+    def add_news_event() -> Any:
+        when = request.form.get("event_time", "").strip()
+        label = request.form.get("label", "").strip()
+        action = request.form.get("action", "add")
+
+        if action == "clear":
+            _set_kv("upcoming_news_events_json", "[]")
+            flash("News blackout list cleared.", "success")
+            return redirect(url_for("risk"))
+
+        try:
+            event_ts = int(time.mktime(time.strptime(when, "%Y-%m-%dT%H:%M"))) - time.timezone
+        except (ValueError, OverflowError):
+            flash("Invalid date/time format.", "error")
+            return redirect(url_for("risk"))
+
+        news_raw = str(_get_kv("upcoming_news_events_json", "") or "[]")
+        try:
+            events = json.loads(news_raw)
+            if not isinstance(events, list):
+                events = []
+        except (TypeError, ValueError):
+            events = []
+        events.append({"timestamp": event_ts, "label": label or "high-impact event"})
+        events = [e for e in events if _to_int(e.get("timestamp") if isinstance(e, dict) else e) > int(time.time()) - 86400]
+        if _set_kv("upcoming_news_events_json", json.dumps(events)):
+            flash("News blackout window added (UTC).", "success")
+        else:
+            flash("Could not save news event.", "error")
+        return redirect(url_for("risk"))
+
+    @flask_app.route("/market")
+    @login_required
+    def market() -> Any:
+        from src.analysis.pivots import current_session_label
+
+        macro_keys = (
+            ("macro_regime", "Macro regime (gold vs real yields)"),
+            ("global_macro_bias", "Global macro bias"),
+            ("global_macro_score", "Macro score"),
+            ("macro_cot_state", "COT positioning"),
+            ("macro_cot_index", "COT index"),
+            ("macro_crisis_mode", "Crisis mode (DXY decoupling)"),
+            ("macro_dxy_correlation", "Gold/DXY correlation"),
+            ("macro_smt_state", "SMT divergence state"),
+            ("macro_smt_z", "SMT z-score"),
+            ("macro_fsr_state", "Fundamental shift rate"),
+            ("macro_consensus_state", "Consensus surprise state"),
+            ("current_structure_state", "Market structure"),
+            ("latest_setup_score", "Latest setup score"),
+            ("latest_setup_classification", "Latest setup classification"),
+        )
+        macro = [
+            {"label": label, "value": str(_get_kv(key, "n/a"))}
+            for key, label in macro_keys
+        ]
+
+        zones = _query_rows(
+            """
+            SELECT id, type, price_top, price_bottom, status, created_at
+            FROM zones
+            WHERE status IN ('ACTIVE','UNMITIGATED','MITIGATED')
+            ORDER BY created_at DESC LIMIT 25;
+            """
+        )
+        for zone in zones:
+            zone["created"] = _format_unix_ts(zone.get("created_at"))
+
+        sweep_raw = str(_get_kv("latest_liquidity_sweep", "") or "")
+        sweep = None
+        try:
+            parsed_sweep = json.loads(sweep_raw) if sweep_raw else None
+            if isinstance(parsed_sweep, dict):
+                sweep = {
+                    "type": str(parsed_sweep.get("type", "")).replace("_", " ").title(),
+                    "when": _format_unix_ts(parsed_sweep.get("timestamp")),
+                }
+        except (TypeError, ValueError):
+            pass
+
+        return render_template(
+            "market.html",
+            macro=macro,
+            zones=zones,
+            sweep=sweep,
+            session_label=current_session_label(),
+        )
+
     return flask_app
 
 

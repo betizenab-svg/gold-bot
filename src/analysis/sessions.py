@@ -52,3 +52,42 @@ class SessionEngine:
             note += " | Late Friday: weekend risk (-5)"
 
         return {"session": session, "score": int(score), "note": note}
+
+    def london_continuation(
+        self,
+        candles: Any,
+        trade_direction: str,
+        timestamp: int,
+    ) -> dict[str, Any]:
+        """NY signals aligned with London's net direction get a bonus (MMM:
+        'the direction taken in London often continues in New York')."""
+        neutral = {"score": 0, "note": None}
+        hour = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).hour
+        if not (12 <= hour < 16):
+            return neutral
+        if not isinstance(candles, list) or not candles:
+            return neutral
+
+        day_start = int(timestamp) - (int(timestamp) % 86400)
+        london = [
+            c
+            for c in candles
+            if day_start + 7 * 3600 <= int(c.timestamp) < day_start + 12 * 3600
+        ]
+        if len(london) < 12:
+            return neutral
+
+        net = float(london[-1].close) - float(london[0].open)
+        if abs(net) < 0.5:
+            return neutral
+        london_direction = "LONG" if net > 0 else "SHORT"
+
+        if str(trade_direction).upper() == london_direction:
+            return {
+                "score": 5,
+                "note": f"NY signal continues London's {london_direction} move (+5)",
+            }
+        return {
+            "score": -5,
+            "note": f"NY signal fights London's {london_direction} move (-5)",
+        }

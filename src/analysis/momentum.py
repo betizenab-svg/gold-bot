@@ -104,6 +104,19 @@ class MomentumEngine:
                 score += 10
                 notes.append("Price below EMA21 below EMA55: trend supports short (+10)")
 
+        # Brooks guideline 73: 7 of the last 10 closes on one side of the EMA
+        # means do not fade that side.
+        if fast_ema is not None and len(closes) >= 10 and not result["veto"]:
+            recent = closes[-10:]
+            above = sum(1 for close in recent if close > fast_ema)
+            below = sum(1 for close in recent if close < fast_ema)
+            if direction == "SHORT" and above >= 7:
+                result["veto"] = True
+                notes.append("7 of last 10 closes above EMA21: shorts vetoed (Brooks G73)")
+            elif direction == "LONG" and below >= 7:
+                result["veto"] = True
+                notes.append("7 of last 10 closes below EMA21: longs vetoed (Brooks G73)")
+
         if not notes:
             notes.append("Momentum: neutral")
 

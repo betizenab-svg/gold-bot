@@ -7,6 +7,7 @@ from src.analysis.adaptive_weights import AdaptiveWeightEngine
 from src.analysis.market_state import MarketStateEngine
 from src.analysis.momentum import MomentumEngine
 from src.analysis.mtf_bias import MultiTimeframeBiasEngine
+from src.analysis.pivots import PivotPointEngine
 from src.analysis.scoring import ScoringEngine
 from src.analysis.sessions import SessionEngine
 from src.analysis.trendline import TrendlineEngine
@@ -46,6 +47,7 @@ class ConfluenceEngineV2:
         self.weight_engine = weight_engine or AdaptiveWeightEngine()
         self.market_state_engine = market_state_engine or MarketStateEngine()
         self.trendline_engine = trendline_engine or TrendlineEngine()
+        self.pivot_engine = PivotPointEngine()
 
     def evaluate(
         self,
@@ -147,6 +149,27 @@ class ConfluenceEngineV2:
         if second_attempt:
             delta += 10
             notes.append("Second attempt at the same level: higher reliability (+10)")
+
+        pivot_result = self._run(
+            self.pivot_engine.evaluate,
+            recent_candles,
+            trade_direction,
+            entry_price,
+            int(current_timestamp),
+        )
+        if pivot_result and pivot_result.get("note"):
+            delta += int(pivot_result.get("score", 0))
+            notes.append(str(pivot_result["note"]))
+
+        continuation_result = self._run(
+            self.session_engine.london_continuation,
+            recent_candles,
+            trade_direction,
+            int(current_timestamp),
+        )
+        if continuation_result and continuation_result.get("note"):
+            delta += int(continuation_result.get("score", 0))
+            notes.append(str(continuation_result["note"]))
 
         smt_delta, smt_note = self._smt_adjustment(repository, trade_direction)
         if smt_note:

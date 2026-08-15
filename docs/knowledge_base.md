@@ -48,11 +48,31 @@ file maps each decision to its sources so future tuning stays evidence-based.
 | `analysis/trendline.py` + confluence | Counter-trend entries require a prior body-close break of the trendline drawn through the last two swing pivots | Brooks ("the single most important rule"); Market Traps; Trendline Trading; Candlestick Bible |
 | `scripts/calibrate_from_history.py` | Evidence loop: per-strategy expectancy, profit factor, loser-MFE and winner-MAE medians with concrete knob recommendations | Link/Kiev statistics reviews; Bassal (change the plan only on evidence) |
 
+## Round 3 — second-pass extraction + external sources (BabyPips)
+
+| Code location | Rule | Source |
+|---|---|---|
+| `strategies/engulfing_zone.py` | Engulfing at a zone as a standalone trigger: Nison's 3 criteria (definable prior leg via EMA21 side, full body engulfment, opposite colors) + zone confluence, STOP beyond the extreme | Candlestick Bible pp109-135; Master the Art; Nison criteria |
+| `strategies/pullback_h2.py` | Brooks H2/L2: second leg of a with-trend pullback, STOP beyond the H2/L2 bar, signal-bar quality gate | Brooks bar-counting chapters + guidelines 42/61 ("you will not make money until you trade with-trend pullbacks") |
+| `analysis/pivots.py` | Classic floor pivots PP/R1-R3/S1-S3 from previous UTC day; entry near a supportive pivot = +6 | BabyPips School of Pipsology (formulas fetched 2026-08) |
+| `analysis/momentum.py` | Brooks G73: 7 of last 10 closes above EMA21 = no shorts (mirror for longs) | Brooks Ch 25 guideline 73 |
+| `analysis/sessions.py` | London-to-NY continuation: NY-killzone signals aligned with London's net direction +5, fighting it -5 | Market Makers Method ("the direction taken in London often continues in New York") |
+| `analysis/risk_governor.py` | Manual kill switch (kv `trading_paused`) togglable from the dashboard | Link/Bassal discipline chapters (the plan owner can always stand down) |
+| `analysis/signal_factory.py` `_render_trade_plan` | Telegram reasoning restructured as a professional trade plan: tier, top-down context, location, liquidity story, trigger, evidence, numbers with WHY, risk state, if-then plan, invalidation | Link (written if/then scenarios), Kiev (conviction tiers, "what proves me wrong"), Bassal (journal format), Bible (trend-level-signal triad) |
+| `src/dashboard/` | Performance page (equity curve in R, per-strategy expectancy/profit factor, MFE/MAE, calibration recommendations), Risk page (governor state, kill switch, news blackout editor), Market page (macro intelligence, zone book, session clock) | Link/Kiev statistics reviews; Bassal monthly review |
+
 ## Still documented for a future round
 
 1. **Trailing runner** behind swing points instead of the fixed 3R cap once
    ≥2R (Kratter/Bennett/Kiev preference — deliberately deferred: moving
    targets are hard to communicate in a signal service).
+2. **Quasimodo limit entries** at the left shoulder after sweep + CHOCH (RTM).
+3. **Wedge/three-push detector** with shrinking-thrust exhaustion (Brooks/Dayton/SPINE).
+4. **Range-day mode** with edge-only failed-breakout fades (Ray Wang/Brooks G46-53).
+5. **Double top/bottom neckline engine** ("tries twice and fails → go the other way").
+6. **Symmetry projections + fib cluster zones** beyond the OTE band (Boroden).
+7. **Morning/evening star + two-bar reversal** grade-C trigger family.
+8. **Conviction-tiered position sizing** (tier already shown in the trade plan; sizing ladder next).
 
 ## Contradictions resolved (so nobody "fixes" them backwards)
 

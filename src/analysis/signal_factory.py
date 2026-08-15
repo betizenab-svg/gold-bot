@@ -4,7 +4,13 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from config.settings import ATR_SL_MULTIPLIER, SL_MIN_ATR_MULT, SL_MIN_USD
+from config.settings import (
+    ACTIVE_MAX_HOLD_HOURS,
+    ATR_SL_MULTIPLIER,
+    SIGNAL_EXPIRY_MINUTES,
+    SL_MIN_ATR_MULT,
+    SL_MIN_USD,
+)
 from src.analysis.position_sizing import LotSizeCalculator
 from src.domain.signal import Signal
 
@@ -65,6 +71,90 @@ class SignalFactory:
         if tp2 < cap < tp1:
             return cap
         return tp2
+
+    def _render_trade_plan(
+        self,
+        plan: dict[str, Any],
+        zone_dict: dict[str, Any],
+        direction: str,
+        entry: float,
+        sl: float,
+        tp1: float,
+        tp2: float,
+        score: int,
+    ) -> str:
+        """Professional trade-plan narrative: thesis, evidence, numbers, and
+        pre-committed reactions (Link/Kiev/Bassal journaling consensus)."""
+        if score >= 85:
+            tier = "Tier 1 - full conviction"
+        elif score >= 75:
+            tier = "Tier 2 - standard"
+        else:
+            tier = "Tier 3 - marginal"
+
+        strategy = str(zone_dict.get("strategy") or "SMC ZONE").replace("_", " ").title()
+        order_type = str(zone_dict.get("order_type", "LIMIT")).upper()
+        zone_type = str(zone_dict.get("type", "")).replace("_", " ").strip()
+        zone_status = str(zone_dict.get("status", "")).title()
+
+        lines: list[str] = [f"TRADE PLAN | Score {score} | {tier}"]
+
+        context_bits = []
+        if plan.get("structure"):
+            context_bits.append(f"Structure {plan['structure']}")
+        if plan.get("macro_bias"):
+            context_bits.append(f"Macro bias {plan['macro_bias']}")
+        if plan.get("regime"):
+            context_bits.append(f"Regime {plan['regime']}")
+        if plan.get("session"):
+            context_bits.append(f"Session: {plan['session']}")
+        if context_bits:
+            lines.append("Context: " + " | ".join(context_bits))
+
+        if zone_type:
+            try:
+                zone_top = float(zone_dict.get("price_top"))
+                zone_bottom = float(zone_dict.get("price_bottom"))
+                lines.append(
+                    f"Location: {zone_status} {zone_type} {zone_bottom:.2f}-{zone_top:.2f}"
+                )
+            except (TypeError, ValueError):
+                lines.append(f"Location: {zone_status} {zone_type}")
+
+        sweep_line = plan.get("liquidity")
+        lines.append(f"Liquidity: {sweep_line if sweep_line else 'no recent sweep on this side'}")
+
+        lines.append(f"Trigger: {strategy} via {order_type} order")
+
+        notes = plan.get("notes")
+        if isinstance(notes, list) and notes:
+            lines.append("Evidence:")
+            for note in notes:
+                lines.append(f"- {note}")
+
+        risk = abs(entry - sl)
+        lines.append(
+            f"Numbers: entry {entry:.2f} ({order_type}) | SL {sl:.2f} "
+            f"(structure + ATR floor, round numbers cleared, risk {risk:.2f}) | "
+            f"TP1 {tp1:.2f} (1.5R, bank half) | TP2 {tp2:.2f} "
+            f"({'measured-move capped' if zone_dict.get('measured_move') else '3R'}) | "
+            "blended 2.25R if both targets pay"
+        )
+
+        risk_bits = []
+        if plan.get("daily_r") is not None:
+            risk_bits.append(f"day so far {plan['daily_r']}")
+        risk_bits.append("risk fixed 2% per lot table below")
+        lines.append("Risk state: " + " | ".join(risk_bits))
+
+        lines.append(
+            "Plan: TP1 hit -> bank half, stop to entry. "
+            f"No trigger in {int(SIGNAL_EXPIRY_MINUTES)} min -> cancelled. "
+            f"No TP1 within {int(ACTIVE_MAX_HOLD_HOURS)}h -> closed flat. "
+            f"Thesis invalid on a close beyond {sl:.2f}."
+        )
+
+        return "\n".join(lines)
 
     def calculate_parameters(
         self,
@@ -134,12 +224,18 @@ class SignalFactory:
         entry, sl, tp1, tp2 = self.calculate_parameters(signal_type, zone_dict, atr)
         zone_status = str(zone_dict.get("status", "UNKNOWN")).title()
         zone_type = str(zone_dict.get("type", "ZONE")).replace("_", " ")
-        base_reasoning = f"Score: {int(score)}. Entry off {zone_status} {zone_type}."
 
-        confluence_notes = zone_dict.get("confluence_notes")
-        if isinstance(confluence_notes, list) and confluence_notes:
-            rendered_notes = "\n".join(f"- {note}" for note in confluence_notes)
-            base_reasoning = f"{base_reasoning}\n{rendered_notes}"
+        plan_context = zone_dict.get("plan_context")
+        if isinstance(plan_context, dict):
+            base_reasoning = self._render_trade_plan(
+                plan_context, zone_dict, signal_type, entry, sl, tp1, tp2, int(score)
+            )
+        else:
+            base_reasoning = f"Score: {int(score)}. Entry off {zone_status} {zone_type}."
+            confluence_notes = zone_dict.get("confluence_notes")
+            if isinstance(confluence_notes, list) and confluence_notes:
+                rendered_notes = "\n".join(f"- {note}" for note in confluence_notes)
+                base_reasoning = f"{base_reasoning}\n{rendered_notes}"
 
         lot_size_table = LotSizeCalculator().generate_table(entry, sl)
         reasoning = f"{base_reasoning}{self.LOT_SIZE_TABLE_MARKER}{lot_size_table}"

@@ -65,6 +65,13 @@ class RiskGovernor:
         now_ts = int(now_ts)
 
         try:
+            paused = repository.get_kv("trading_paused")
+            if isinstance(paused, str) and paused.strip() in {"1", "true", "TRUE", "yes"}:
+                return False, "Risk governor: trading manually paused (kill switch)"
+        except Exception as exc:
+            logging.debug("Risk governor pause check skipped: %s", exc)
+
+        try:
             open_signals = repository.get_open_signals()
             if isinstance(open_signals, list) and len(open_signals) >= self.max_concurrent_signals:
                 return False, (

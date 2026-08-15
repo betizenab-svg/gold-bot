@@ -1,0 +1,87 @@
+{% extends "base.html" %} {% block title %}Risk | XAUUSD Intelligence{% endblock
+%} {% block page_title %}Risk Governor{% endblock %} {% block content %}
+<section class="grid grid-cols-2 gap-4 md:grid-cols-4">
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Kill switch</p>
+    <p class="mt-1 text-2xl font-semibold {% if paused %}text-rose-400{% else %}text-emerald-400{% endif %}">
+      {{ "PAUSED" if paused else "LIVE" }}
+    </p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Realized today</p>
+    <p class="mt-1 text-2xl font-semibold {% if daily_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      {{ "%+.2f"|format(daily_r) }}R
+    </p>
+    <p class="mt-1 text-xs text-slate-500">stops at -3R · locks at +4R</p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Loss streak</p>
+    <p class="mt-1 text-2xl font-semibold">{{ streak }}</p>
+    <p class="mt-1 text-xs text-slate-500">halt at 3 (6h) · suspend at 5 (24h)</p>
+  </div>
+  <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+    <p class="text-xs text-slate-400">Signals today</p>
+    <p class="mt-1 text-2xl font-semibold">{{ signals_today }}</p>
+    <p class="mt-1 text-xs text-slate-500">cap 6 · SL cooldown {{ cooldown_left_min }}min left</p>
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-sm font-semibold text-slate-300">Manual kill switch</h2>
+      <p class="mt-1 text-xs text-slate-500">
+        Pausing blocks every new signal at the governor level. Open trades keep
+        being managed (TP/SL/breakeven updates continue).
+      </p>
+      <p class="mt-1 text-xs text-slate-500">Last stop loss: {{ last_sl_time }}</p>
+    </div>
+    <form method="post" action="{{ url_for('toggle_pause') }}">
+      <button
+        class="rounded-xl px-5 py-3 text-sm font-semibold transition-colors {% if paused %}bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30{% else %}bg-rose-500/20 text-rose-300 hover:bg-rose-500/30{% endif %}"
+        type="submit"
+      >
+        {{ "Resume trading" if paused else "Pause trading" }}
+      </button>
+    </form>
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">News blackout windows</h2>
+  <p class="mt-1 text-xs text-slate-500">
+    No new signals from 30 minutes before to 15 minutes after each event
+    (FOMC, NFP, CPI...). Times are UTC.
+  </p>
+  <form method="post" action="{{ url_for('add_news_event') }}" class="mt-4 flex flex-wrap items-end gap-3">
+    <label class="text-xs text-slate-400">
+      Event time (UTC)
+      <input type="datetime-local" name="event_time" required
+        class="mt-1 block rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+    </label>
+    <label class="text-xs text-slate-400">
+      Label
+      <input type="text" name="label" placeholder="FOMC rate decision"
+        class="mt-1 block rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200" />
+    </label>
+    <button type="submit" name="action" value="add"
+      class="rounded-xl bg-cyanlux/20 px-4 py-2 text-sm font-semibold text-cyanlux hover:bg-cyanlux/30 transition-colors">
+      Add window
+    </button>
+    <button type="submit" name="action" value="clear"
+      class="rounded-xl bg-white/5 px-4 py-2 text-sm text-slate-400 hover:bg-white/10 transition-colors">
+      Clear all
+    </button>
+  </form>
+  <div class="mt-4 space-y-2">
+    {% for event in news_events %}
+    <div class="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm">
+      <span class="text-slate-300">{{ event.label or "high-impact event" }}</span>
+      <span class="font-mono text-xs text-slate-400">{{ event.when }}</span>
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-500">No upcoming blackout windows configured.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
