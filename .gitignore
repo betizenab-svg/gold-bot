@@ -12,3 +12,4 @@ pyright_*.json
 sprint*_result.txt
 # Copyrighted reference material - never publish
 books/
+data/replay_report.json

@@ -74,7 +74,8 @@ def test_memory_deallocation(db_path: str) -> None:
     repository = Repository(connection)
     client = YahooFinanceClient(repository=repository)
 
-    start = datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Candles must lie in the past: the client drops still-forming bars.
+    start = datetime.now(timezone.utc) - timedelta(minutes=5010)
     index = pd.date_range(start=start, periods=5000, freq="min", tz="UTC")
 
     tracker: dict[str, weakref.ReferenceType[pd.DataFrame]] = {}

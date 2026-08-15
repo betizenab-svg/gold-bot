@@ -8,7 +8,7 @@ import logging
 import pandas as pd
 import yfinance as yf
 
-from config.settings import YAHOO_SYMBOL_MAP
+from config.settings import TIMEFRAME_SECONDS, YAHOO_SYMBOL_MAP
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
 from src.resilience.circuit_breaker import CircuitBreaker
@@ -149,10 +149,15 @@ class YahooFinanceClient:
         df = df[df[ohlc_cols].notna().all(axis=1)]
 
         candles: List[Candle] = []
+        now_epoch = int(datetime.now(timezone.utc).timestamp())
+        step_seconds = int(TIMEFRAME_SECONDS.get(timeframe, 60))
         for timestamp, row in df.iterrows():
             row_data: Any = row
             epoch_timestamp = int(cast(Any, timestamp).timestamp())
             if epoch_timestamp <= last_timestamp:
+                continue
+            # Skip the still-forming bar: its OHLC would be frozen wrong forever.
+            if epoch_timestamp + step_seconds > now_epoch:
                 continue
 
             volume = 0.0 if pd.isna(row_data["Volume"]) else float(row_data["Volume"])

@@ -16,7 +16,8 @@ class QuasimodoStrategy:
     LIMIT at SH1, stop above SH2.
     """
 
-    MAX_AGE_BARS = 40
+    MAX_AGE_BARS = 25
+    ZONE_PROXIMITY_USD = 2.0
 
     def __init__(self, entry_buffer_pts: float = ENTRY_BUFFER_PTS) -> None:
         self.entry_buffer_pts = float(entry_buffer_pts)
@@ -25,6 +26,7 @@ class QuasimodoStrategy:
         self,
         candles: List[Candle],
         swing_history: Optional[dict[str, Any]],
+        active_zones: Optional[List[dict[str, Any]]] = None,
     ) -> Optional[dict[str, Any]]:
         if not isinstance(candles, list) or len(candles) < 5:
             return None
@@ -38,9 +40,41 @@ class QuasimodoStrategy:
         max_age_seconds = self.MAX_AGE_BARS * step
 
         bearish = self._detect_bearish(highs, lows, current, max_age_seconds)
-        if bearish is not None:
+        if bearish is not None and self._shoulder_at_zone(
+            float(bearish["entry_price"]), active_zones, "BEARISH"
+        ):
             return bearish
-        return self._detect_bullish(highs, lows, current, max_age_seconds)
+        bullish = self._detect_bullish(highs, lows, current, max_age_seconds)
+        if bullish is not None and self._shoulder_at_zone(
+            float(bullish["entry_price"]), active_zones, "BULLISH"
+        ):
+            return bullish
+        return None
+
+    def _shoulder_at_zone(
+        self,
+        shoulder_price: float,
+        active_zones: Optional[List[dict[str, Any]]],
+        wanted: str,
+    ) -> bool:
+        """Book spec (RTM): the QM shoulder must coincide with a mapped
+        supply/demand zone — without it the pattern overfires (replay-proven)."""
+        if not isinstance(active_zones, list):
+            return False
+        for zone in active_zones:
+            if str(zone.get("status", "")).upper() not in {"ACTIVE", "UNMITIGATED"}:
+                continue
+            if wanted not in str(zone.get("type", "")).upper():
+                continue
+            try:
+                top = float(zone["price_top"])
+                bottom = float(zone["price_bottom"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            low, high = min(top, bottom), max(top, bottom)
+            if low - self.ZONE_PROXIMITY_USD <= shoulder_price <= high + self.ZONE_PROXIMITY_USD:
+                return True
+        return False
 
     @staticmethod
     def _pivots(raw: Any) -> List[dict[str, float]]:

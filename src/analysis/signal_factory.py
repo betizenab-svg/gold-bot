@@ -251,7 +251,9 @@ class SignalFactory:
                 if strategy_key is not None
                 else f"{round(entry, 2):.2f}|{round(sl, 2):.2f}"
             )
-        date_string = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Date from the signal candle (not wall clock) so a pending setup
+        # cannot re-fire as a "new" signal across the midnight rollover.
+        date_string = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).strftime("%Y-%m-%d")
         hash_input = f"{symbol}|{signal_type}|{dedupe_target}|{date_string}"
         signal_hash = hashlib.md5(hash_input.encode("utf-8")).hexdigest()
 

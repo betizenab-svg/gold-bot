@@ -1,6 +1,22 @@
 {% extends "base.html" %} {% block title %}Dashboard | XAUUSD Intelligence{%
 endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
 %}
+<meta http-equiv="refresh" content="60" />
+{% if heartbeat_state == 'STALLED' %}
+<div class="mb-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-5 py-4">
+  <p class="font-semibold text-rose-300">
+    Engine stalled — no pulse for {{ heartbeat_age_min }} minutes.
+  </p>
+  <p class="mt-1 text-xs text-rose-200/70">
+    Check the GitHub Actions tab (or your cron). Weekends and market holidays are normal.
+  </p>
+</div>
+{% elif heartbeat_state == 'LIVE' %}
+<div class="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3">
+  <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
+  <p class="text-sm text-emerald-300">Engine live — last pulse {{ heartbeat_age_min }} min ago</p>
+</div>
+{% endif %}
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
   <article class="metric-card metric-cyan">
     <p class="metric-label">Total Signals</p>

@@ -96,6 +96,9 @@ class SignalFormatter:
         elif normalized_type == "BE_HIT":
             alert_message = "⚖️ <b>Breakeven Exit</b>\nRunner closed at entry after TP1 was banked."
             explanation_title = "Reason"
+        elif normalized_type == "EARLY_BE":
+            alert_message = "🛡️ <b>Breakeven Protect</b>\nRan +1R, stop moved to entry, closed flat instead of stopped."
+            explanation_title = "Reason"
         elif normalized_type == "EXPIRED":
             alert_message = "⌛ <b>Signal Expired</b>\nEntry was never triggered; order cancelled."
             explanation_title = "Reason"

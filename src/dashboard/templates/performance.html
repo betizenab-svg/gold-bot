@@ -70,6 +70,23 @@ block content %}
 </section>
 
 <section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Net R by session (when signals were born)</h2>
+  <div class="mt-3 grid gap-3 md:grid-cols-4">
+    {% for row in session_split %}
+    <div class="rounded-xl bg-white/5 p-4">
+      <p class="text-xs text-slate-400">{{ row.session }}</p>
+      <p class="mt-1 text-lg font-semibold {% if row.net_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+        {{ "%+.2f"|format(row.net_r) }}R
+      </p>
+      <p class="text-xs text-slate-500">{{ row.n }} closed</p>
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">No closed trades yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
   <h2 class="text-sm font-semibold text-slate-300">Excursion telemetry (avg MFE / MAE in R)</h2>
   <div class="mt-3 grid gap-3 md:grid-cols-3">
     {% for row in excursions %}

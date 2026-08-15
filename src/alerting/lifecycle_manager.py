@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional, Sequence
 
 from config.settings import ACTIVE_MAX_HOLD_HOURS, SIGNAL_EXPIRY_MINUTES
@@ -21,6 +22,7 @@ class SignalLifecycleManager:
         "TP2_SMASH": "CLOSED_TP2",
         "SL_HIT": "CLOSED_SL",
         "BE_HIT": "CLOSED_BE",
+        "EARLY_BE": "CLOSED_BE",
         "EXPIRED": "CANCELLED",
         "TIME_STOP": "CLOSED_TIME",
         "STRUCTURE_EXIT": "CLOSED_STRUCT",
@@ -30,9 +32,14 @@ class SignalLifecycleManager:
     EVENT_R_MAP = {
         "SL_HIT": -1.0,
         "BE_HIT": 0.75,
+        "EARLY_BE": 0.0,
         "TP2_SMASH": 2.25,
         "TIME_STOP": 0.0,
     }
+
+    # Once a trade has run this far in R, the stop moves to entry
+    # (Trendline/Brooks: breakeven after the move equals the risk).
+    BE_ARM_R = 1.0
 
     def __init__(
         self,
@@ -124,12 +131,17 @@ class SignalLifecycleManager:
                     if order_type == "STOP"
                     else candle_low <= entry_price
                 )
+                if triggered and candle_low <= sl_price:
+                    # Filled and stopped within the same candle: pessimistic fill.
+                    return "SL_HIT"
             else:
                 triggered = (
                     candle_low <= entry_price
                     if order_type == "STOP"
                     else candle_high >= entry_price
                 )
+                if triggered and candle_high >= sl_price:
+                    return "SL_HIT"
             return "ACTIVATED" if triggered else None
 
         if status not in {"ACTIVE", "PARTIAL_TP1"}:
@@ -144,8 +156,12 @@ class SignalLifecycleManager:
             # Worst-case first: protective exits take priority over targets.
             if status == "PARTIAL_TP1" and candle_low <= entry_price:
                 return "BE_HIT"
-            if status == "ACTIVE" and candle_low <= sl_price:
-                return "SL_HIT"
+            if status == "ACTIVE":
+                be_armed = self._breakeven_armed(signal)
+                if be_armed and candle_low <= entry_price:
+                    return "EARLY_BE"
+                if not be_armed and candle_low <= sl_price:
+                    return "SL_HIT"
             if candle_high >= tp2_price:
                 return "TP2_SMASH"
             if status == "ACTIVE" and candle_high >= tp1_price:
@@ -154,13 +170,46 @@ class SignalLifecycleManager:
 
         if status == "PARTIAL_TP1" and candle_high >= entry_price:
             return "BE_HIT"
-        if status == "ACTIVE" and candle_high >= sl_price:
-            return "SL_HIT"
+        if status == "ACTIVE":
+            be_armed = self._breakeven_armed(signal)
+            if be_armed and candle_high >= entry_price:
+                return "EARLY_BE"
+            if not be_armed and candle_high >= sl_price:
+                return "SL_HIT"
         if candle_low <= tp2_price:
             return "TP2_SMASH"
         if status == "ACTIVE" and candle_low <= tp1_price:
             return "TP1_SMASH"
         return None
+
+    def _breakeven_armed(self, signal: Any) -> bool:
+        """True once the trade has already run >= 1R in favor (tracked MFE):
+        the stop is then treated as sitting at entry."""
+        try:
+            mfe = float(self._get_value(signal, "mfe_r", default=0.0) or 0.0)
+        except (TypeError, ValueError):
+            return False
+        return mfe >= self.BE_ARM_R
+
+    @staticmethod
+    def _trading_age_seconds(created_ts: int, now_ts: int) -> int:
+        """Elapsed time minus weekend hours, so Friday signals are not mass
+        expired at the Sunday reopen. Approximates the closed market as the
+        UTC Saturday+Sunday block."""
+        total = int(now_ts) - int(created_ts)
+        if total <= 0:
+            return 0
+        closed = 0
+        day_cursor = int(created_ts) - (int(created_ts) % 86400)
+        while day_cursor < now_ts:
+            day_end = day_cursor + 86400
+            weekday = datetime.fromtimestamp(day_cursor, tz=timezone.utc).weekday()
+            if weekday in (5, 6):  # Saturday, Sunday
+                overlap = min(day_end, int(now_ts)) - max(day_cursor, int(created_ts))
+                if overlap > 0:
+                    closed += overlap
+            day_cursor = day_end
+        return max(0, total - closed)
 
     def _is_pending_expired(self, signal: Any, current_candle: Candle) -> bool:
         raw_created = self._get_value(signal, "timestamp", "created_at")
@@ -170,7 +219,7 @@ class SignalLifecycleManager:
             return False
         if created_ts <= 0:
             return False
-        age_seconds = int(current_candle.timestamp) - created_ts
+        age_seconds = self._trading_age_seconds(created_ts, int(current_candle.timestamp))
         return age_seconds > int(SIGNAL_EXPIRY_MINUTES) * 60
 
     def _is_active_stale(self, signal: Any, current_candle: Candle) -> bool:
@@ -181,7 +230,7 @@ class SignalLifecycleManager:
             return False
         if created_ts <= 0:
             return False
-        age_seconds = int(current_candle.timestamp) - created_ts
+        age_seconds = self._trading_age_seconds(created_ts, int(current_candle.timestamp))
         return age_seconds > int(ACTIVE_MAX_HOLD_HOURS) * 3600
 
     def process_open_signals(
@@ -200,11 +249,13 @@ class SignalLifecycleManager:
             raise ValueError("repository is required to process open signals")
 
         for signal in open_signals:
-            self._track_excursions(active_repository, signal, current_candle)
             event_type = self.evaluate_signal(signal, current_candle)
             if event_type is None:
                 event_type = self._structure_exit_event(active_repository, signal)
             if event_type is None:
+                # Track excursions only on non-exit candles so the exit bar's
+                # overshoot cannot pollute MFE/MAE calibration data.
+                self._track_excursions(active_repository, signal, current_candle)
                 continue
 
             signal_hash = str(self._get_required_value(signal, "signal_hash"))
@@ -411,6 +462,12 @@ class SignalLifecycleManager:
         if normalized == "BE_HIT":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return f"Price returned to entry at {price:.2f} after TP1; runner closed at breakeven."
+        if normalized == "EARLY_BE":
+            price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
+            return (
+                f"Trade ran +1R then returned to entry at {price:.2f}; "
+                "protected at breakeven instead of taking the full stop."
+            )
         if normalized == "EXPIRED":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return f"Pending entry at {price:.2f} was never triggered; signal cancelled."

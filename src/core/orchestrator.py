@@ -48,6 +48,7 @@ from src.domain.candle import Candle
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
     CHART_ALERTS_ENABLED,
+    DISABLED_STRATEGIES,
     DXY_TICKER,
     DXY_CORRELATION_WINDOW,
     MARKET_DATA_RETENTION_DAYS,
@@ -355,6 +356,16 @@ class PulseOrchestrator:
 
         return None
 
+    @staticmethod
+    def _strategy_allowed(setup: Optional[dict[str, Any]]) -> bool:
+        if setup is None:
+            return False
+        strategy = str(setup.get("strategy", "")).upper()
+        if strategy and strategy in DISABLED_STRATEGIES:
+            logging.info("Setup from quarantined strategy skipped: %s", strategy)
+            return False
+        return True
+
     def _detect_trade_setup(
         self,
         repository: Repository,
@@ -365,17 +376,17 @@ class PulseOrchestrator:
         active_zones = repository.get_active_zones(symbol)
         pin_bar_strategy = PinBarRejectionStrategy()
         pin_bar_setup = pin_bar_strategy.detect_setup(recent_candles, active_zones)
-        if pin_bar_setup is not None:
+        if self._strategy_allowed(pin_bar_setup):
             return pin_bar_setup
 
         engulfing_strategy = EngulfingZoneStrategy()
         engulfing_setup = engulfing_strategy.detect_setup(recent_candles, active_zones)
-        if engulfing_setup is not None:
+        if self._strategy_allowed(engulfing_setup):
             return engulfing_setup
 
         pullback_strategy = PullbackH2L2Strategy()
         pullback_setup = pullback_strategy.detect_setup(recent_candles)
-        if pullback_setup is not None:
+        if self._strategy_allowed(pullback_setup):
             return pullback_setup
 
         try:
@@ -386,13 +397,15 @@ class PulseOrchestrator:
         except (TypeError, ValueError):
             swing_history = None
         if isinstance(swing_history, dict):
-            quasimodo_setup = QuasimodoStrategy().detect_setup(recent_candles, swing_history)
-            if quasimodo_setup is not None:
+            quasimodo_setup = QuasimodoStrategy().detect_setup(
+                recent_candles, swing_history, active_zones
+            )
+            if self._strategy_allowed(quasimodo_setup):
                 return quasimodo_setup
 
         inside_bar_strategy = InsideBarTrapStrategy()
         inside_bar_setup = inside_bar_strategy.detect_setup(recent_candles)
-        if inside_bar_setup is not None:
+        if self._strategy_allowed(inside_bar_setup):
             return inside_bar_setup
 
         try:
@@ -408,6 +421,8 @@ class PulseOrchestrator:
                 continue
             return {
                 "trade_direction": trade_direction,
+                "strategy": "ZONE_BOUNCE",
+                "order_type": "LIMIT",
                 "zone": zone,
             }
 
@@ -1100,6 +1115,48 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.warning("Weekly report skipped (will retry): %s", exc)
 
+    def _record_pulse_health(
+        self,
+        repository: Optional[Repository],
+        errors_encountered: int,
+    ) -> None:
+        """Heartbeat + sick-bot alarm: after 5 consecutive failing pulses,
+        send one admin alert (6h cooldown) so silent death is impossible."""
+        if repository is None:
+            return
+        try:
+            now = int(time.time())
+            repository.set_kv("last_pulse_wallclock", str(now))
+            if errors_encountered == 0:
+                repository.set_kv("consecutive_pulse_errors", "0")
+                return
+
+            try:
+                streak = int(repository.get_kv("consecutive_pulse_errors") or 0) + 1
+            except (TypeError, ValueError):
+                streak = 1
+            repository.set_kv("consecutive_pulse_errors", str(streak))
+
+            if streak < 5:
+                return
+            try:
+                last_alert = int(repository.get_kv("last_error_alert_ts") or 0)
+            except (TypeError, ValueError):
+                last_alert = 0
+            if now - last_alert < 6 * 3600:
+                return
+
+            telegram_client = self.telegram_client_factory()
+            if getattr(telegram_client, "chat_id", None):
+                telegram_client.send_message(
+                    "🩺 <b>Bot health alert</b>\n"
+                    f"{streak} consecutive pulses hit errors. "
+                    "Check the Actions log / data feed. Signals may be delayed."
+                )
+                repository.set_kv("last_error_alert_ts", str(now))
+        except Exception as exc:
+            logging.debug("Pulse health recording skipped: %s", exc)
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
@@ -1426,6 +1483,7 @@ class PulseOrchestrator:
 
             self.memory_profiler.log_snapshot("Pulse end")
             logging.info("Pulse finished in %.2fs", execution_time_ms / 1000.0)
+            self._record_pulse_health(repository, errors_encountered)
             if repository is not None and hasattr(repository, "close"):
                 repository.close()
             logging.info("---- Pulse ended ----")

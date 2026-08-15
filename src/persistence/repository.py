@@ -331,7 +331,8 @@ class Repository:
                 closure_reason,
                 status,
                 COALESCE(order_type, 'LIMIT') AS order_type,
-                strategy
+                strategy,
+                COALESCE(mfe_r, 0.0) AS mfe_r
             FROM signals
             WHERE status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
             ORDER BY created_at ASC, id ASC;
@@ -359,6 +360,7 @@ class Repository:
                     status=str(row[13] or "PENDING"),
                     order_type=str(row[14] or "LIMIT"),
                     strategy=str(row[15]) if row[15] is not None else None,
+                    mfe_r=float(row[16] or 0.0),
                 )
             )
         return signals

@@ -174,12 +174,24 @@ def create_app() -> Flask:
 
         recent_signals = _query_rows(
             """
-            SELECT id, symbol, COALESCE(signal_type, type) AS direction, score, status, timestamp
+            SELECT id, signal_hash, symbol, COALESCE(signal_type, type) AS direction, score, status, timestamp
             FROM signals
             ORDER BY id DESC
             LIMIT 8;
             """
         )
+
+        # Heartbeat: how long since the engine last pulsed?
+        last_pulse = _to_int(
+            _query_value(
+                "SELECT value FROM kv_store WHERE key = 'last_pulse_wallclock';",
+                default=0,
+            )
+        )
+        heartbeat_age_min = int((time.time() - last_pulse) // 60) if last_pulse > 0 else None
+        heartbeat_state = "UNKNOWN"
+        if heartbeat_age_min is not None:
+            heartbeat_state = "LIVE" if heartbeat_age_min <= 15 else "STALLED"
 
         return render_template(
             "index.html",
@@ -190,6 +202,8 @@ def create_app() -> Flask:
             setup_classification=str(setup_classification),
             latest_signal_time=_format_unix_ts(latest_signal_ts),
             recent_signals=recent_signals,
+            heartbeat_state=heartbeat_state,
+            heartbeat_age_min=heartbeat_age_min,
         )
 
     @flask_app.route("/signals")
@@ -215,6 +229,80 @@ def create_app() -> Flask:
             """
         )
         return render_template("signals.html", rows=rows)
+
+    def _load_signal(signal_hash: str) -> dict[str, Any] | None:
+        rows = _query_rows(
+            """
+            SELECT id, signal_hash, symbol,
+                   COALESCE(signal_type, type) AS signal_type,
+                   COALESCE(entry_price, entry) AS entry_price,
+                   COALESCE(sl_price, sl) AS sl_price,
+                   COALESCE(tp1_price, tp1) AS tp1_price,
+                   COALESCE(tp2_price, tp2) AS tp2_price,
+                   score, status, timestamp, reasoning, closure_reason,
+                   COALESCE(order_type,'LIMIT') AS order_type, strategy,
+                   COALESCE(mfe_r, 0) AS mfe_r, COALESCE(mae_r, 0) AS mae_r
+            FROM signals WHERE signal_hash = ? LIMIT 1;
+            """,
+            (signal_hash,),
+        )
+        return rows[0] if rows else None
+
+    @flask_app.route("/signals/<signal_hash>")
+    @login_required
+    def signal_detail(signal_hash: str) -> Any:
+        row = _load_signal(signal_hash)
+        if row is None:
+            flash("Signal not found.", "error")
+            return redirect(url_for("signals"))
+        row["when"] = _format_unix_ts(row.get("timestamp"))
+        return render_template("signal_detail.html", s=row)
+
+    @flask_app.route("/signals/<signal_hash>/chart.png")
+    @login_required
+    def signal_chart(signal_hash: str) -> Any:
+        from flask import Response
+
+        from src.alerting.chart_renderer import ChartRenderer
+        from src.domain.candle import Candle
+
+        row = _load_signal(signal_hash)
+        if row is None:
+            return Response("not found", status=404)
+
+        ts = _to_int(row.get("timestamp"))
+        candle_rows = _query_rows(
+            """
+            SELECT symbol, timeframe, timestamp, open, high, low, close, volume
+            FROM market_data
+            WHERE symbol = 'XAUUSD' AND timestamp <= ?
+            ORDER BY timestamp DESC LIMIT 60;
+            """,
+            (ts if ts > 0 else int(time.time()),),
+        )
+        candles = [
+            Candle(
+                symbol=c["symbol"], timeframe=c["timeframe"], timestamp=int(c["timestamp"]),
+                open=float(c["open"]), high=float(c["high"]), low=float(c["low"]),
+                close=float(c["close"]), volume=float(c["volume"] or 0),
+            )
+            for c in reversed(candle_rows)
+        ]
+
+        class _SignalView:
+            pass
+
+        view = _SignalView()
+        for key in (
+            "symbol", "signal_type", "entry_price", "sl_price",
+            "tp1_price", "tp2_price", "score", "order_type", "strategy",
+        ):
+            setattr(view, key, row.get(key))
+
+        png = ChartRenderer().render_signal_chart(candles, view, zone=None)
+        if png is None:
+            return Response("chart unavailable (not enough stored candles)", status=404)
+        return Response(png, mimetype="image/png")
 
     @flask_app.route("/logs")
     @login_required
@@ -345,6 +433,21 @@ def create_app() -> Flask:
             """
         )
 
+        # Net R split by killzone/session of signal creation.
+        from src.analysis.pivots import current_session_label
+
+        session_r: dict[str, float] = {}
+        session_n: dict[str, int] = {}
+        for row in closed:
+            label = current_session_label(_to_int(row.get("timestamp")))
+            r_value = OUTCOME_R.get(str(row.get("status", "")).upper(), 0.0)
+            session_r[label] = session_r.get(label, 0.0) + r_value
+            session_n[label] = session_n.get(label, 0) + 1
+        session_split = [
+            {"session": label, "net_r": round(value, 2), "n": session_n[label]}
+            for label, value in sorted(session_r.items(), key=lambda kv: -kv[1])
+        ]
+
         return render_template(
             "performance.html",
             curve_labels=curve_labels,
@@ -353,6 +456,7 @@ def create_app() -> Flask:
             recommendations=report.get("recommendations", []),
             totals=totals,
             excursions=excursions,
+            session_split=session_split,
         )
 
     @flask_app.route("/risk", methods=["GET"])

@@ -101,8 +101,12 @@ def test_quasimodo_bearish_limit_at_left_shoulder() -> None:
             {"timestamp": 1_700_000_500, "price": 2000.0},  # neckline
         ],
     }
+    supply_zone = {
+        "id": 11, "type": "OB_BEARISH", "status": "ACTIVE",
+        "price_top": 2011.0, "price_bottom": 2009.0,
+    }
     candles = [_candle(1_700_001_000 + i * 300, 2000.0, 2001.0, 1994.0, 1995.0) for i in range(5)]
-    setup = QuasimodoStrategy().detect_setup(candles, history)
+    setup = QuasimodoStrategy().detect_setup(candles, history, [supply_zone])
     assert setup is not None
     assert setup["strategy"] == "QUASIMODO"
     assert setup["trade_direction"] == "SHORT"
@@ -110,10 +114,17 @@ def test_quasimodo_bearish_limit_at_left_shoulder() -> None:
     assert setup["entry_price"] == 2010.0
     assert setup["sl_price"] == 2015.5
 
+    # Same pattern with NO zone at the shoulder: gated out (replay-proven).
+    assert QuasimodoStrategy().detect_setup(candles, history, []) is None
+
 
 def test_quasimodo_requires_neckline_break_and_sweep() -> None:
     strategy = QuasimodoStrategy()
     candles = [_candle(1_700_001_000 + i * 300, 2005.0, 2006.0, 2004.0, 2005.0) for i in range(5)]
+    supply_zone = {
+        "id": 11, "type": "OB_BEARISH", "status": "ACTIVE",
+        "price_top": 2016.0, "price_bottom": 2009.0,
+    }
 
     # Neckline not broken (close above it): no setup.
     unbroken = {
@@ -123,7 +134,7 @@ def test_quasimodo_requires_neckline_break_and_sweep() -> None:
         ],
         "lows": [{"timestamp": 1_700_000_500, "price": 2000.0}],
     }
-    assert strategy.detect_setup(candles, unbroken) is None
+    assert strategy.detect_setup(candles, unbroken, [supply_zone]) is None
 
     # No sweep (second high lower): no setup.
     no_sweep = {
@@ -136,7 +147,7 @@ def test_quasimodo_requires_neckline_break_and_sweep() -> None:
     broken_candles = [
         _candle(1_700_001_000 + i * 300, 2000.0, 2001.0, 1994.0, 1995.0) for i in range(5)
     ]
-    assert strategy.detect_setup(broken_candles, no_sweep) is None
+    assert strategy.detect_setup(broken_candles, no_sweep, [supply_zone]) is None
 
 
 def test_quasimodo_bullish_mirror() -> None:
@@ -149,8 +160,12 @@ def test_quasimodo_bullish_mirror() -> None:
             {"timestamp": 1_700_000_500, "price": 2000.0},  # neckline
         ],
     }
+    demand_zone = {
+        "id": 12, "type": "OB_BULLISH", "status": "ACTIVE",
+        "price_top": 1991.0, "price_bottom": 1989.0,
+    }
     candles = [_candle(1_700_001_000 + i * 300, 2001.0, 2006.0, 2000.5, 2005.0) for i in range(5)]
-    setup = QuasimodoStrategy().detect_setup(candles, history)
+    setup = QuasimodoStrategy().detect_setup(candles, history, [demand_zone])
     assert setup is not None
     assert setup["trade_direction"] == "LONG"
     assert setup["entry_price"] == 1990.0

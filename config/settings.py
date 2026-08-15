@@ -105,13 +105,23 @@ INSIDE_BAR_LOOKBACK_CANDLES = 3
 # --- Signal Quality & Risk (v2) ---
 # Timeframe the strategy engines run on (M1 is too noisy for delayed feeds).
 SIGNAL_TIMEFRAME = os.getenv("SIGNAL_TIMEFRAME", "M5")
+# Strategies quarantined by replay evidence (negative expectancy over 20+
+# trades). Comma-separated; re-enable by clearing the entry once a strategy
+# proves itself in a new regime.
+DISABLED_STRATEGIES = {
+    name.strip().upper()
+    for name in os.getenv("DISABLED_STRATEGIES", "QUASIMODO").split(",")
+    if name.strip()
+}
 # Minimum stop distance: never risk less than max(SL_MIN_USD, SL_MIN_ATR_MULT * ATR).
 SL_MIN_USD = float(os.getenv("SL_MIN_USD", "3.0"))
 SL_MIN_ATR_MULT = float(os.getenv("SL_MIN_ATR_MULT", "1.0"))
 # Pending signals that never trigger are cancelled after this window.
 SIGNAL_EXPIRY_MINUTES = int(os.getenv("SIGNAL_EXPIRY_MINUTES", "90"))
 # Candle history pulled for the intelligence engines each pulse.
-ANALYSIS_LOOKBACK_CANDLES = int(os.getenv("ANALYSIS_LOOKBACK_CANDLES", "240"))
+# 600 M5 bars = 50 hours: covers the full previous trading day (pivots),
+# the whole Asian session (day-extension governor) and all EMA warmups.
+ANALYSIS_LOOKBACK_CANDLES = int(os.getenv("ANALYSIS_LOOKBACK_CANDLES", "600"))
 # Attach a rendered chart image to each Telegram signal.
 CHART_ALERTS_ENABLED = _env_bool("CHART_ALERTS_ENABLED", True)
 # Days of market_data retained in SQLite (keeps the DB small on free hosting).

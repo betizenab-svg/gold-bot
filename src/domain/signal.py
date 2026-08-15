@@ -22,6 +22,7 @@ class Signal:
     status: str = "PENDING"
     order_type: str = "LIMIT"
     strategy: str | None = None
+    mfe_r: float = 0.0
 
     def __post_init__(self) -> None:
         timestamp = self.timestamp

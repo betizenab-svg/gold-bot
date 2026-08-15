@@ -71,6 +71,26 @@ file maps each decision to its sources so future tuning stays evidence-based.
 | `analysis/confluence.py` `_two_bar_reversal_evidence` | Two-bar reversal as +4 evidence (opposite similar bodies, second reclaims the first's open) | Brooks (two-bar reversals as buying/selling pressure), Candlestick Bible (tweezers) |
 | `analysis/position_sizing.py` + factory | Conviction-tiered sizing: Tier 1 (score >= 85) sizes the lot table at 2% risk, Tier 2 at 1% | Kiev (conviction tiers), Link (size by setup quality), Bassal |
 
+## Replay evidence (45 days of real M5 data, full pipeline, 2026-08-15)
+
+The replay engine (`scripts/replay.py`) runs the ACTUAL production pipeline
+pulse-by-pulse over history. Three runs on identical data:
+
+| Configuration | Net R | Full-win rate | What changed |
+|---|---|---|---|
+| Baseline | -10.25R | 17.9% | as-built |
+| Fix 1+2 | -0.75R | 17.2% | Quasimodo zone gate (RTM's own rule) + breakeven protect at +1R (Trendline/Brooks rule) |
+| Fix 3 | **+9.75R** | **30.8%** | QUASIMODO quarantined (negative expectancy over 31 trades across both runs -> Link's quarantine rule) |
+
+Per-strategy verdicts (final run): H2_PULLBACK +1.28R/trade PF 11.25 (the
+books' "most reliable trade" confirmed), L2 +0.13R, ZONE_BOUNCE +0.11R,
+INSIDE_BAR ~flat, PIN_BAR -0.29R over 7 (small sample, monitoring).
+Quarantine is config: `DISABLED_STRATEGIES` in .env; live adaptive weights
+continue to referee every strategy from real outcomes.
+
+Re-run the validation anytime: `python scripts/replay.py --days 45`, or the
+"Replay Validation" workflow on GitHub (report as downloadable artifact).
+
 ## Deliberately not implemented (and why)
 
 1. **Range-day edge-fade strategy family** — the barbwire veto, day-extension
