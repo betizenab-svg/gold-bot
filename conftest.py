@@ -15,3 +15,5 @@ os.environ.setdefault("SIGNAL_TIMEFRAME", "M1")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 os.environ.setdefault("TELEGRAM_CHAT_ID", "test-chat")
 os.environ.setdefault("TELEGRAM_API_BASE_URL", "http://127.0.0.1:9")
+# Chart rendering is covered by dedicated tests; keep pulse tests fast.
+os.environ.setdefault("CHART_ALERTS_ENABLED", "0")

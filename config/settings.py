@@ -112,6 +112,8 @@ SL_MIN_ATR_MULT = float(os.getenv("SL_MIN_ATR_MULT", "1.0"))
 SIGNAL_EXPIRY_MINUTES = int(os.getenv("SIGNAL_EXPIRY_MINUTES", "90"))
 # Candle history pulled for the intelligence engines each pulse.
 ANALYSIS_LOOKBACK_CANDLES = int(os.getenv("ANALYSIS_LOOKBACK_CANDLES", "240"))
+# Attach a rendered chart image to each Telegram signal.
+CHART_ALERTS_ENABLED = _env_bool("CHART_ALERTS_ENABLED", True)
 # Days of market_data retained in SQLite (keeps the DB small on free hosting).
 MARKET_DATA_RETENTION_DAYS = int(os.getenv("MARKET_DATA_RETENTION_DAYS", "45"))
 

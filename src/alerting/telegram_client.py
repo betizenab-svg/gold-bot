@@ -75,3 +75,45 @@ class TelegramClient:
             raise TelegramAPIError("Telegram API response missing result.message_id") from exc
 
         return message_id
+
+    def send_photo(
+        self,
+        photo_bytes: bytes,
+        caption: Optional[str] = None,
+        reply_to_message_id: int | None = None,
+    ) -> int:
+        if not self.bot_token:
+            raise ValueError("TELEGRAM_BOT_TOKEN is not configured")
+        if not self.chat_id:
+            raise ValueError("TELEGRAM_CHAT_ID is not configured")
+
+        data: dict[str, Any] = {"chat_id": str(self.chat_id)}
+        if caption:
+            data["caption"] = str(caption)
+            data["parse_mode"] = "HTML"
+        if reply_to_message_id is not None:
+            data["reply_to_message_id"] = int(reply_to_message_id)
+
+        endpoint = f"{self.base_url}/bot{self.bot_token}/sendPhoto"
+        try:
+            response = requests.post(
+                endpoint,
+                data=data,
+                files={"photo": ("signal.png", photo_bytes, "image/png")},
+                timeout=self.timeout_seconds,
+            )
+        except requests.Timeout as exc:
+            raise TelegramAPIError("Telegram API request timed out") from exc
+        except requests.RequestException as exc:
+            raise TelegramAPIError(f"Telegram API request failed: {exc}") from exc
+
+        if response.status_code != 200:
+            raise TelegramAPIError(
+                f"Telegram API returned status {response.status_code}: {response.text}"
+            )
+
+        try:
+            payload_json = response.json()
+            return int(payload_json["result"]["message_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TelegramAPIError("Telegram API response missing result.message_id") from exc

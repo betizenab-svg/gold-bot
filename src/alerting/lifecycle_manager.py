@@ -50,11 +50,22 @@ class SignalLifecycleManager:
         signal_obj: Any,
         sl_distance_pips: float,
         chat_id: Optional[str] = None,
+        chart_png: Optional[bytes] = None,
     ) -> tuple[int, int]:
         target_chat_id = self._get_required_value(signal_obj, "telegram_chat_id", default=chat_id)
         self._set_client_chat_id(str(target_chat_id))
         initial_message = self.formatter.format_initial_signal(signal_obj)
         message_id = self.telegram_client.send_message(initial_message)
+
+        # Chart is best-effort decoration: never let it break the alert flow.
+        if chart_png:
+            try:
+                self.telegram_client.send_photo(
+                    chart_png,
+                    reply_to_message_id=int(message_id),
+                )
+            except Exception as exc:
+                logging.info("Signal chart delivery skipped: %s", exc)
 
         signal_hash = self._get_optional_value(signal_obj, "signal_hash")
         if self.repository is not None and signal_hash is not None:

@@ -47,6 +47,7 @@ from src.validation.validator import DataValidator
 from src.domain.candle import Candle
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
+    CHART_ALERTS_ENABLED,
     DXY_TICKER,
     DXY_CORRELATION_WINDOW,
     MARKET_DATA_RETENTION_DAYS,
@@ -710,12 +711,26 @@ class PulseOrchestrator:
             )
             return True, 0
 
+        chart_png: Optional[bytes] = None
+        if CHART_ALERTS_ENABLED:
+            try:
+                from src.alerting.chart_renderer import ChartRenderer
+
+                chart_png = ChartRenderer().render_signal_chart(
+                    candles=recent_candles,
+                    signal=signal,
+                    zone=zone if zone else None,
+                )
+            except Exception as exc:
+                logging.info("Chart rendering skipped: %s", exc)
+
         sl_distance_pips = abs(float(signal.entry_price) - float(signal.sl_price))
         try:
             initial_message_id, reasoning_message_id = lifecycle_manager.deploy_signal(
                 signal,
                 sl_distance_pips=sl_distance_pips,
                 chat_id=str(target_chat_id),
+                chart_png=chart_png,
             )
             logging.info(
                 "Telegram signal dispatched: signal=%s initial_message_id=%s reasoning_message_id=%s",
