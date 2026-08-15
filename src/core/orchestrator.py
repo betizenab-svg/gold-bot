@@ -64,6 +64,7 @@ from src.strategies.engulfing_zone import EngulfingZoneStrategy
 from src.strategies.inside_bar_trap import InsideBarTrapStrategy
 from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
 from src.strategies.pullback_h2 import PullbackH2L2Strategy
+from src.strategies.quasimodo import QuasimodoStrategy
 
 
 MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
@@ -371,6 +372,18 @@ class PulseOrchestrator:
         pullback_setup = pullback_strategy.detect_setup(recent_candles)
         if pullback_setup is not None:
             return pullback_setup
+
+        try:
+            raw_history = repository.get_kv("swing_history")
+            swing_history = (
+                json.loads(raw_history) if isinstance(raw_history, str) else None
+            )
+        except (TypeError, ValueError):
+            swing_history = None
+        if isinstance(swing_history, dict):
+            quasimodo_setup = QuasimodoStrategy().detect_setup(recent_candles, swing_history)
+            if quasimodo_setup is not None:
+                return quasimodo_setup
 
         inside_bar_strategy = InsideBarTrapStrategy()
         inside_bar_setup = inside_bar_strategy.detect_setup(recent_candles)

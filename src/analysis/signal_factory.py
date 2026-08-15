@@ -237,7 +237,9 @@ class SignalFactory:
                 rendered_notes = "\n".join(f"- {note}" for note in confluence_notes)
                 base_reasoning = f"{base_reasoning}\n{rendered_notes}"
 
-        lot_size_table = LotSizeCalculator().generate_table(entry, sl)
+        lot_size_table = LotSizeCalculator().generate_table(
+            entry, sl, risk_pct=0.02 if int(score) >= 85 else 0.01
+        )
         reasoning = f"{base_reasoning}{self.LOT_SIZE_TABLE_MARKER}{lot_size_table}"
 
         zone_id = zone_dict.get("id", zone_dict.get("zone_id"))

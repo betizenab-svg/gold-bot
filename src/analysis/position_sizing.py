@@ -30,19 +30,19 @@ class LotSizeCalculator:
         lot_size = risk_amount / (pip_distance * self.STANDARD_LOT_PIP_VALUE)
         return round(max(lot_size, 0.01), 2)
 
-    def generate_table(self, entry_price: float, sl_price: float) -> str:
+    def generate_table(self, entry_price: float, sl_price: float, risk_pct: float = RISK_PERCENT) -> str:
         pips = self.calculate_pips(entry_price, sl_price)
         if pips == 0:
             return "<b>Lot size unavailable:</b> <code>SL distance is zero.</code>"
-        return self._build_table_from_pips(pips)
+        return self._build_table_from_pips(pips, risk_pct)
 
     def calculate_table(self, sl_distance_pips: float) -> str:
         pip_distance = float(sl_distance_pips)
         if pip_distance <= 0:
             raise ValueError("sl_distance_pips must be greater than zero")
-        return self._build_table_from_pips(pip_distance)
+        return self._build_table_from_pips(pip_distance, self.RISK_PERCENT)
 
-    def _build_table_from_pips(self, pips: float) -> str:
+    def _build_table_from_pips(self, pips: float, risk_pct: float = RISK_PERCENT) -> str:
         pre_lines_before_baseline = [
             "Balance   Lot Size",
             "-------   --------",
@@ -50,7 +50,7 @@ class LotSizeCalculator:
         pre_lines_from_baseline: list[str] = []
 
         for balance in self.ACCOUNT_BALANCES:
-            lot_size = self.calculate_lot_size(balance=balance, pips=pips, risk_pct=self.RISK_PERCENT)
+            lot_size = self.calculate_lot_size(balance=balance, pips=pips, risk_pct=risk_pct)
             row = f"${balance:<7} {lot_size:.2f}"
             if balance < self.BASELINE_BALANCE:
                 pre_lines_before_baseline.append(row)
@@ -59,9 +59,10 @@ class LotSizeCalculator:
 
         before_block = "<pre>" + "\n".join(pre_lines_before_baseline) + "</pre>"
         baseline_block = "<pre>" + "\n".join(pre_lines_from_baseline) + "</pre>"
+        risk_label = f"{risk_pct * 100:g}%"
         return (
             f"{self.LEGACY_BASELINE_TEXT}\n"
-            "<i>2% risk model for XAUUSD | 1.00 lot = $10 per pip</i>\n"
+            f"<i>{risk_label} risk model for XAUUSD | 1.00 lot = $10 per pip</i>\n"
             f"{before_block}\n"
             f"{self.BASELINE_NOTE}\n"
             f"{baseline_block}"

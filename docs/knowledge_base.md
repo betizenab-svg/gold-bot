@@ -61,18 +61,28 @@ file maps each decision to its sources so future tuning stays evidence-based.
 | `analysis/signal_factory.py` `_render_trade_plan` | Telegram reasoning restructured as a professional trade plan: tier, top-down context, location, liquidity story, trigger, evidence, numbers with WHY, risk state, if-then plan, invalidation | Link (written if/then scenarios), Kiev (conviction tiers, "what proves me wrong"), Bassal (journal format), Bible (trend-level-signal triad) |
 | `src/dashboard/` | Performance page (equity curve in R, per-strategy expectancy/profit factor, MFE/MAE, calibration recommendations), Risk page (governor state, kill switch, news blackout editor), Market page (macro intelligence, zone book, session clock) | Link/Kiev statistics reviews; Bassal monthly review |
 
-## Still documented for a future round
+## Round 4 — finishing the documented backlog
 
-1. **Trailing runner** behind swing points instead of the fixed 3R cap once
-   ≥2R (Kratter/Bennett/Kiev preference — deliberately deferred: moving
-   targets are hard to communicate in a signal service).
-2. **Quasimodo limit entries** at the left shoulder after sweep + CHOCH (RTM).
-3. **Wedge/three-push detector** with shrinking-thrust exhaustion (Brooks/Dayton/SPINE).
-4. **Range-day mode** with edge-only failed-breakout fades (Ray Wang/Brooks G46-53).
-5. **Double top/bottom neckline engine** ("tries twice and fails → go the other way").
-6. **Symmetry projections + fib cluster zones** beyond the OTE band (Boroden).
-7. **Morning/evening star + two-bar reversal** grade-C trigger family.
-8. **Conviction-tiered position sizing** (tier already shown in the trade plan; sizing ladder next).
+| Code location | Rule | Source |
+|---|---|---|
+| `alerting/lifecycle_manager.py` | Structure exit: after TP1, a confirmed structure flip against the runner closes it at market (banked half kept, runner marked in R) | Brooks (trail by structure), Boroden (exit on pattern flip), Master the Art ("if the 15-minute breaks a previous low, exit immediately") |
+| `strategies/quasimodo.py` | Quasimodo: sweep of the prior swing + neckline break arms a LIMIT back at the left shoulder, stop beyond the head | Reading the Market (QM section) |
+| `analysis/confluence.py` `_three_push_exhaustion` | Three pushes with shrinking thrust veto with-trend entries | Brooks (wedge/shrinking stairs), Dayton (shortening of the thrust) |
+| `analysis/confluence.py` `_two_bar_reversal_evidence` | Two-bar reversal as +4 evidence (opposite similar bodies, second reclaims the first's open) | Brooks (two-bar reversals as buying/selling pressure), Candlestick Bible (tweezers) |
+| `analysis/position_sizing.py` + factory | Conviction-tiered sizing: Tier 1 (score >= 85) sizes the lot table at 2% risk, Tier 2 at 1% | Kiev (conviction tiers), Link (size by setup quality), Bassal |
+
+## Deliberately not implemented (and why)
+
+1. **Range-day edge-fade strategy family** — the barbwire veto, day-extension
+   veto and failed-breakout traps already cover the defensive half; the
+   offensive half (fading range edges) needs live range-boundary tracking
+   that should be calibrated against real MFE/MAE data first.
+2. **Symmetry projections / full fib clusters** — the OTE band plus measured
+   moves capture most of the value; clusters add precision only after the
+   evidence loop shows where entries are missing by small margins.
+3. **Morning/evening star detectors** — the books themselves warn these lose
+   ~20% reliability below H4; on an M5 pipeline the pin-bar grades and
+   engulfing detector are the appropriate versions of the same idea.
 
 ## Contradictions resolved (so nobody "fixes" them backwards)
 

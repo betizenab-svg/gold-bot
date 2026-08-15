@@ -23,6 +23,7 @@ class SignalLifecycleManager:
         "BE_HIT": "CLOSED_BE",
         "EXPIRED": "CANCELLED",
         "TIME_STOP": "CLOSED_TIME",
+        "STRUCTURE_EXIT": "CLOSED_STRUCT",
     }
 
     # Realized R for terminal events (half off at TP1=1.5R, half at TP2=3R).
@@ -202,12 +203,14 @@ class SignalLifecycleManager:
             self._track_excursions(active_repository, signal, current_candle)
             event_type = self.evaluate_signal(signal, current_candle)
             if event_type is None:
+                event_type = self._structure_exit_event(active_repository, signal)
+            if event_type is None:
                 continue
 
             signal_hash = str(self._get_required_value(signal, "signal_hash"))
             new_status = self.EVENT_STATUS_MAP[event_type]
             active_repository.update_signal_status(signal_hash, new_status)
-            self._record_risk_outcome(active_repository, event_type, current_candle)
+            self._record_risk_outcome(active_repository, event_type, current_candle, signal)
 
             reason = self._build_lifecycle_reason(signal, event_type)
             try:
@@ -324,7 +327,40 @@ class SignalLifecycleManager:
             logging.debug("Excursion tracking skipped: %s", exc)
 
     @staticmethod
-    def _record_risk_outcome(repository: Any, event_type: str, current_candle: Candle) -> None:
+    def _structure_exit_event(repository: Any, signal: Any) -> Optional[str]:
+        """After TP1 the runner is protected at breakeven, but a confirmed
+        structure flip against it means the move is over: bank and leave
+        (Brooks/Boroden: trail by structure, exit on structure break)."""
+        try:
+            status = str(
+                SignalLifecycleManager._get_value(signal, "status", default="")
+            ).upper()
+            if status != "PARTIAL_TP1":
+                return None
+            if repository is None or not hasattr(repository, "get_kv"):
+                return None
+            structure = repository.get_kv("current_structure_state")
+            if not isinstance(structure, str):
+                return None
+            direction = str(
+                SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")
+            ).upper()
+            structure = structure.upper()
+            if (direction == "LONG" and structure == "BEARISH") or (
+                direction == "SHORT" and structure == "BULLISH"
+            ):
+                return "STRUCTURE_EXIT"
+        except Exception as exc:
+            logging.debug("Structure exit check skipped: %s", exc)
+        return None
+
+    @staticmethod
+    def _record_risk_outcome(
+        repository: Any,
+        event_type: str,
+        current_candle: Candle,
+        signal: Any = None,
+    ) -> None:
         try:
             governor = RiskGovernor()
             event_ts = int(current_candle.timestamp)
@@ -332,7 +368,26 @@ class SignalLifecycleManager:
                 governor.record_stop_loss(repository, event_ts)
             elif event_type in {"TP1_SMASH", "TP2_SMASH"}:
                 governor.record_win(repository)
+
             r_delta = SignalLifecycleManager.EVENT_R_MAP.get(event_type)
+            if event_type == "STRUCTURE_EXIT" and signal is not None:
+                # Banked TP1 half (0.75R) plus the runner half marked at close.
+                try:
+                    entry = float(
+                        SignalLifecycleManager._get_required_value(signal, "entry_price", "entry")
+                    )
+                    sl = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
+                    direction = str(
+                        SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")
+                    ).upper()
+                    risk = abs(entry - sl)
+                    if risk > 0:
+                        move = float(current_candle.close) - entry
+                        if direction == "SHORT":
+                            move = -move
+                        r_delta = 0.75 + 0.5 * (move / risk)
+                except (TypeError, ValueError, AttributeError):
+                    r_delta = 0.75
             if r_delta is not None:
                 governor.record_result_r(repository, r_delta, event_ts)
         except Exception as exc:
@@ -361,6 +416,8 @@ class SignalLifecycleManager:
             return f"Pending entry at {price:.2f} was never triggered; signal cancelled."
         if normalized == "TIME_STOP":
             return "Trade never reached TP1 within the holding window; closed as stagnant."
+        if normalized == "STRUCTURE_EXIT":
+            return "Market structure flipped against the runner; closed to protect banked TP1 gains."
         raise ValueError(f"Unsupported lifecycle event type: {event_type}")
 
     @staticmethod

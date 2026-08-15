@@ -139,6 +139,18 @@ class ConfluenceEngineV2:
                 if trendline_result.get("note"):
                     notes.append(str(trendline_result["note"]))
 
+        three_push_note = self._three_push_exhaustion(
+            trade_direction, swing_history, int(current_timestamp)
+        )
+        if three_push_note is not None:
+            vetoes.append(three_push_note)
+            notes.append(three_push_note)
+
+        two_bar_note = self._two_bar_reversal_evidence(trade_direction, recent_candles)
+        if two_bar_note is not None:
+            delta += 4
+            notes.append(two_bar_note)
+
         ote_note = self._ote_bonus(
             trade_direction, entry_price, last_swing_high, last_swing_low
         )
@@ -204,6 +216,69 @@ class ConfluenceEngineV2:
             "notes": [note for note in notes if note],
             "weight": weight,
         }
+
+    @staticmethod
+    def _three_push_exhaustion(
+        trade_direction: str,
+        swing_history: Optional[Dict[str, Any]],
+        current_timestamp: int,
+    ) -> Optional[str]:
+        """Three pushes with shrinking thrust = exhaustion; with-trend entries
+        into the third push are vetoed (Brooks wedge / Dayton shortening)."""
+        if not isinstance(swing_history, dict):
+            return None
+        direction = str(trade_direction).upper()
+        side = "highs" if direction == "LONG" else "lows"
+        raw = swing_history.get(side)
+        if not isinstance(raw, list) or len(raw) < 3:
+            return None
+        try:
+            p1, p2, p3 = (float(p["price"]) for p in raw[-3:])
+            last_ts = int(raw[-1]["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if current_timestamp - last_ts > 2 * 3600:
+            return None
+
+        if direction == "LONG":
+            ascending = p1 < p2 < p3
+            shrinking = (p3 - p2) < (p2 - p1)
+        else:
+            ascending = p1 > p2 > p3
+            shrinking = (p2 - p3) < (p1 - p2)
+        if ascending and shrinking:
+            return (
+                "Three-push exhaustion: each thrust smaller than the last — "
+                "with-trend entry vetoed"
+            )
+        return None
+
+    @staticmethod
+    def _two_bar_reversal_evidence(
+        trade_direction: str,
+        recent_candles: List[Candle],
+    ) -> Optional[str]:
+        """Two adjacent similar-sized opposite bodies with the second closing
+        beyond the first's open = buying/selling pressure evidence (Brooks)."""
+        if not isinstance(recent_candles, list) or len(recent_candles) < 2:
+            return None
+        prev, current = recent_candles[-2], recent_candles[-1]
+        prev_body = float(prev.close) - float(prev.open)
+        cur_body = float(current.close) - float(current.open)
+        if prev_body == 0 or cur_body == 0:
+            return None
+        if (prev_body > 0) == (cur_body > 0):
+            return None
+        ratio = abs(cur_body) / abs(prev_body)
+        if not (0.6 <= ratio <= 1.67):
+            return None
+
+        direction = str(trade_direction).upper()
+        if direction == "LONG" and cur_body > 0 and float(current.close) > float(prev.open):
+            return "Two-bar reversal: buyers reclaimed the prior bar (+4)"
+        if direction == "SHORT" and cur_body < 0 and float(current.close) < float(prev.open):
+            return "Two-bar reversal: sellers reclaimed the prior bar (+4)"
+        return None
 
     @staticmethod
     def _smt_adjustment(repository: Any, trade_direction: str) -> tuple[int, Optional[str]]:

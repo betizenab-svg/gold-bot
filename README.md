@@ -14,7 +14,9 @@ Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 - Risk governor: daily signal caps, stop-loss cooldowns, losing-streak halts, daily -3R circuit breaker, +4R profit lock, and news blackouts.
 - Trendline gate: counter-trend signals are blocked until the trendline through the last two swing pivots is broken by a body close.
 - Evidence loop: every trade records its max favorable/adverse excursion in R; scripts/calibrate_from_history.py turns that into concrete tuning recommendations.
-- Four strategy families: pin bars (two grades), engulfing-at-zone, Brooks H2/L2 with-trend pullbacks, inside-bar traps — plus SMC zone retests.
+- Four strategy families: pin bars (two grades), engulfing-at-zone, Brooks H2/L2 with-trend pullbacks, inside-bar traps — plus SMC zone retests and Quasimodo sweep-reversal limits.
+- Runner management: breakeven after TP1, structure-flip exit, time stop — winners protected three ways.
+- Conviction-tiered sizing: Tier 1 signals size at 2% risk, Tier 2 at 1%.
 - Daily floor-trader pivots (BabyPips formulas) and London-to-NY continuation as confluence inputs.
 - Telegram reasoning is a full professional trade plan: tier, context, location, liquidity story, trigger, evidence, numbers with reasons, and pre-committed if-then management.
 - Web dashboard: performance analytics (equity curve in R, per-strategy expectancy, MFE/MAE), risk governor console with manual kill switch and news blackout editor, live market-state page.

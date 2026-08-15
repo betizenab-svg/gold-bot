@@ -102,6 +102,9 @@ class SignalFormatter:
         elif normalized_type == "TIME_STOP":
             alert_message = "⏱️ <b>Time Stop</b>\nTrade stalled without reaching TP1; closed flat."
             explanation_title = "Reason"
+        elif normalized_type == "STRUCTURE_EXIT":
+            alert_message = "🔀 <b>Structure Exit</b>\nTrend flipped; runner closed with TP1 already banked."
+            explanation_title = "Reason"
         else:
             raise ValueError(f"Unsupported lifecycle update type: {update_type}")
 
