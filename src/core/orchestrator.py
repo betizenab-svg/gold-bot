@@ -490,56 +490,62 @@ class PulseOrchestrator:
         self,
         repository: Repository,
         symbol: str,
-        current_candle: Candle,
+        new_candles: List[Candle],
     ) -> None:
         lifecycle_manager = ZoneLifecycleManager()
-        active_zones = repository.get_active_zones(symbol)
-        zones_to_check = list(active_zones) if isinstance(active_zones, list) else []
+        for candle in sorted(new_candles, key=lambda item: item.timestamp):
+            active_zones = repository.get_active_zones(symbol)
+            zones_to_check = list(active_zones) if isinstance(active_zones, list) else []
 
-        # Include once-touched (MITIGATED) order blocks so a second touch
-        # consumes them (fresh-zones-only book rule).
-        try:
-            recent_obs = repository.get_recent_order_blocks(symbol, limit=20)
-        except Exception:
-            recent_obs = []
-        if isinstance(recent_obs, list):
-            seen_ids = {zone.get("id") for zone in zones_to_check}
-            for zone in recent_obs:
-                if str(zone.get("status", "")).upper() == "MITIGATED" and zone.get("id") not in seen_ids:
-                    zones_to_check.append(zone)
+            # Include once-touched (MITIGATED) order blocks so a second touch
+            # consumes them (fresh-zones-only book rule).
+            try:
+                recent_obs = repository.get_recent_order_blocks(symbol, limit=20)
+            except Exception:
+                recent_obs = []
+            if isinstance(recent_obs, list):
+                seen_ids = {zone.get("id") for zone in zones_to_check}
+                for zone in recent_obs:
+                    if str(zone.get("status", "")).upper() == "MITIGATED" and zone.get("id") not in seen_ids:
+                        zones_to_check.append(zone)
 
-        updated_zones = lifecycle_manager.evaluate_zones(current_candle, zones_to_check)
-        if not updated_zones:
-            return
+            updated_zones = lifecycle_manager.evaluate_zones(candle, zones_to_check)
+            if not updated_zones:
+                continue
 
-        repository.update_zone_statuses(updated_zones)
-        logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
+            repository.update_zone_statuses(updated_zones)
+            logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
 
     def _monitor_open_signals(
         self,
         repository: Repository,
-        current_candle: Candle,
+        new_candles: List[Candle],
     ) -> None:
+        """Walk EVERY new candle since the last pulse (oldest first) so TP/SL
+        touches inside scheduler gaps are never skipped."""
+        if not new_candles:
+            return
         lifecycle_manager = self.lifecycle_manager_factory(repository)
-        open_signals = repository.get_open_signals()
-        if open_signals is None:
-            return
-        if not isinstance(open_signals, list):
-            try:
-                open_signals = list(open_signals)
-            except TypeError:
-                logging.info("Open signal payload is not iterable; skipping lifecycle monitor")
-                return
-        if not open_signals:
-            return
+        for candle in sorted(new_candles, key=lambda item: item.timestamp):
+            open_signals = repository.get_open_signals()
+            if open_signals is None:
+                continue
+            if not isinstance(open_signals, list):
+                try:
+                    open_signals = list(open_signals)
+                except TypeError:
+                    logging.info("Open signal payload is not iterable; skipping lifecycle monitor")
+                    return
+            if not open_signals:
+                continue
 
-        lifecycle_manager.process_open_signals(
-            open_signals=open_signals,
-            current_candle=current_candle,
-            telegram_client=lifecycle_manager.telegram_client,
-            repository=repository,
-            formatter=lifecycle_manager.formatter,
-        )
+            lifecycle_manager.process_open_signals(
+                open_signals=open_signals,
+                current_candle=candle,
+                telegram_client=lifecycle_manager.telegram_client,
+                repository=repository,
+                formatter=lifecycle_manager.formatter,
+            )
 
     def _evaluate_market_structure(
         self,
@@ -1214,8 +1220,8 @@ class PulseOrchestrator:
             self._maybe_prune_market_data(repository)
             self._maybe_refresh_news_calendar(repository)
             self._maybe_send_weekly_report(repository)
-            self._monitor_open_signals(repository, current_candle)
-            self._evaluate_zone_lifecycle(repository, symbol, current_candle)
+            self._monitor_open_signals(repository, valid_candles)
+            self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
 
             detector = FractalDetector()
             recent_candles = repository.get_recent_candles(

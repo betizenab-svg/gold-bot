@@ -203,7 +203,11 @@ def test_orchestrator_runs_lifecycle_monitor_before_setup_scan() -> None:
 
     orchestrator.run()
 
-    assert call_order == ["lifecycle", "setup"]
+    # Lifecycle monitoring must precede setup scanning; with per-candle
+    # gap-proof monitoring the lifecycle may run once per new candle.
+    assert call_order[0] == "lifecycle"
+    assert call_order[-1] == "setup"
+    assert call_order.count("setup") == 1
 
 
 def main() -> None:
