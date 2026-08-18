@@ -121,6 +121,9 @@ class SchemaInitializer:
         self._ensure_column(cursor, "signals", "strategy", "TEXT")
         self._ensure_column(cursor, "signals", "mfe_r", "REAL")
         self._ensure_column(cursor, "signals", "mae_r", "REAL")
+        # Self-heal: purge malformed rows (test seeds / legacy junk) that
+        # pollute dashboards and stats. Real signals always carry a symbol.
+        cursor.execute("DELETE FROM signals WHERE symbol IS NULL;")
         self.connection.commit()
 
     def _ensure_column(

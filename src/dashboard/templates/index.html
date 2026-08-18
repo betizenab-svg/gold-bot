@@ -5,10 +5,13 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
 {% if heartbeat_state == 'STALLED' %}
 <div class="mb-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-5 py-4">
   <p class="font-semibold text-rose-300">
-    Engine stalled — no pulse for {{ heartbeat_age_min }} minutes.
+    No pulse in this data for {{ heartbeat_age_min }} minutes.
   </p>
   <p class="mt-1 text-xs text-rose-200/70">
-    Check the GitHub Actions tab (or your cron). Weekends and market holidays are normal.
+    Viewing a local copy? It is only as fresh as your last sync — run
+    <code class="rounded bg-black/30 px-1">git pull botaccount main</code> and reload.
+    If the GitHub Actions tab also shows no recent green runs, the engine itself is down.
+    Weekends and market holidays are normal.
   </p>
 </div>
 {% elif heartbeat_state == 'LIVE' %}
