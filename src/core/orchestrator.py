@@ -48,6 +48,7 @@ from src.domain.candle import Candle
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
     CHART_ALERTS_ENABLED,
+    DAILY_STATUS_ENABLED,
     DISABLED_STRATEGIES,
     DXY_TICKER,
     DXY_CORRELATION_WINDOW,
@@ -372,22 +373,12 @@ class PulseOrchestrator:
         symbol: str,
         current_candle: Candle,
         recent_candles: List[Candle],
+        new_candle_count: int = 1,
     ) -> Optional[dict[str, Any]]:
+        """Scan every candle that arrived since the last pulse as a potential
+        trigger bar (newest first). Scheduler jitter can deliver 3-6 candles
+        per pulse; checking only the latest silently skips most triggers."""
         active_zones = repository.get_active_zones(symbol)
-        pin_bar_strategy = PinBarRejectionStrategy()
-        pin_bar_setup = pin_bar_strategy.detect_setup(recent_candles, active_zones)
-        if self._strategy_allowed(pin_bar_setup):
-            return pin_bar_setup
-
-        engulfing_strategy = EngulfingZoneStrategy()
-        engulfing_setup = engulfing_strategy.detect_setup(recent_candles, active_zones)
-        if self._strategy_allowed(engulfing_setup):
-            return engulfing_setup
-
-        pullback_strategy = PullbackH2L2Strategy()
-        pullback_setup = pullback_strategy.detect_setup(recent_candles)
-        if self._strategy_allowed(pullback_setup):
-            return pullback_setup
 
         try:
             raw_history = repository.get_kv("swing_history")
@@ -396,15 +387,47 @@ class PulseOrchestrator:
             )
         except (TypeError, ValueError):
             swing_history = None
+
+        scan_count = max(1, min(int(new_candle_count), 12, len(recent_candles)))
+        for offset in range(scan_count):
+            window = recent_candles if offset == 0 else recent_candles[:-offset]
+            if len(window) == 0:
+                break
+            setup = self._detect_setup_on_window(
+                repository, symbol, window, active_zones, swing_history
+            )
+            if setup is not None:
+                return setup
+        return None
+
+    def _detect_setup_on_window(
+        self,
+        repository: Repository,
+        symbol: str,
+        window: List[Candle],
+        active_zones: Any,
+        swing_history: Optional[dict[str, Any]],
+    ) -> Optional[dict[str, Any]]:
+        pin_bar_setup = PinBarRejectionStrategy().detect_setup(window, active_zones)
+        if self._strategy_allowed(pin_bar_setup):
+            return pin_bar_setup
+
+        engulfing_setup = EngulfingZoneStrategy().detect_setup(window, active_zones)
+        if self._strategy_allowed(engulfing_setup):
+            return engulfing_setup
+
+        pullback_setup = PullbackH2L2Strategy().detect_setup(window)
+        if self._strategy_allowed(pullback_setup):
+            return pullback_setup
+
         if isinstance(swing_history, dict):
             quasimodo_setup = QuasimodoStrategy().detect_setup(
-                recent_candles, swing_history, active_zones
+                window, swing_history, active_zones
             )
             if self._strategy_allowed(quasimodo_setup):
                 return quasimodo_setup
 
-        inside_bar_strategy = InsideBarTrapStrategy()
-        inside_bar_setup = inside_bar_strategy.detect_setup(recent_candles)
+        inside_bar_setup = InsideBarTrapStrategy().detect_setup(window)
         if self._strategy_allowed(inside_bar_setup):
             return inside_bar_setup
 
@@ -415,8 +438,9 @@ class PulseOrchestrator:
         if not order_blocks:
             return None
 
+        bounce_candle = window[-1]
         for zone in order_blocks:
-            trade_direction = self._zone_bounce_direction(current_candle, zone)
+            trade_direction = self._zone_bounce_direction(bounce_candle, zone)
             if trade_direction is None:
                 continue
             return {
@@ -601,9 +625,9 @@ class PulseOrchestrator:
         self,
         repository: Repository,
         recent_candles: List[Candle],
-        current_candle: Candle,
+        new_candles: List[Candle],
     ) -> None:
-        if not recent_candles:
+        if not recent_candles or not new_candles:
             return
 
         last_swing_high_point = self._parse_swing_point(repository.get_kv("last_swing_high"))
@@ -613,22 +637,24 @@ class PulseOrchestrator:
 
         detector = LiquiditySweepDetector()
         avg_volume = detector.calculate_average_volume(recent_candles, period=14)
-        sweep = detector.detect_sweep(
-            current_candle=current_candle,
-            avg_volume=avg_volume,
-            last_swing_high=float(last_swing_high_point["price"]),
-            last_swing_low=float(last_swing_low_point["price"]),
-        )
-        if sweep is None:
-            return
+        # Every gap candle can be the sweep bar, not just the newest one.
+        for candle in sorted(new_candles, key=lambda item: item.timestamp):
+            sweep = detector.detect_sweep(
+                current_candle=candle,
+                avg_volume=avg_volume,
+                last_swing_high=float(last_swing_high_point["price"]),
+                last_swing_low=float(last_swing_low_point["price"]),
+            )
+            if sweep is None:
+                continue
 
-        repository.set_kv("latest_liquidity_sweep", json.dumps(sweep))
-        logging.info(
-            "Liquidity sweep detected: type=%s sweep_price=%.2f timestamp=%s",
-            sweep["type"],
-            sweep["sweep_price"],
-            sweep["timestamp"],
-        )
+            repository.set_kv("latest_liquidity_sweep", json.dumps(sweep))
+            logging.info(
+                "Liquidity sweep detected: type=%s sweep_price=%.2f timestamp=%s",
+                sweep["type"],
+                sweep["sweep_price"],
+                sweep["timestamp"],
+            )
 
     def _load_recent_fvgs(
         self,
@@ -1163,6 +1189,42 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Pulse health recording skipped: %s", exc)
 
+    def _maybe_send_daily_status(self, repository: Repository) -> None:
+        """One quiet-confidence message per day: proof of life plus what the
+        engine looked at, so silence is never mistaken for death."""
+        if not DAILY_STATUS_ENABLED:
+            return
+        now = int(time.time())
+        today = time.strftime("%Y-%m-%d", time.gmtime(now))
+        try:
+            if repository.get_kv("daily_status_last_date") == today:
+                return
+        except Exception:
+            return
+        try:
+            day_ago = now - 86400
+            candles_24h = repository.count_candles_since(day_ago)
+            signals_24h = repository.count_signals_since(day_ago)
+            open_now = len(repository.get_open_signals())
+            score = repository.get_kv("latest_setup_score")
+            classification = repository.get_kv("latest_setup_classification")
+
+            message = (
+                "\u2705 <b>Daily Status</b>\n"
+                f"Candles analyzed (24h): <b>{candles_24h}</b>\n"
+                f"Signals published (24h): <b>{signals_24h}</b> | Open now: <b>{open_now}</b>\n"
+                f"Last setup considered: {classification or 'none yet'}"
+                f"{f' (score {score})' if score else ''}\n"
+                "<i>No signal means no setup passed every gate \u2014 that is the "
+                "discipline working, not a malfunction.</i>"
+            )
+            telegram_client = self.telegram_client_factory()
+            if getattr(telegram_client, "chat_id", None):
+                telegram_client.send_message(message)
+                repository.set_kv("daily_status_last_date", today)
+        except Exception as exc:
+            logging.debug("Daily status skipped: %s", exc)
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
@@ -1220,6 +1282,7 @@ class PulseOrchestrator:
             self._maybe_prune_market_data(repository)
             self._maybe_refresh_news_calendar(repository)
             self._maybe_send_weekly_report(repository)
+            self._maybe_send_daily_status(repository)
             self._monitor_open_signals(repository, valid_candles)
             self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
 
@@ -1229,7 +1292,7 @@ class PulseOrchestrator:
             )
             latest_fractals = detector.find_fractals(recent_candles)
             self._persist_latest_fractals(repository, latest_fractals)
-            self._evaluate_liquidity_sweep(repository, recent_candles, current_candle)
+            self._evaluate_liquidity_sweep(repository, recent_candles, valid_candles)
             prev_close = (
                 float(recent_candles[-2].close)
                 if isinstance(recent_candles, list) and len(recent_candles) >= 2
@@ -1270,6 +1333,7 @@ class PulseOrchestrator:
                 symbol,
                 current_candle,
                 recent_candles,
+                new_candle_count=len(valid_candles),
             )
             if potential_setup is not None:
                 permission_engine = PermissionEngine()

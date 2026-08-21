@@ -586,6 +586,15 @@ class Repository:
             return 0
         return int(row[0])
 
+    def count_candles_since(self, cutoff_timestamp: int) -> int:
+        row = self._fetchone(
+            "SELECT COUNT(*) FROM market_data WHERE timestamp >= ?;",
+            (int(cutoff_timestamp),),
+        )
+        if row is None or row[0] is None:
+            return 0
+        return int(row[0])
+
     def get_strategy_outcomes(self, strategy: str, limit: int = 30) -> List[str]:
         rows = self._fetchall(
             """

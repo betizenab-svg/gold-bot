@@ -20,3 +20,4 @@ os.environ.setdefault("CHART_ALERTS_ENABLED", "0")
 # Network-fetching automations are covered by dedicated unit tests.
 os.environ.setdefault("NEWS_AUTOFETCH_ENABLED", "0")
 os.environ.setdefault("WEEKLY_REPORT_ENABLED", "0")
+os.environ.setdefault("DAILY_STATUS_ENABLED", "0")
