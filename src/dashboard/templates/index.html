@@ -1,5 +1,5 @@
-{% extends "base.html" %} {% block title %}Dashboard | XAUUSD Intelligence{%
-endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
+{% extends "base.html" %} {% block title %}Mission Control | Signal Desk{%
+endblock %} {% block page_title %}Mission Control{% endblock %} {% block content
 %}
 <meta http-equiv="refresh" content="60" />
 {% if heartbeat_state == 'STALLED' %}
@@ -11,21 +11,77 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
     Viewing a local copy? It is only as fresh as your last sync — run
     <code class="rounded bg-black/30 px-1">git pull botaccount main</code> and reload.
     If the GitHub Actions tab also shows no recent green runs, the engine itself is down.
-    Weekends and market holidays are normal.
   </p>
 </div>
 {% elif heartbeat_state == 'LIVE' %}
 <div class="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3">
   <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
-  <p class="text-sm text-emerald-300">Engine live — last pulse {{ heartbeat_age_min }} min ago</p>
+  <p class="text-sm text-emerald-300">Engine live — last pulse {{ heartbeat_age_min }} min ago · watching {{ symbol_cards|length }} markets</p>
 </div>
 {% endif %}
+
+<!-- Market watch: one card per instrument -->
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {% for card in symbol_cards %}
+  <article class="metric-card symbol-card" data-symbol="{{ card.symbol }}">
+    <div class="flex items-start justify-between">
+      <div>
+        <p class="metric-label flex items-center gap-2">
+          <span class="symbol-dot sym-{{ card.symbol|lower }}"></span>
+          {{ card.name }} · {{ card.symbol }}
+        </p>
+        <p class="mt-1 font-mono text-2xl font-semibold tracking-tight">
+          {{ card.price }}
+        </p>
+      </div>
+      <div class="text-right">
+        {% if card.change_pct is not none %}
+        <span class="rounded-full px-2 py-0.5 text-xs font-semibold {% if card.up %}bg-emerald-500/15 text-emerald-300{% else %}bg-rose-500/15 text-rose-300{% endif %}">
+          {{ "%+.2f"|format(card.change_pct) }}%
+        </span>
+        {% endif %}
+        {% if card.weekend %}
+        <p class="mt-1 text-[10px] uppercase tracking-widest text-cyanlux/70">24/7</p>
+        {% endif %}
+      </div>
+    </div>
+    {% if card.spark %}
+    <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="spark mt-3 {% if card.up %}spark-up{% else %}spark-down{% endif %}">
+      <polyline points="{{ card.spark }}" fill="none" stroke-width="1.6" />
+    </svg>
+    {% else %}
+    <p class="mt-3 text-xs text-slate-500">Collecting first candles…</p>
+    {% endif %}
+    <div class="mt-3 flex items-center justify-between text-xs">
+      <span class="text-slate-400">
+        Structure
+        <span class="font-semibold {% if card.structure == 'BULLISH' %}text-emerald-300{% elif card.structure == 'BEARISH' %}text-rose-300{% else %}text-slate-300{% endif %}">{{ card.structure }}</span>
+      </span>
+      <span class="text-slate-400">
+        Setup
+        <span class="font-semibold text-slate-200">{{ card.setup_class }}{% if card.setup_score %} ({{ card.setup_score }}){% endif %}</span>
+      </span>
+    </div>
+    {% if card.fresh_min is not none %}
+    <p class="mt-2 text-[10px] text-slate-500">data {{ card.fresh_min }} min old</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+<!-- Headline numbers -->
+<div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+  <article class="metric-card metric-gold">
+    <p class="metric-label">Net Result</p>
+    <p class="metric-value {% if net_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      {{ "%+.2f"|format(net_r) }}R
+    </p>
+  </article>
   <article class="metric-card metric-cyan">
     <p class="metric-label">Total Signals</p>
     <p class="metric-value">{{ signals_total }}</p>
   </article>
-  <article class="metric-card metric-gold">
+  <article class="metric-card">
     <p class="metric-label">Open Signals</p>
     <p class="metric-value">{{ open_signals }}</p>
   </article>
@@ -34,10 +90,53 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
     <p class="metric-value">{{ closed_signals }}</p>
   </article>
   <article class="metric-card">
-    <p class="metric-label">Latest Signal Time</p>
+    <p class="metric-label">Latest Signal</p>
     <p class="text-lg font-semibold tracking-tight">{{ latest_signal_time }}</p>
   </article>
 </div>
+
+{% if open_positions %}
+<!-- Live positions -->
+<section class="mt-6 rounded-2xl border border-cyanlux/20 bg-slatecore/55 p-5 shadow-luxe">
+  <h3 class="text-lg font-semibold">Open Positions</h3>
+  <div class="mt-4 overflow-x-auto">
+    <table class="w-full min-w-[760px] text-sm">
+      <thead class="text-slate-400 border-b border-white/10">
+        <tr>
+          <th class="py-2 text-left font-medium">Market</th>
+          <th class="py-2 text-left font-medium">Dir</th>
+          <th class="py-2 text-left font-medium">Strategy</th>
+          <th class="py-2 text-left font-medium">Entry</th>
+          <th class="py-2 text-left font-medium">SL</th>
+          <th class="py-2 text-left font-medium">TP2</th>
+          <th class="py-2 text-left font-medium">MFE</th>
+          <th class="py-2 text-left font-medium">Status</th>
+          <th class="py-2 text-left font-medium">Opened</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in open_positions %}
+        <tr class="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+          <td class="py-3">
+            <a class="font-semibold text-cyanlux hover:text-goldlux transition-colors" href="{{ url_for('signal_detail', signal_hash=p.hash) }}">
+              <span class="symbol-dot sym-{{ p.symbol|lower }}"></span> {{ p.symbol }}
+            </a>
+          </td>
+          <td class="py-3 font-semibold {% if p.direction == 'LONG' %}text-emerald-300{% else %}text-rose-300{% endif %}">{{ p.direction }}</td>
+          <td class="py-3 text-xs text-slate-300">{{ p.strategy }}</td>
+          <td class="py-3 font-mono text-xs">{{ p.entry }}</td>
+          <td class="py-3 font-mono text-xs text-rose-300/90">{{ p.sl }}</td>
+          <td class="py-3 font-mono text-xs text-emerald-300/90">{{ p.tp2 }}</td>
+          <td class="py-3 text-xs">{{ "%+.2f"|format(p.mfe) }}R</td>
+          <td class="py-3"><span class="status-chip status-{{ p.status|lower }}">{{ p.status }}</span></td>
+          <td class="py-3 text-xs text-slate-400">{{ p.when }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 
 <div class="mt-6 grid gap-6 xl:grid-cols-3">
   <section
@@ -69,7 +168,10 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
             class="border-b border-white/5 hover:bg-white/[0.03] transition-colors"
           >
             <td class="py-3">{{ row.id }}</td>
-            <td class="py-3">{{ row.symbol or 'N/A' }}</td>
+            <td class="py-3">
+              <span class="symbol-dot sym-{{ (row.symbol or 'xauusd')|lower }}"></span>
+              {{ row.symbol or 'N/A' }}
+            </td>
             <td class="py-3">{{ row.direction or 'N/A' }}</td>
             <td class="py-3">
               {{ row.score if row.score is not none else 'N/A' }}
@@ -94,7 +196,7 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
   >
     <div>
       <p class="text-xs uppercase tracking-[0.22em] text-slate-400">
-        Macro Bias
+        Macro Bias (Gold)
       </p>
       <p class="mt-2 text-2xl font-semibold">{{ macro_bias }}</p>
     </div>
@@ -107,7 +209,8 @@ endblock %} {% block page_title %}Pulse Overview{% endblock %} {% block content
     </div>
     <div class="h-px bg-white/10"></div>
     <p class="text-xs text-slate-400">
-      All database reads are short-lived and lock-safe for cron co-execution.
+      Markets watched: {% for card in symbol_cards %}{{ card.symbol }}{% if not loop.last %} · {% endif %}{% endfor %}.
+      Crypto trades through the weekend; metals and FX resume Sunday 17:00 New York.
     </p>
   </section>
 </div>

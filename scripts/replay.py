@@ -7,6 +7,7 @@ report the live bot produces, computed from what WOULD have happened.
 
 Usage:
     .venv/bin/python scripts/replay.py --days 45
+    .venv/bin/python scripts/replay.py --days 45 --symbol BTCUSD
     .venv/bin/python scripts/replay.py --csv path/to/history.csv
 """
 from __future__ import annotations
@@ -25,12 +26,21 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 # Replay environment MUST be set before config.settings is imported anywhere.
+_REPLAY_SYMBOL = "XAUUSD"
+for _i, _arg in enumerate(sys.argv):
+    if _arg == "--symbol" and _i + 1 < len(sys.argv):
+        _REPLAY_SYMBOL = sys.argv[_i + 1].upper()
+    elif _arg.startswith("--symbol="):
+        _REPLAY_SYMBOL = _arg.split("=", 1)[1].upper()
 _REPLAY_DB = os.path.join(tempfile.mkdtemp(prefix="gold_replay_"), "replay.db")
 os.environ["DB_PATH"] = _REPLAY_DB
 os.environ["SIGNAL_TIMEFRAME"] = "M5"
+os.environ["SYMBOLS"] = _REPLAY_SYMBOL
 os.environ["CHART_ALERTS_ENABLED"] = "0"
 os.environ["NEWS_AUTOFETCH_ENABLED"] = "0"
 os.environ["WEEKLY_REPORT_ENABLED"] = "0"
+os.environ["DAILY_STATUS_ENABLED"] = "0"
+os.environ["AUTO_QUARANTINE_ENABLED"] = "0"
 os.environ["TELEGRAM_BOT_TOKEN"] = ""
 os.environ["TELEGRAM_CHAT_ID"] = ""
 os.environ["TELEGRAM_API_BASE_URL"] = "http://127.0.0.1:9"
@@ -62,14 +72,18 @@ def _download_history(days: int) -> list[Candle]:
 
     import yfinance as yf
 
-    print(f"Downloading {days} days of XAUUSD (GC=F) 5-minute history...")
+    from config.instruments import get_instrument
+
+    instrument = get_instrument(_REPLAY_SYMBOL)
+    ticker = instrument.yahoo_ticker
+    print(f"Downloading {days} days of {_REPLAY_SYMBOL} ({ticker}) 5-minute history...")
     end = dt.datetime.now(dt.timezone.utc)
     start = end - dt.timedelta(days=min(days, 59))
 
     frame = None
     for attempt in range(3):
         frame = yf.download(
-            tickers="GC=F",
+            tickers=ticker,
             interval="5m",
             start=start,
             end=end,
@@ -93,7 +107,7 @@ def _download_history(days: int) -> list[Candle]:
     for timestamp, row in frame.iterrows():
         candles.append(
             Candle(
-                symbol="XAUUSD",
+                symbol=_REPLAY_SYMBOL,
                 timeframe="M5",
                 timestamp=int(timestamp.timestamp()),
                 open=float(row["Open"]),
@@ -199,6 +213,7 @@ def summarize(db_path: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Replay the live pipeline over history")
     parser.add_argument("--days", type=int, default=45)
+    parser.add_argument("--symbol", type=str, default="XAUUSD")
     parser.add_argument("--csv", type=str, default=None)
     parser.add_argument("--out", type=str, default="data/replay_report.json")
     args = parser.parse_args()

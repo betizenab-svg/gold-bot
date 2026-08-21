@@ -45,8 +45,10 @@ from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
+from config.instruments import active_symbols, get_instrument, state_key
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
+    AUTO_QUARANTINE_ENABLED,
     CHART_ALERTS_ENABLED,
     DAILY_STATUS_ENABLED,
     DISABLED_STRATEGIES,
@@ -78,6 +80,15 @@ MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
 MACRO_HISTORY_DAYS = 90
 DXY_HISTORY_DAYS = 30
 
+# Realized R by closing status (mirrors scripts/calibrate_from_history.py).
+STATUS_R = {
+    "CLOSED_TP2": 2.25,
+    "CLOSED_BE": 0.75,
+    "CLOSED_SL": -1.0,
+    "CLOSED_TIME": 0.0,
+    "CLOSED_STRUCT": 1.0,
+}
+
 
 class PulseOrchestrator:
     def __init__(
@@ -105,6 +116,8 @@ class PulseOrchestrator:
         self.lifecycle_manager_factory = (
             lifecycle_manager_factory or self._default_lifecycle_manager_factory
         )
+        # Strategies quarantined automatically from live results (kv-backed).
+        self._extra_disabled: set[str] = set()
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
@@ -357,13 +370,15 @@ class PulseOrchestrator:
 
         return None
 
-    @staticmethod
-    def _strategy_allowed(setup: Optional[dict[str, Any]]) -> bool:
+    def _strategy_allowed(self, setup: Optional[dict[str, Any]]) -> bool:
         if setup is None:
             return False
         strategy = str(setup.get("strategy", "")).upper()
         if strategy and strategy in DISABLED_STRATEGIES:
             logging.info("Setup from quarantined strategy skipped: %s", strategy)
+            return False
+        if strategy and strategy in self._extra_disabled:
+            logging.info("Setup from auto-quarantined strategy skipped: %s", strategy)
             return False
         return True
 
@@ -381,7 +396,7 @@ class PulseOrchestrator:
         active_zones = repository.get_active_zones(symbol)
 
         try:
-            raw_history = repository.get_kv("swing_history")
+            raw_history = repository.get_kv(state_key("swing_history", symbol))
             swing_history = (
                 json.loads(raw_history) if isinstance(raw_history, str) else None
             )
@@ -488,25 +503,26 @@ class PulseOrchestrator:
         self,
         repository: Repository,
         latest_fractals: dict[str, Any],
+        symbol: str = "XAUUSD",
     ) -> None:
-        repository.set_kv("smc_latest_fractals", json.dumps(latest_fractals))
+        repository.set_kv(state_key("smc_latest_fractals", symbol), json.dumps(latest_fractals))
 
         swing_high = latest_fractals.get("swing_high")
         swing_low = latest_fractals.get("swing_low")
 
         if swing_high is not None:
-            repository.set_kv("last_swing_high", swing_high)
+            repository.set_kv(state_key("last_swing_high", symbol), swing_high)
         if swing_low is not None:
-            repository.set_kv("last_swing_low", swing_low)
+            repository.set_kv(state_key("last_swing_low", symbol), swing_low)
 
         # Rolling pivot history feeds the Brooks trendline gate.
         try:
-            raw_history = repository.get_kv("swing_history")
+            raw_history = repository.get_kv(state_key("swing_history", symbol))
             history = TrendlineEngine.update_history(
                 raw_history if isinstance(raw_history, str) else None,
                 latest_fractals,
             )
-            repository.set_kv("swing_history", json.dumps(history))
+            repository.set_kv(state_key("swing_history", symbol), json.dumps(history))
         except Exception as exc:
             logging.debug("Swing history update skipped: %s", exc)
 
@@ -540,6 +556,15 @@ class PulseOrchestrator:
             repository.update_zone_statuses(updated_zones)
             logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
 
+    @staticmethod
+    def _signal_symbol_matches(signal: Any, symbol: str) -> bool:
+        """Only compare a signal against candles of its own market. Non-string
+        symbols (mocks/legacy rows) keep the legacy match-everything behavior."""
+        sig_symbol = getattr(signal, "symbol", None)
+        if not isinstance(sig_symbol, str) or not sig_symbol:
+            return True
+        return sig_symbol.upper() == str(symbol).upper()
+
     def _monitor_open_signals(
         self,
         repository: Repository,
@@ -560,6 +585,13 @@ class PulseOrchestrator:
                 except TypeError:
                     logging.info("Open signal payload is not iterable; skipping lifecycle monitor")
                     return
+            candle_symbol = getattr(candle, "symbol", None)
+            if isinstance(candle_symbol, str) and candle_symbol:
+                open_signals = [
+                    signal
+                    for signal in open_signals
+                    if self._signal_symbol_matches(signal, candle_symbol)
+                ]
             if not open_signals:
                 continue
 
@@ -579,13 +611,21 @@ class PulseOrchestrator:
     ) -> Optional[str]:
         structure_engine = MarketStructureEngine()
 
-        stored_trend = repository.get_kv("current_structure_state")
+        raw_symbol = getattr(current_candle, "symbol", None)
+        symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
+        structure_key = state_key("current_structure_state", symbol)
+
+        stored_trend = repository.get_kv(structure_key)
         current_trend = stored_trend.upper() if stored_trend else "BULLISH"
         if stored_trend is None:
-            repository.set_kv("current_structure_state", current_trend)
+            repository.set_kv(structure_key, current_trend)
 
-        last_swing_high = self._parse_swing_point(repository.get_kv("last_swing_high"))
-        last_swing_low = self._parse_swing_point(repository.get_kv("last_swing_low"))
+        last_swing_high = self._parse_swing_point(
+            repository.get_kv(state_key("last_swing_high", symbol))
+        )
+        last_swing_low = self._parse_swing_point(
+            repository.get_kv(state_key("last_swing_low", symbol))
+        )
 
         counter_trend_swing = last_swing_low if current_trend == "BULLISH" else last_swing_high
         new_trend = structure_engine.detect_choch(
@@ -594,7 +634,7 @@ class PulseOrchestrator:
             current_trend=current_trend,
         )
         if new_trend is not None:
-            repository.set_kv("current_structure_state", new_trend)
+            repository.set_kv(structure_key, new_trend)
             logging.info(
                 "CHOCH detected: %s -> %s at timestamp=%s close=%.2f",
                 current_trend,
@@ -630,8 +670,15 @@ class PulseOrchestrator:
         if not recent_candles or not new_candles:
             return
 
-        last_swing_high_point = self._parse_swing_point(repository.get_kv("last_swing_high"))
-        last_swing_low_point = self._parse_swing_point(repository.get_kv("last_swing_low"))
+        raw_symbol = getattr(new_candles[0], "symbol", None)
+        symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
+
+        last_swing_high_point = self._parse_swing_point(
+            repository.get_kv(state_key("last_swing_high", symbol))
+        )
+        last_swing_low_point = self._parse_swing_point(
+            repository.get_kv(state_key("last_swing_low", symbol))
+        )
         if last_swing_high_point is None or last_swing_low_point is None:
             return
 
@@ -648,7 +695,7 @@ class PulseOrchestrator:
             if sweep is None:
                 continue
 
-            repository.set_kv("latest_liquidity_sweep", json.dumps(sweep))
+            repository.set_kv(state_key("latest_liquidity_sweep", symbol), json.dumps(sweep))
             logging.info(
                 "Liquidity sweep detected: type=%s sweep_price=%.2f timestamp=%s",
                 sweep["type"],
@@ -1031,7 +1078,11 @@ class PulseOrchestrator:
     # (Brooks: "the second signal is more reliable").
     SECOND_ATTEMPT_MIN_BARS = 3
     SECOND_ATTEMPT_MAX_BARS = 20
-    SECOND_ATTEMPT_TOLERANCE_USD = 2.0
+
+    @staticmethod
+    def _second_attempt_tolerance(symbol: str) -> float:
+        instrument = get_instrument(symbol)
+        return max(20.0 * instrument.pip_size, 2.0 * instrument.round_buffer)
 
     def _is_second_attempt(
         self,
@@ -1042,8 +1093,10 @@ class PulseOrchestrator:
     ) -> bool:
         if entry_hint is None:
             return False
+        raw_symbol = getattr(current_candle, "symbol", None)
+        symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
         try:
-            raw = repository.get_kv("last_setup_attempt")
+            raw = repository.get_kv(state_key("last_setup_attempt", symbol))
         except Exception:
             return False
         if not raw or not isinstance(raw, str):
@@ -1070,7 +1123,7 @@ class PulseOrchestrator:
         if not (self.SECOND_ATTEMPT_MIN_BARS <= age_bars <= self.SECOND_ATTEMPT_MAX_BARS):
             return False
 
-        return abs(float(entry_hint) - prior_price) <= self.SECOND_ATTEMPT_TOLERANCE_USD
+        return abs(float(entry_hint) - prior_price) <= self._second_attempt_tolerance(symbol)
 
     def _record_setup_attempt(
         self,
@@ -1081,9 +1134,11 @@ class PulseOrchestrator:
     ) -> None:
         if entry_hint is None:
             return
+        raw_symbol = getattr(current_candle, "symbol", None)
+        symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
         try:
             repository.set_kv(
-                "last_setup_attempt",
+                state_key("last_setup_attempt", symbol),
                 json.dumps(
                     {
                         "price": float(entry_hint),
@@ -1189,6 +1244,72 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Pulse health recording skipped: %s", exc)
 
+    def _load_auto_quarantine(self, repository: Repository) -> None:
+        """Refresh the in-memory set of live-quarantined strategies."""
+        self._extra_disabled = set()
+        try:
+            raw = repository.get_kv("auto_quarantined_strategies")
+            if isinstance(raw, str) and raw:
+                payload = json.loads(raw)
+                if isinstance(payload, list):
+                    self._extra_disabled = {str(name).upper() for name in payload}
+        except Exception as exc:
+            logging.debug("Auto-quarantine load skipped: %s", exc)
+
+    def _maybe_update_strategy_quarantine(self, repository: Repository) -> None:
+        """Self-coaching loop: once a day, quarantine any strategy whose LIVE
+        expectancy over the last 45 days is clearly negative (>=8 closed
+        trades, <= -0.25R/trade). Mirrors the manual Quasimodo decision."""
+        if not AUTO_QUARANTINE_ENABLED:
+            return
+        now = int(time.time())
+        today = time.strftime("%Y-%m-%d", time.gmtime(now))
+        try:
+            if repository.get_kv("strategy_quarantine_last_date") == today:
+                return
+        except Exception:
+            return
+        try:
+            outcomes = repository.get_closed_outcomes_since(now - 45 * 86400)
+            if not isinstance(outcomes, list):
+                return
+            stats: dict[str, list[float]] = {}
+            for strategy, status in outcomes:
+                r_value = STATUS_R.get(str(status))
+                if r_value is None:
+                    continue
+                stats.setdefault(str(strategy).upper(), []).append(float(r_value))
+
+            existing = set(self._extra_disabled)
+            newly = []
+            for strategy, r_values in stats.items():
+                if len(r_values) < 8 or strategy in existing or strategy in DISABLED_STRATEGIES:
+                    continue
+                expectancy = sum(r_values) / len(r_values)
+                if expectancy <= -0.25:
+                    newly.append((strategy, expectancy, len(r_values)))
+
+            if newly:
+                updated = sorted(existing | {name for name, _, _ in newly})
+                repository.set_kv("auto_quarantined_strategies", json.dumps(updated))
+                self._extra_disabled = set(updated)
+                lines = "\n".join(
+                    f"\u2022 {name}: {exp:+.2f}R/trade over {n} live trades"
+                    for name, exp, n in newly
+                )
+                telegram_client = self.telegram_client_factory()
+                if getattr(telegram_client, "chat_id", None):
+                    telegram_client.send_message(
+                        "\U0001f9ea <b>Strategy auto-quarantine</b>\n"
+                        f"{lines}\n"
+                        "<i>Suspended based on live results; clear "
+                        "auto_quarantined_strategies in the DB to re-enable.</i>"
+                    )
+                logging.info("Auto-quarantined strategies: %s", [n for n, _, _ in newly])
+            repository.set_kv("strategy_quarantine_last_date", today)
+        except Exception as exc:
+            logging.debug("Strategy quarantine check skipped: %s", exc)
+
     def _maybe_send_daily_status(self, repository: Repository) -> None:
         """One quiet-confidence message per day: proof of life plus what the
         engine looked at, so silence is never mistaken for death."""
@@ -1206,17 +1327,43 @@ class PulseOrchestrator:
             candles_24h = repository.count_candles_since(day_ago)
             signals_24h = repository.count_signals_since(day_ago)
             open_now = len(repository.get_open_signals())
-            score = repository.get_kv("latest_setup_score")
-            classification = repository.get_kv("latest_setup_classification")
+
+            symbol_lines = []
+            for sym in active_symbols():
+                classification = repository.get_kv(
+                    state_key("latest_setup_classification", sym)
+                )
+                score = repository.get_kv(state_key("latest_setup_score", sym))
+                label = str(classification) if classification else "no setup yet"
+                score_text = f" ({score})" if score else ""
+                symbol_lines.append(f"{get_instrument(sym).display_name}: {label}{score_text}")
+
+            # Regime-drift watch: negative rolling 14-day expectancy is flagged
+            # before it can quietly bleed the account.
+            drift_line = ""
+            try:
+                recent = repository.get_closed_outcomes_since(now - 14 * 86400)
+                r_values = [
+                    STATUS_R[str(status)]
+                    for _, status in recent
+                    if str(status) in STATUS_R
+                ]
+                if len(r_values) >= 6 and sum(r_values) <= -3.0:
+                    drift_line = (
+                        f"\n\u26a0\ufe0f 14-day results: {sum(r_values):+.1f}R over "
+                        f"{len(r_values)} trades \u2014 regime may have shifted; review /performance."
+                    )
+            except Exception:
+                drift_line = ""
 
             message = (
                 "\u2705 <b>Daily Status</b>\n"
                 f"Candles analyzed (24h): <b>{candles_24h}</b>\n"
                 f"Signals published (24h): <b>{signals_24h}</b> | Open now: <b>{open_now}</b>\n"
-                f"Last setup considered: {classification or 'none yet'}"
-                f"{f' (score {score})' if score else ''}\n"
+                f"Last setups \u2014 {' | '.join(symbol_lines)}\n"
                 "<i>No signal means no setup passed every gate \u2014 that is the "
                 "discipline working, not a malfunction.</i>"
+                f"{drift_line}"
             )
             telegram_client = self.telegram_client_factory()
             if getattr(telegram_client, "chat_id", None):
@@ -1225,13 +1372,315 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Daily status skipped: %s", exc)
 
+    def _pulse_symbol(
+        self,
+        repository: Repository,
+        client: Any,
+        validator: DataValidator,
+        symbol: str,
+        timeframe: str,
+        force_signal: bool = False,
+    ) -> tuple[int, int]:
+        """Full detection pipeline for one instrument.
+        Returns (signals_generated, errors_encountered)."""
+        signals_generated = 0
+        errors_encountered = 0
+
+        try:
+            candles = client.fetch_latest_candles(symbol, timeframe)
+        except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
+            logging.error("Ingestion failed for %s: %s", symbol, exc)
+            return signals_generated, errors_encountered + 1
+
+        self.memory_profiler.log_snapshot(f"Post-ingestion {symbol}")
+
+        total_count = len(candles)
+        valid_candles = validator.filter_candles(candles)
+        del candles
+        filtered = total_count - len(valid_candles)
+        logging.info(
+            "%s candles received: %s, valid: %s", symbol, total_count, len(valid_candles)
+        )
+        if filtered:
+            logging.info("Filtered out %s invalid %s candles", filtered, symbol)
+
+        if not valid_candles:
+            logging.info("No valid candles for %s; skipping symbol", symbol)
+            return signals_generated, errors_encountered
+
+        repository.save_candles(valid_candles)
+        latest_timestamp = max(candle.timestamp for candle in valid_candles)
+        repository.set_kv(f"last_processed_{symbol}", latest_timestamp)
+        if symbol == "XAUUSD" or os.getenv("MOCK_INGESTION") == "1":
+            # Legacy global watermark (heartbeats, mock clock, old dashboards).
+            repository.set_kv("last_processed_timestamp", latest_timestamp)
+        current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
+        self._monitor_open_signals(repository, valid_candles)
+        self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
+
+        detector = FractalDetector()
+        recent_candles = repository.get_recent_candles(
+            symbol, timeframe, ANALYSIS_LOOKBACK_CANDLES
+        )
+        latest_fractals = detector.find_fractals(recent_candles)
+        self._persist_latest_fractals(repository, latest_fractals, symbol)
+        self._evaluate_liquidity_sweep(repository, recent_candles, valid_candles)
+        prev_close = (
+            float(recent_candles[-2].close)
+            if isinstance(recent_candles, list) and len(recent_candles) >= 2
+            else None
+        )
+        recent_bos_type = self._evaluate_market_structure(
+            repository, current_candle, prev_close
+        )
+        recent_fvgs = self._scan_for_fvg_zones(repository, recent_candles)
+        self._scan_for_order_blocks(
+            repository,
+            recent_candles,
+            recent_bos_type,
+            recent_fvgs,
+        )
+
+        if force_signal:
+            logging.info("UAT force-signal enabled; bypassing permission and scoring engines")
+            forced_setup = self._build_forced_setup(current_candle)
+            try:
+                signal_saved, signal_errors = self._persist_actionable_signal(
+                    repository,
+                    forced_setup,
+                    recent_candles,
+                    current_candle,
+                    100,
+                )
+                if signal_saved:
+                    signals_generated += 1
+                errors_encountered += signal_errors
+            except Exception as exc:
+                errors_encountered += 1
+                logging.error("Failed to persist forced UAT signal: %s", exc)
+            return signals_generated, errors_encountered
+
+        potential_setup = self._detect_trade_setup(
+            repository,
+            symbol,
+            current_candle,
+            recent_candles,
+            new_candle_count=len(valid_candles),
+        )
+        if potential_setup is not None:
+            permission_engine = PermissionEngine()
+            macro_context = self._build_macro_permission_context(repository)
+            is_permitted, permission_reason = permission_engine.is_trade_permitted(
+                cast(dict[str, Any], potential_setup),
+                macro_context,
+                symbol=symbol,
+            )
+            if not is_permitted:
+                logging.info(
+                    "Setup blocked by permission filter: symbol=%s direction=%s reason=%s",
+                    symbol,
+                    potential_setup.get("trade_direction"),
+                    permission_reason,
+                )
+                return signals_generated, errors_encountered
+
+            governor = RiskGovernor()
+            trading_allowed, governor_reason = governor.is_trading_allowed(
+                repository, int(current_candle.timestamp)
+            )
+            if not trading_allowed:
+                logging.info("Setup blocked: %s", governor_reason)
+                return signals_generated, errors_encountered
+
+            raw_macro_bias_state = repository.get_kv("macro_bias_state")
+            if raw_macro_bias_state is None:
+                raw_macro_bias_state = repository.get_kv("global_macro_bias")
+            macro_bias_state = (
+                raw_macro_bias_state.upper() if raw_macro_bias_state is not None else "NEUTRAL"
+            )
+            if not get_instrument(symbol).macro_gold_filters:
+                # Gold's macro regime must not vote on other markets.
+                macro_bias_state = "NEUTRAL"
+
+            raw_structure_state = repository.get_kv(
+                state_key("current_structure_state", symbol)
+            )
+            current_structure_state = (
+                raw_structure_state.upper() if raw_structure_state is not None else "BULLISH"
+            )
+
+            latest_sweep = self._parse_liquidity_sweep(
+                repository.get_kv(state_key("latest_liquidity_sweep", symbol))
+            )
+            has_recent_sweep = self._has_recent_directional_sweep(
+                trade_direction=str(potential_setup["trade_direction"]),
+                current_timestamp=int(current_candle.timestamp),
+                timeframe=current_candle.timeframe,
+                latest_sweep=latest_sweep,
+            )
+
+            trade_direction = str(potential_setup["trade_direction"])
+            setup_order_type = str(potential_setup.get("order_type", "LIMIT")).upper()
+            setup_strategy = potential_setup.get("strategy")
+            zone_for_scoring = cast(Optional[dict[str, Any]], potential_setup.get("zone"))
+
+            entry_hint: Optional[float] = None
+            raw_entry = potential_setup.get("entry_price")
+            if raw_entry is None and zone_for_scoring:
+                key = "price_top" if trade_direction.upper() == "LONG" else "price_bottom"
+                raw_entry = zone_for_scoring.get(key)
+            try:
+                entry_hint = float(raw_entry) if raw_entry is not None else None
+            except (TypeError, ValueError):
+                entry_hint = None
+
+            swing_high_point = self._parse_swing_point(
+                repository.get_kv(state_key("last_swing_high", symbol))
+            )
+            swing_low_point = self._parse_swing_point(
+                repository.get_kv(state_key("last_swing_low", symbol))
+            )
+            swing_high_price = (
+                float(swing_high_point["price"]) if swing_high_point else None
+            )
+            swing_low_price = (
+                float(swing_low_point["price"]) if swing_low_point else None
+            )
+
+            second_attempt = self._is_second_attempt(
+                repository, trade_direction, entry_hint, current_candle
+            )
+
+            swing_history: Optional[dict[str, Any]] = None
+            raw_swing_history = repository.get_kv(state_key("swing_history", symbol))
+            if isinstance(raw_swing_history, str):
+                try:
+                    parsed_history = json.loads(raw_swing_history)
+                    if isinstance(parsed_history, dict):
+                        swing_history = parsed_history
+                except (TypeError, ValueError):
+                    swing_history = None
+
+            try:
+                confluence = ConfluenceEngineV2().evaluate(
+                    trade_direction=trade_direction,
+                    macro_bias=macro_bias_state,
+                    current_structure=current_structure_state,
+                    zone_dict=zone_for_scoring,
+                    has_recent_sweep=has_recent_sweep,
+                    recent_candles=recent_candles,
+                    current_timestamp=int(current_candle.timestamp),
+                    order_type=setup_order_type,
+                    strategy=str(setup_strategy) if setup_strategy else None,
+                    repository=repository,
+                    entry_price=entry_hint,
+                    last_swing_high=swing_high_price,
+                    last_swing_low=swing_low_price,
+                    second_attempt=second_attempt,
+                    swing_history=swing_history,
+                    symbol=symbol,
+                )
+                total_score = int(confluence["score"])
+                classification = str(confluence["classification"])
+                if confluence.get("vetoes"):
+                    logging.info(
+                        "Confluence vetoes applied: %s", "; ".join(confluence["vetoes"])
+                    )
+                potential_setup["confluence_notes"] = list(confluence.get("notes", []))
+            except Exception as exc:
+                logging.error("Confluence v2 failed; using legacy scoring: %s", exc)
+                scoring_engine = ScoringEngine()
+                total_score = scoring_engine.calculate_total_score(
+                    trade_direction=trade_direction,
+                    macro_bias=macro_bias_state,
+                    current_structure=current_structure_state,
+                    zone_dict=zone_for_scoring,
+                    has_recent_sweep=has_recent_sweep,
+                )
+                classification = scoring_engine.classify_score(total_score)
+
+            self._record_setup_attempt(
+                repository, trade_direction, entry_hint, current_candle
+            )
+            if swing_high_price is not None and swing_low_price is not None:
+                leg = abs(swing_high_price - swing_low_price)
+                if leg > 0:
+                    decimals = get_instrument(symbol).price_decimals
+                    potential_setup["measured_move"] = round(leg, decimals)
+
+            # Assemble the professional trade-plan context for the alert.
+            try:
+                from src.analysis.pivots import current_session_label
+
+                sweep_desc = None
+                if latest_sweep is not None:
+                    step = int(TIMEFRAME_SECONDS.get(current_candle.timeframe, 60))
+                    age_bars = max(
+                        0,
+                        (int(current_candle.timestamp) - int(latest_sweep["timestamp"])) // step,
+                    )
+                    sweep_desc = (
+                        f"{str(latest_sweep.get('type', '')).replace('_', ' ').title()} "
+                        f"{age_bars} bars ago"
+                    )
+                daily_r_raw = repository.get_kv("risk_daily_r_value")
+                daily_r: Optional[str] = None
+                if isinstance(daily_r_raw, (str, int, float)):
+                    try:
+                        daily_r = f"{float(daily_r_raw):+.2f}R"
+                    except (TypeError, ValueError):
+                        daily_r = None
+                potential_setup["plan_context"] = {
+                    "structure": current_structure_state,
+                    "macro_bias": macro_bias_state,
+                    "regime": repository.get_kv("macro_regime"),
+                    "session": current_session_label(int(current_candle.timestamp)),
+                    "liquidity": sweep_desc,
+                    "daily_r": daily_r,
+                    "notes": list(potential_setup.get("confluence_notes", [])),
+                }
+            except Exception as exc:
+                logging.debug("Trade plan context skipped: %s", exc)
+
+            repository.set_kv(state_key("latest_setup_score", symbol), total_score)
+            repository.set_kv(
+                state_key("latest_setup_classification", symbol), classification
+            )
+            logging.info(
+                "Setup scored: symbol=%s direction=%s score=%d classification=%s",
+                symbol,
+                potential_setup["trade_direction"],
+                total_score,
+                classification,
+            )
+            if classification == "ACTIONABLE":
+                try:
+                    signal_saved, signal_errors = self._persist_actionable_signal(
+                        repository,
+                        cast(dict[str, Any], potential_setup),
+                        recent_candles,
+                        current_candle,
+                        total_score,
+                    )
+                    if signal_saved:
+                        signals_generated += 1
+                    errors_encountered += signal_errors
+                except Exception as exc:
+                    errors_encountered += 1
+                    logging.error("Failed to persist actionable signal: %s", exc)
+
+        # Release large pulse objects before the next symbol.
+        del recent_fvgs
+        del recent_candles
+        del valid_candles
+        return signals_generated, errors_encountered
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
         self.memory_profiler.start_timer()
         self.memory_profiler.log_snapshot("Pulse start")
 
-        symbol = "XAUUSD"
         timeframe = SIGNAL_TIMEFRAME
         repository: Optional[Repository] = None
         signals_generated = 0
@@ -1249,280 +1698,31 @@ class PulseOrchestrator:
                 logging.error("Unexpected macro regime error: %s", exc)
             if os.getenv("MOCK_INGESTION") == "1":
                 client: Any = self._mock_client(repository)
+                symbols = [os.getenv("MOCK_SYMBOL", "XAUUSD")]
             else:
                 client = self.client_factory(repository)
+                symbols = active_symbols()
             logging.info("Selected ingestion client: %s", client.__class__.__name__)
             validator = DataValidator()
+            self._load_auto_quarantine(repository)
 
-            try:
-                candles = client.fetch_latest_candles(symbol, timeframe)
-            except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
-                errors_encountered += 1
-                logging.error("Ingestion failed: %s", exc)
-                return
+            for symbol in symbols:
+                try:
+                    sym_signals, sym_errors = self._pulse_symbol(
+                        repository, client, validator, symbol, timeframe, force_signal
+                    )
+                    signals_generated += sym_signals
+                    errors_encountered += sym_errors
+                except Exception:
+                    errors_encountered += 1
+                    logging.exception("Symbol pulse failed: %s", symbol)
 
-            self.memory_profiler.log_snapshot("Post-ingestion")
-
-            total_count = len(candles)
-            valid_candles = validator.filter_candles(candles)
-            del candles
-            filtered = total_count - len(valid_candles)
-            logging.info("Candles received: %s, valid: %s", total_count, len(valid_candles))
-            if filtered:
-                logging.info("Filtered out %s invalid candles", filtered)
-
-            if not valid_candles:
-                logging.info("No valid candles to persist; pulse stopping")
-                return
-
-            repository.save_candles(valid_candles)
-            latest_timestamp = max(candle.timestamp for candle in valid_candles)
-            repository.set_kv("last_processed_timestamp", latest_timestamp)
-            current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
+            # Housekeeping runs even on quiet pulses (weekends included).
             self._maybe_prune_market_data(repository)
             self._maybe_refresh_news_calendar(repository)
             self._maybe_send_weekly_report(repository)
+            self._maybe_update_strategy_quarantine(repository)
             self._maybe_send_daily_status(repository)
-            self._monitor_open_signals(repository, valid_candles)
-            self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
-
-            detector = FractalDetector()
-            recent_candles = repository.get_recent_candles(
-                symbol, timeframe, ANALYSIS_LOOKBACK_CANDLES
-            )
-            latest_fractals = detector.find_fractals(recent_candles)
-            self._persist_latest_fractals(repository, latest_fractals)
-            self._evaluate_liquidity_sweep(repository, recent_candles, valid_candles)
-            prev_close = (
-                float(recent_candles[-2].close)
-                if isinstance(recent_candles, list) and len(recent_candles) >= 2
-                else None
-            )
-            recent_bos_type = self._evaluate_market_structure(
-                repository, current_candle, prev_close
-            )
-            recent_fvgs = self._scan_for_fvg_zones(repository, recent_candles)
-            self._scan_for_order_blocks(
-                repository,
-                recent_candles,
-                recent_bos_type,
-                recent_fvgs,
-            )
-
-            if force_signal:
-                logging.info("UAT force-signal enabled; bypassing permission and scoring engines")
-                forced_setup = self._build_forced_setup(current_candle)
-                try:
-                    signal_saved, signal_errors = self._persist_actionable_signal(
-                        repository,
-                        forced_setup,
-                        recent_candles,
-                        current_candle,
-                        100,
-                    )
-                    if signal_saved:
-                        signals_generated += 1
-                    errors_encountered += signal_errors
-                except Exception as exc:
-                    errors_encountered += 1
-                    logging.error("Failed to persist forced UAT signal: %s", exc)
-                return
-
-            potential_setup = self._detect_trade_setup(
-                repository,
-                symbol,
-                current_candle,
-                recent_candles,
-                new_candle_count=len(valid_candles),
-            )
-            if potential_setup is not None:
-                permission_engine = PermissionEngine()
-                macro_context = self._build_macro_permission_context(repository)
-                is_permitted, permission_reason = permission_engine.is_trade_permitted(
-                    cast(dict[str, Any], potential_setup),
-                    macro_context,
-                )
-                if not is_permitted:
-                    logging.info(
-                        "Setup blocked by permission filter: direction=%s reason=%s",
-                        potential_setup.get("trade_direction"),
-                        permission_reason,
-                    )
-                    return
-
-                governor = RiskGovernor()
-                trading_allowed, governor_reason = governor.is_trading_allowed(
-                    repository, int(current_candle.timestamp)
-                )
-                if not trading_allowed:
-                    logging.info("Setup blocked: %s", governor_reason)
-                    return
-
-                raw_macro_bias_state = repository.get_kv("macro_bias_state")
-                if raw_macro_bias_state is None:
-                    raw_macro_bias_state = repository.get_kv("global_macro_bias")
-                macro_bias_state = (
-                    raw_macro_bias_state.upper() if raw_macro_bias_state is not None else "NEUTRAL"
-                )
-
-                raw_structure_state = repository.get_kv("current_structure_state")
-                current_structure_state = (
-                    raw_structure_state.upper() if raw_structure_state is not None else "BULLISH"
-                )
-
-                latest_sweep = self._parse_liquidity_sweep(repository.get_kv("latest_liquidity_sweep"))
-                has_recent_sweep = self._has_recent_directional_sweep(
-                    trade_direction=str(potential_setup["trade_direction"]),
-                    current_timestamp=int(current_candle.timestamp),
-                    timeframe=current_candle.timeframe,
-                    latest_sweep=latest_sweep,
-                )
-
-                trade_direction = str(potential_setup["trade_direction"])
-                setup_order_type = str(potential_setup.get("order_type", "LIMIT")).upper()
-                setup_strategy = potential_setup.get("strategy")
-                zone_for_scoring = cast(Optional[dict[str, Any]], potential_setup.get("zone"))
-
-                entry_hint: Optional[float] = None
-                raw_entry = potential_setup.get("entry_price")
-                if raw_entry is None and zone_for_scoring:
-                    key = "price_top" if trade_direction.upper() == "LONG" else "price_bottom"
-                    raw_entry = zone_for_scoring.get(key)
-                try:
-                    entry_hint = float(raw_entry) if raw_entry is not None else None
-                except (TypeError, ValueError):
-                    entry_hint = None
-
-                swing_high_point = self._parse_swing_point(repository.get_kv("last_swing_high"))
-                swing_low_point = self._parse_swing_point(repository.get_kv("last_swing_low"))
-                swing_high_price = (
-                    float(swing_high_point["price"]) if swing_high_point else None
-                )
-                swing_low_price = (
-                    float(swing_low_point["price"]) if swing_low_point else None
-                )
-
-                second_attempt = self._is_second_attempt(
-                    repository, trade_direction, entry_hint, current_candle
-                )
-
-                swing_history: Optional[dict[str, Any]] = None
-                raw_swing_history = repository.get_kv("swing_history")
-                if isinstance(raw_swing_history, str):
-                    try:
-                        parsed_history = json.loads(raw_swing_history)
-                        if isinstance(parsed_history, dict):
-                            swing_history = parsed_history
-                    except (TypeError, ValueError):
-                        swing_history = None
-
-                try:
-                    confluence = ConfluenceEngineV2().evaluate(
-                        trade_direction=trade_direction,
-                        macro_bias=macro_bias_state,
-                        current_structure=current_structure_state,
-                        zone_dict=zone_for_scoring,
-                        has_recent_sweep=has_recent_sweep,
-                        recent_candles=recent_candles,
-                        current_timestamp=int(current_candle.timestamp),
-                        order_type=setup_order_type,
-                        strategy=str(setup_strategy) if setup_strategy else None,
-                        repository=repository,
-                        entry_price=entry_hint,
-                        last_swing_high=swing_high_price,
-                        last_swing_low=swing_low_price,
-                        second_attempt=second_attempt,
-                        swing_history=swing_history,
-                    )
-                    total_score = int(confluence["score"])
-                    classification = str(confluence["classification"])
-                    if confluence.get("vetoes"):
-                        logging.info(
-                            "Confluence vetoes applied: %s", "; ".join(confluence["vetoes"])
-                        )
-                    potential_setup["confluence_notes"] = list(confluence.get("notes", []))
-                except Exception as exc:
-                    logging.error("Confluence v2 failed; using legacy scoring: %s", exc)
-                    scoring_engine = ScoringEngine()
-                    total_score = scoring_engine.calculate_total_score(
-                        trade_direction=trade_direction,
-                        macro_bias=macro_bias_state,
-                        current_structure=current_structure_state,
-                        zone_dict=zone_for_scoring,
-                        has_recent_sweep=has_recent_sweep,
-                    )
-                    classification = scoring_engine.classify_score(total_score)
-
-                self._record_setup_attempt(
-                    repository, trade_direction, entry_hint, current_candle
-                )
-                if swing_high_price is not None and swing_low_price is not None:
-                    leg = abs(swing_high_price - swing_low_price)
-                    if leg > 0:
-                        potential_setup["measured_move"] = round(leg, 2)
-
-                # Assemble the professional trade-plan context for the alert.
-                try:
-                    from src.analysis.pivots import current_session_label
-
-                    sweep_desc = None
-                    if latest_sweep is not None:
-                        step = int(TIMEFRAME_SECONDS.get(current_candle.timeframe, 60))
-                        age_bars = max(
-                            0,
-                            (int(current_candle.timestamp) - int(latest_sweep["timestamp"])) // step,
-                        )
-                        sweep_desc = (
-                            f"{str(latest_sweep.get('type', '')).replace('_', ' ').title()} "
-                            f"{age_bars} bars ago"
-                        )
-                    daily_r_raw = repository.get_kv("risk_daily_r_value")
-                    daily_r: Optional[str] = None
-                    if isinstance(daily_r_raw, (str, int, float)):
-                        try:
-                            daily_r = f"{float(daily_r_raw):+.2f}R"
-                        except (TypeError, ValueError):
-                            daily_r = None
-                    potential_setup["plan_context"] = {
-                        "structure": current_structure_state,
-                        "macro_bias": macro_bias_state,
-                        "regime": repository.get_kv("macro_regime"),
-                        "session": current_session_label(int(current_candle.timestamp)),
-                        "liquidity": sweep_desc,
-                        "daily_r": daily_r,
-                        "notes": list(potential_setup.get("confluence_notes", [])),
-                    }
-                except Exception as exc:
-                    logging.debug("Trade plan context skipped: %s", exc)
-
-                repository.set_kv("latest_setup_score", total_score)
-                repository.set_kv("latest_setup_classification", classification)
-                logging.info(
-                    "Setup scored: direction=%s score=%d classification=%s",
-                    potential_setup["trade_direction"],
-                    total_score,
-                    classification,
-                )
-                if classification == "ACTIONABLE":
-                    try:
-                        signal_saved, signal_errors = self._persist_actionable_signal(
-                            repository,
-                            cast(dict[str, Any], potential_setup),
-                            recent_candles,
-                            current_candle,
-                            total_score,
-                        )
-                        if signal_saved:
-                            signals_generated += 1
-                        errors_encountered += signal_errors
-                    except Exception as exc:
-                        errors_encountered += 1
-                        logging.error("Failed to persist actionable signal: %s", exc)
-
-            # Release large pulse objects before returning control to scheduler.
-            del recent_fvgs
-            del recent_candles
-            del valid_candles
             gc.collect()
         except Exception:
             errors_encountered += 1

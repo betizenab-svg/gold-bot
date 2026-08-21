@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional, Sequence
 
+from config.instruments import get_instrument, state_key
 from config.settings import ACTIVE_MAX_HOLD_HOURS, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
 from src.alerting.telegram_client import TelegramClient
@@ -192,13 +193,22 @@ class SignalLifecycleManager:
         return mfe >= self.BE_ARM_R
 
     @staticmethod
-    def _trading_age_seconds(created_ts: int, now_ts: int) -> int:
+    def _signal_instrument(signal: Any):
+        raw = SignalLifecycleManager._get_optional_value(signal, "symbol")
+        symbol = raw if isinstance(raw, str) and raw else "XAUUSD"
+        return get_instrument(symbol)
+
+    @staticmethod
+    def _trading_age_seconds(
+        created_ts: int, now_ts: int, weekend_closed: bool = True
+    ) -> int:
         """Elapsed time minus weekend hours, so Friday signals are not mass
-        expired at the Sunday reopen. Approximates the closed market as the
-        UTC Saturday+Sunday block."""
+        expired at the Sunday reopen. 24/7 markets (crypto) count real time."""
         total = int(now_ts) - int(created_ts)
         if total <= 0:
             return 0
+        if not weekend_closed:
+            return total
         closed = 0
         day_cursor = int(created_ts) - (int(created_ts) % 86400)
         while day_cursor < now_ts:
@@ -219,7 +229,11 @@ class SignalLifecycleManager:
             return False
         if created_ts <= 0:
             return False
-        age_seconds = self._trading_age_seconds(created_ts, int(current_candle.timestamp))
+        age_seconds = self._trading_age_seconds(
+            created_ts,
+            int(current_candle.timestamp),
+            weekend_closed=not self._signal_instrument(signal).weekend_trading,
+        )
         return age_seconds > int(SIGNAL_EXPIRY_MINUTES) * 60
 
     def _is_active_stale(self, signal: Any, current_candle: Candle) -> bool:
@@ -230,7 +244,11 @@ class SignalLifecycleManager:
             return False
         if created_ts <= 0:
             return False
-        age_seconds = self._trading_age_seconds(created_ts, int(current_candle.timestamp))
+        age_seconds = self._trading_age_seconds(
+            created_ts,
+            int(current_candle.timestamp),
+            weekend_closed=not self._signal_instrument(signal).weekend_trading,
+        )
         return age_seconds > int(ACTIVE_MAX_HOLD_HOURS) * 3600
 
     def process_open_signals(
@@ -390,7 +408,9 @@ class SignalLifecycleManager:
                 return None
             if repository is None or not hasattr(repository, "get_kv"):
                 return None
-            structure = repository.get_kv("current_structure_state")
+            raw_symbol = SignalLifecycleManager._get_optional_value(signal, "symbol")
+            sig_symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
+            structure = repository.get_kv(state_key("current_structure_state", sig_symbol))
             if not isinstance(structure, str):
                 return None
             direction = str(
@@ -447,30 +467,31 @@ class SignalLifecycleManager:
     @staticmethod
     def _build_lifecycle_reason(signal: Any, event_type: str) -> str:
         normalized = event_type.upper()
+        nd = SignalLifecycleManager._signal_instrument(signal).price_decimals
         if normalized == "ACTIVATED":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
-            return f"Entry activated at {price:.2f}."
+            return f"Entry activated at {price:.{nd}f}."
         if normalized == "TP1_SMASH":
             price = float(SignalLifecycleManager._get_required_value(signal, "tp1_price", "tp1"))
-            return f"Price hit TP1 at {price:.2f}."
+            return f"Price hit TP1 at {price:.{nd}f}."
         if normalized == "TP2_SMASH":
             price = float(SignalLifecycleManager._get_required_value(signal, "tp2_price", "tp2"))
-            return f"Price hit TP2 at {price:.2f}."
+            return f"Price hit TP2 at {price:.{nd}f}."
         if normalized == "SL_HIT":
             price = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
-            return f"Price hit SL at {price:.2f}."
+            return f"Price hit SL at {price:.{nd}f}."
         if normalized == "BE_HIT":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
-            return f"Price returned to entry at {price:.2f} after TP1; runner closed at breakeven."
+            return f"Price returned to entry at {price:.{nd}f} after TP1; runner closed at breakeven."
         if normalized == "EARLY_BE":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return (
-                f"Trade ran +1R then returned to entry at {price:.2f}; "
+                f"Trade ran +1R then returned to entry at {price:.{nd}f}; "
                 "protected at breakeven instead of taking the full stop."
             )
         if normalized == "EXPIRED":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
-            return f"Pending entry at {price:.2f} was never triggered; signal cancelled."
+            return f"Pending entry at {price:.{nd}f} was never triggered; signal cancelled."
         if normalized == "TIME_STOP":
             return "Trade never reached TP1 within the holding window; closed as stagnant."
         if normalized == "STRUCTURE_EXIT":

@@ -1,6 +1,18 @@
-{% extends "base.html" %} {% block title %}Performance | XAUUSD Intelligence{%
+{% extends "base.html" %} {% block title %}Performance | Signal Desk{%
 endblock %} {% block page_title %}Performance & Calibration{% endblock %} {%
 block content %}
+<form method="get" class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+  <select name="symbol" class="rounded-xl border border-white/10 bg-slatecore px-3 py-2">
+    <option value="">All markets</option>
+    {% for sym in all_symbols %}
+    <option value="{{ sym }}" {% if symbol_filter == sym %}selected{% endif %}>{{ sym }}</option>
+    {% endfor %}
+  </select>
+  <button class="rounded-xl border border-cyanlux/40 bg-cyanlux/10 px-4 py-2 font-semibold text-cyanlux hover:bg-cyanlux/20 transition-colors">Apply</button>
+  {% if symbol_filter %}
+  <a href="{{ url_for('performance') }}" class="text-slate-400 hover:text-white transition-colors">Clear</a>
+  {% endif %}
+</form>
 <section class="grid grid-cols-2 gap-4 md:grid-cols-5">
   <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
     <p class="text-xs text-slate-400">Closed trades</p>
@@ -66,6 +78,65 @@ block content %}
         {% endfor %}
       </tbody>
     </table>
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Per-market scoreboard</h2>
+  <div class="mt-3 grid gap-3 md:grid-cols-4">
+    {% for row in symbol_split %}
+    <div class="rounded-xl bg-white/5 p-4">
+      <p class="text-xs text-slate-400"><span class="symbol-dot sym-{{ row.symbol|lower }}"></span> {{ row.name }} ({{ row.symbol }})</p>
+      <p class="mt-1 text-lg font-semibold {% if row.net_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+        {{ "%+.2f"|format(row.net_r) }}R
+      </p>
+      <p class="text-xs text-slate-500">{{ row.n }} closed · {{ row.win_pct }}% full wins</p>
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">No closed trades yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Edge clock — net R by weekday × New York hour</h2>
+  <div class="mt-3 overflow-x-auto">
+    <table class="heatmap-table">
+      <thead>
+        <tr>
+          <th></th>
+          {% for h in range(24) %}<th class="heat-hour">{{ h }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in heatmap %}
+        <tr>
+          <td class="heat-day">{{ row.day }}</td>
+          {% for cell in row.cells %}
+          <td class="heat-cell {% if cell.value is not none %}{% if cell.positive %}heat-pos{% else %}heat-neg{% endif %}{% endif %}"
+              {% if cell.value is not none %}style="--heat: {{ cell.intensity }}" title="{{ '%+.2f'|format(cell.value) }}R"{% endif %}></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-2 text-xs text-slate-500">Green = hours that paid, red = hours that cost. Hover a cell for the exact R.</p>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Outcome distribution</h2>
+  <div class="mt-3 space-y-2">
+    {% for bar in histogram %}
+    <div class="flex items-center gap-3 text-sm">
+      <span class="w-40 shrink-0 text-xs text-slate-400">{{ bar.label }}</span>
+      <div class="h-5 flex-1 rounded-full bg-white/5">
+        <div class="h-5 rounded-full {% if bar.tone == 'pos' %}bg-emerald-500/60{% elif bar.tone == 'neg' %}bg-rose-500/60{% else %}bg-slate-500/50{% endif %}"
+             style="width: {{ bar.pct }}%"></div>
+      </div>
+      <span class="w-8 text-right font-mono text-xs">{{ bar.count }}</span>
+    </div>
+    {% endfor %}
   </div>
 </section>
 

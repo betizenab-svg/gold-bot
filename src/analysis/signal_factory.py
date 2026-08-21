@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from config.instruments import get_instrument
 from config.settings import (
     ACTIVE_MAX_HOLD_HOURS,
     ATR_SL_MULTIPLIER,
@@ -20,21 +21,29 @@ class SignalFactory:
 
     LOT_SIZE_TABLE_MARKER = "\n\n[LOT_SIZE_TABLE]\n"
 
-    def _minimum_risk(self, atr: float) -> float:
+    def _minimum_risk(self, atr: float, symbol: str = "XAUUSD") -> float:
         atr_value = max(float(atr), 0.0)
-        return max(float(SL_MIN_USD), float(SL_MIN_ATR_MULT) * atr_value)
+        instrument = get_instrument(symbol)
+        # Gold keeps the legacy env override; other markets use their own floor.
+        floor = float(SL_MIN_USD) if instrument.symbol == "XAUUSD" else instrument.min_stop_abs
+        return max(floor, float(SL_MIN_ATR_MULT) * atr_value)
 
     ROUND_NUMBER_GRID = 5.0
     ROUND_NUMBER_BUFFER = 0.30
 
-    def _clear_round_number(self, direction: str, sl: float) -> float:
-        """Stops parked on $5-grid round numbers get hunted; push them past."""
-        nearest = round(sl / self.ROUND_NUMBER_GRID) * self.ROUND_NUMBER_GRID
-        if abs(sl - nearest) >= self.ROUND_NUMBER_BUFFER:
+    def _clear_round_number(
+        self, direction: str, sl: float, symbol: str = "XAUUSD"
+    ) -> float:
+        """Stops parked on round-number grids get hunted; push them past."""
+        instrument = get_instrument(symbol)
+        grid = instrument.round_grid
+        buffer = instrument.round_buffer
+        nearest = round(sl / grid) * grid
+        if abs(sl - nearest) >= buffer:
             return sl
         if direction == "LONG":
-            return nearest - self.ROUND_NUMBER_BUFFER
-        return nearest + self.ROUND_NUMBER_BUFFER
+            return nearest - buffer
+        return nearest + buffer
 
     @staticmethod
     def _cap_tp2_at_measured_move(
@@ -82,9 +91,11 @@ class SignalFactory:
         tp1: float,
         tp2: float,
         score: int,
+        symbol: str = "XAUUSD",
     ) -> str:
         """Professional trade-plan narrative: thesis, evidence, numbers, and
         pre-committed reactions (Link/Kiev/Bassal journaling consensus)."""
+        nd = get_instrument(symbol).price_decimals
         if score >= 85:
             tier = "Tier 1 - full conviction"
         elif score >= 75:
@@ -116,7 +127,8 @@ class SignalFactory:
                 zone_top = float(zone_dict.get("price_top"))
                 zone_bottom = float(zone_dict.get("price_bottom"))
                 lines.append(
-                    f"Location: {zone_status} {zone_type} {zone_bottom:.2f}-{zone_top:.2f}"
+                    f"Location: {zone_status} {zone_type} "
+                    f"{zone_bottom:.{nd}f}-{zone_top:.{nd}f}"
                 )
             except (TypeError, ValueError):
                 lines.append(f"Location: {zone_status} {zone_type}")
@@ -134,9 +146,9 @@ class SignalFactory:
 
         risk = abs(entry - sl)
         lines.append(
-            f"Numbers: entry {entry:.2f} ({order_type}) | SL {sl:.2f} "
-            f"(structure + ATR floor, round numbers cleared, risk {risk:.2f}) | "
-            f"TP1 {tp1:.2f} (1.5R, bank half) | TP2 {tp2:.2f} "
+            f"Numbers: entry {entry:.{nd}f} ({order_type}) | SL {sl:.{nd}f} "
+            f"(structure + ATR floor, round numbers cleared, risk {risk:.{nd}f}) | "
+            f"TP1 {tp1:.{nd}f} (1.5R, bank half) | TP2 {tp2:.{nd}f} "
             f"({'measured-move capped' if zone_dict.get('measured_move') else '3R'}) | "
             "blended 2.25R if both targets pay"
         )
@@ -151,7 +163,7 @@ class SignalFactory:
             "Plan: TP1 hit -> bank half, stop to entry. "
             f"No trigger in {int(SIGNAL_EXPIRY_MINUTES)} min -> cancelled. "
             f"No TP1 within {int(ACTIVE_MAX_HOLD_HOURS)}h -> closed flat. "
-            f"Thesis invalid on a close beyond {sl:.2f}."
+            f"Thesis invalid on a close beyond {sl:.{nd}f}."
         )
 
         return "\n".join(lines)
@@ -161,6 +173,7 @@ class SignalFactory:
         trade_direction: str,
         zone_dict: dict[str, Any],
         atr: float,
+        symbol: str = "XAUUSD",
     ) -> tuple[float, float, float, float]:
         direction = trade_direction.upper()
         if direction not in {"LONG", "SHORT"}:
@@ -182,8 +195,8 @@ class SignalFactory:
                 sl = price_top + (ATR_SL_MULTIPLIER * atr_value)
 
         # Enforce a minimum stop distance so normal noise cannot wick out the trade.
-        min_risk = self._minimum_risk(atr)
-        sl = self._clear_round_number(direction, sl)
+        min_risk = self._minimum_risk(atr, symbol)
+        sl = self._clear_round_number(direction, sl, symbol)
         if direction == "LONG":
             risk = entry - sl
             if 0 < risk < min_risk:
@@ -204,11 +217,12 @@ class SignalFactory:
 
         tp2 = self._cap_tp2_at_measured_move(direction, entry, tp1, tp2, zone_dict, atr)
 
+        nd = get_instrument(symbol).price_decimals
         return (
-            round(entry, 2),
-            round(sl, 2),
-            round(tp1, 2),
-            round(tp2, 2),
+            round(entry, nd),
+            round(sl, nd),
+            round(tp1, nd),
+            round(tp2, nd),
         )
 
     def build_signal(
@@ -221,14 +235,14 @@ class SignalFactory:
         timestamp: int,
     ) -> Signal:
         signal_type = trade_direction.upper()
-        entry, sl, tp1, tp2 = self.calculate_parameters(signal_type, zone_dict, atr)
+        entry, sl, tp1, tp2 = self.calculate_parameters(signal_type, zone_dict, atr, symbol)
         zone_status = str(zone_dict.get("status", "UNKNOWN")).title()
         zone_type = str(zone_dict.get("type", "ZONE")).replace("_", " ")
 
         plan_context = zone_dict.get("plan_context")
         if isinstance(plan_context, dict):
             base_reasoning = self._render_trade_plan(
-                plan_context, zone_dict, signal_type, entry, sl, tp1, tp2, int(score)
+                plan_context, zone_dict, signal_type, entry, sl, tp1, tp2, int(score), symbol
             )
         else:
             base_reasoning = f"Score: {int(score)}. Entry off {zone_status} {zone_type}."
@@ -238,18 +252,19 @@ class SignalFactory:
                 base_reasoning = f"{base_reasoning}\n{rendered_notes}"
 
         lot_size_table = LotSizeCalculator().generate_table(
-            entry, sl, risk_pct=0.02 if int(score) >= 85 else 0.01
+            entry, sl, risk_pct=0.02 if int(score) >= 85 else 0.01, symbol=symbol
         )
         reasoning = f"{base_reasoning}{self.LOT_SIZE_TABLE_MARKER}{lot_size_table}"
 
         zone_id = zone_dict.get("id", zone_dict.get("zone_id"))
         strategy_key: Optional[str] = zone_dict.get("strategy")
+        nd = get_instrument(symbol).price_decimals
         dedupe_target = zone_id
         if dedupe_target is None:
             dedupe_target = (
-                f"{strategy_key}|{round(entry, 2):.2f}|{round(sl, 2):.2f}"
+                f"{strategy_key}|{round(entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
                 if strategy_key is not None
-                else f"{round(entry, 2):.2f}|{round(sl, 2):.2f}"
+                else f"{round(entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
             )
         # Date from the signal candle (not wall clock) so a pending setup
         # cannot re-fire as a "new" signal across the midnight rollover.

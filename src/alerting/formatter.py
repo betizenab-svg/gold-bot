@@ -5,6 +5,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from config.instruments import get_instrument
+
 
 class SignalFormatter:
     """Format outbound Telegram messages for initial trade alerts and lifecycle replies."""
@@ -12,29 +14,33 @@ class SignalFormatter:
     LOT_SIZE_TABLE_MARKER = "[LOT_SIZE_TABLE]"
 
     def format_initial_signal(self, signal_obj: Any) -> str:
-        symbol = self._escape(self._get_value(signal_obj, "symbol", default="XAUUSD"))
+        raw_symbol = self._get_value(signal_obj, "symbol", default="XAUUSD")
+        symbol = self._escape(raw_symbol)
+        nd = get_instrument(
+            raw_symbol if isinstance(raw_symbol, str) else "XAUUSD"
+        ).price_decimals
         direction = self._escape(
             str(self._get_value(signal_obj, "signal_type", "type", default="UNKNOWN")).upper()
         )
-        entry_price = self._get_numeric(signal_obj, "entry_price", "entry")
-        sl_price = self._get_numeric(signal_obj, "sl_price", "sl")
-        tp1_price = self._get_numeric(signal_obj, "tp1_price", "tp1")
-        tp2_price = self._get_numeric(signal_obj, "tp2_price", "tp2")
+        entry_price = self._get_numeric(signal_obj, "entry_price", "entry", decimals=nd)
+        sl_price = self._get_numeric(signal_obj, "sl_price", "sl", decimals=nd)
+        tp1_price = self._get_numeric(signal_obj, "tp1_price", "tp1", decimals=nd)
+        tp2_price = self._get_numeric(signal_obj, "tp2_price", "tp2", decimals=nd)
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         return (
-            "🚨 <b>Signal Alert</b>\n"
-            f"🟡 <b>Status:</b> market execution/pending order\n"
-            f"📌 <b>Symbol:</b> {symbol}\n"
-            f"📈 <b>Direction:</b> {direction}\n"
+            "\U0001f6a8 <b>Signal Alert</b>\n"
+            f"\U0001f7e1 <b>Status:</b> market execution/pending order\n"
+            f"\U0001f4cc <b>Symbol:</b> {symbol}\n"
+            f"\U0001f4c8 <b>Direction:</b> {direction}\n"
             "\n"
             "<b>Trade Levels</b>\n"
-            f"entry @ <code>{entry_price:.2f}</code>\n"
-            f"sl @ <code>{sl_price:.2f}</code>\n"
-            f"tp 1 @ <code>{tp1_price:.2f}</code>\n"
-            f"tp 2 @ <code>{tp2_price:.2f}</code>\n"
+            f"entry @ <code>{entry_price:.{nd}f}</code>\n"
+            f"sl @ <code>{sl_price:.{nd}f}</code>\n"
+            f"tp 1 @ <code>{tp1_price:.{nd}f}</code>\n"
+            f"tp 2 @ <code>{tp2_price:.{nd}f}</code>\n"
             "\n"
-            f"🕒 <b>Timestamp:</b> {generated_at}"
+            f"\U0001f552 <b>Timestamp:</b> {generated_at}"
         )
 
     def format_trade_reasoning(self, signal_obj: Any, lot_size_table: str) -> str:
@@ -118,9 +124,9 @@ class SignalFormatter:
         return alert_message, explanation_message
 
     @staticmethod
-    def _get_numeric(signal_obj: Any, *keys: str) -> float:
+    def _get_numeric(signal_obj: Any, *keys: str, decimals: int = 2) -> float:
         value = SignalFormatter._get_value(signal_obj, *keys)
-        return round(float(value), 2)
+        return round(float(value), decimals)
 
     @staticmethod
     def _escape(value: Any) -> str:
@@ -130,7 +136,7 @@ class SignalFormatter:
     def _code_wrap_prices(value: Any) -> str:
         escaped = html.escape(str(value), quote=False)
         return re.sub(
-            r"(?<![\w>])(\d+(?:\.\d{1,2})?)(?![\w<])",
+            r"(?<![\w>])(\d+(?:\.\d{1,5})?)(?![\w<])",
             r"<code>\1</code>",
             escaped,
         )

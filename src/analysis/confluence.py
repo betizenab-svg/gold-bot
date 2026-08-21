@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from config.instruments import get_instrument
 from src.analysis.adaptive_weights import AdaptiveWeightEngine
 from src.analysis.market_state import MarketStateEngine
 from src.analysis.momentum import MomentumEngine
@@ -66,6 +67,7 @@ class ConfluenceEngineV2:
         last_swing_low: Optional[float] = None,
         second_attempt: bool = False,
         swing_history: Optional[Dict[str, Any]] = None,
+        symbol: str = "XAUUSD",
     ) -> Dict[str, Any]:
         base_score = self.scoring_engine.calculate_total_score(
             trade_direction=trade_direction,
@@ -79,7 +81,9 @@ class ConfluenceEngineV2:
         vetoes: List[str] = []
         delta = 0
 
-        session_result = self._run(self.session_engine.evaluate, int(current_timestamp))
+        session_result = self._run(
+            self.session_engine.evaluate, int(current_timestamp), symbol
+        )
         if session_result:
             delta += int(session_result.get("score", 0))
             notes.append(str(session_result.get("note", "")))
@@ -168,6 +172,7 @@ class ConfluenceEngineV2:
             trade_direction,
             entry_price,
             int(current_timestamp),
+            symbol,
         )
         if pivot_result and pivot_result.get("note"):
             delta += int(pivot_result.get("score", 0))
@@ -178,12 +183,15 @@ class ConfluenceEngineV2:
             recent_candles,
             trade_direction,
             int(current_timestamp),
+            symbol,
         )
         if continuation_result and continuation_result.get("note"):
             delta += int(continuation_result.get("score", 0))
             notes.append(str(continuation_result["note"]))
 
-        smt_delta, smt_note = self._smt_adjustment(repository, trade_direction)
+        smt_delta, smt_note = (0, None)
+        if get_instrument(symbol).macro_gold_filters:
+            smt_delta, smt_note = self._smt_adjustment(repository, trade_direction)
         if smt_note:
             delta += smt_delta
             notes.append(smt_note)

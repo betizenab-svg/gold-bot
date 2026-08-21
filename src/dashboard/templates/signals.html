@@ -1,6 +1,24 @@
-{% extends "base.html" %} {% block title %}Signals | XAUUSD Intelligence{%
+{% extends "base.html" %} {% block title %}Signals | Signal Desk{%
 endblock %} {% block page_title %}Signal Ledger{% endblock %} {% block content
 %}
+<form method="get" class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+  <select name="symbol" class="rounded-xl border border-white/10 bg-slatecore px-3 py-2">
+    <option value="">All markets</option>
+    {% for sym in all_symbols %}
+    <option value="{{ sym }}" {% if symbol_filter == sym %}selected{% endif %}>{{ sym }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" class="rounded-xl border border-white/10 bg-slatecore px-3 py-2">
+    <option value="">All statuses</option>
+    <option value="OPEN" {% if status_filter == 'OPEN' %}selected{% endif %}>Open</option>
+    <option value="CLOSED" {% if status_filter == 'CLOSED' %}selected{% endif %}>Closed</option>
+    <option value="CANCELLED" {% if status_filter == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+  </select>
+  <button class="rounded-xl border border-cyanlux/40 bg-cyanlux/10 px-4 py-2 font-semibold text-cyanlux hover:bg-cyanlux/20 transition-colors">Filter</button>
+  {% if symbol_filter or status_filter %}
+  <a href="{{ url_for('signals') }}" class="text-slate-400 hover:text-white transition-colors">Clear</a>
+  {% endif %}
+</form>
 <section
   class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe"
 >
@@ -33,23 +51,22 @@ endblock %} {% block page_title %}Signal Ledger{% endblock %} {% block content
             <a class="hover:text-goldlux transition-colors" href="{{ url_for('signal_detail', signal_hash=row.signal_hash) }}">{{ row.signal_hash }}</a>
             {% else %}N/A{% endif %}
           </td>
-          <td class="py-3">{{ row.symbol or 'N/A' }}</td>
+          <td class="py-3">
+            <span class="symbol-dot sym-{{ (row.symbol or 'xauusd')|lower }}"></span>
+            {{ row.symbol or 'N/A' }}
+          </td>
           <td class="py-3">{{ row.direction or 'N/A' }}</td>
-          <td class="py-3">
-            {{ "%.2f"|format(row.entry_price) if row.entry_price is not none
-            else 'N/A' }}
+          <td class="py-3 font-mono text-xs">
+            {{ row.entry_price if row.entry_price is not none else 'N/A' }}
           </td>
-          <td class="py-3">
-            {{ "%.2f"|format(row.sl_price) if row.sl_price is not none else
-            'N/A' }}
+          <td class="py-3 font-mono text-xs">
+            {{ row.sl_price if row.sl_price is not none else 'N/A' }}
           </td>
-          <td class="py-3">
-            {{ "%.2f"|format(row.tp1_price) if row.tp1_price is not none else
-            'N/A' }}
+          <td class="py-3 font-mono text-xs">
+            {{ row.tp1_price if row.tp1_price is not none else 'N/A' }}
           </td>
-          <td class="py-3">
-            {{ "%.2f"|format(row.tp2_price) if row.tp2_price is not none else
-            'N/A' }}
+          <td class="py-3 font-mono text-xs">
+            {{ row.tp2_price if row.tp2_price is not none else 'N/A' }}
           </td>
           <td class="py-3">
             {{ row.score if row.score is not none else 'N/A' }}

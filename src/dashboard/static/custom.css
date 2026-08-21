@@ -79,6 +79,86 @@ body {
     border-color: rgba(230, 193, 116, 0.65);
 }
 
+/* --- Multi-asset identity --- */
+.symbol-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 9999px;
+    margin-right: 0.15rem;
+    vertical-align: baseline;
+    background: #94a3b8;
+    box-shadow: 0 0 6px currentColor;
+}
+
+.sym-xauusd { background: #e6c174; color: #e6c174; }
+.sym-btcusd { background: #f7931a; color: #f7931a; }
+.sym-eurusd { background: #49d7ff; color: #49d7ff; }
+.sym-gbpusd { background: #b48cf2; color: #b48cf2; }
+
+.symbol-card[data-symbol="XAUUSD"]:hover { border-color: rgba(230, 193, 116, 0.6); }
+.symbol-card[data-symbol="BTCUSD"]:hover { border-color: rgba(247, 147, 26, 0.6); }
+.symbol-card[data-symbol="EURUSD"]:hover { border-color: rgba(73, 215, 255, 0.6); }
+.symbol-card[data-symbol="GBPUSD"]:hover { border-color: rgba(180, 140, 242, 0.6); }
+
+/* --- Sparklines --- */
+.spark {
+    width: 100%;
+    height: 34px;
+    display: block;
+}
+
+.spark-up polyline { stroke: #34d399; }
+.spark-down polyline { stroke: #fb7185; }
+
+/* --- Status chips --- */
+.status-chip {
+    border-radius: 9999px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    background: rgba(148, 163, 184, 0.15);
+    color: #cbd5e1;
+}
+
+.status-pending { background: rgba(230, 193, 116, 0.16); color: #e6c174; }
+.status-active { background: rgba(52, 211, 153, 0.16); color: #34d399; }
+.status-partial_tp1 { background: rgba(73, 215, 255, 0.16); color: #49d7ff; }
+
+/* --- Edge-clock heatmap --- */
+.heatmap-table {
+    border-collapse: separate;
+    border-spacing: 3px;
+    min-width: 720px;
+}
+
+.heatmap-table .heat-hour {
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: #64748b;
+    text-align: center;
+    padding-bottom: 2px;
+}
+
+.heatmap-table .heat-day {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #94a3b8;
+    padding-right: 6px;
+    text-align: right;
+}
+
+.heat-cell {
+    width: 22px;
+    height: 20px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.heat-pos { background: rgba(52, 211, 153, calc(0.15 + var(--heat, 0) * 0.75)); }
+.heat-neg { background: rgba(251, 113, 133, calc(0.15 + var(--heat, 0) * 0.75)); }
+
 .metric-label {
     font-size: 0.72rem;
     text-transform: uppercase;

@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from config.instruments import get_instrument
+
 NY_TZ = ZoneInfo("America/New_York")
 
 
@@ -36,10 +38,26 @@ class SessionEngine:
             return "NEW_YORK_LATE"
         return "OFF_SESSION"
 
-    def evaluate(self, timestamp: int) -> dict[str, Any]:
+    def evaluate(self, timestamp: int, symbol: str = "XAUUSD") -> dict[str, Any]:
         session = self.classify_session(timestamp)
         ny_time = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).astimezone(NY_TZ)
         weekday = ny_time.weekday()
+
+        instrument = get_instrument(symbol)
+        if not instrument.session_scored:
+            # 24/7 markets: killzones still concentrate volume, but off-hours
+            # are normal trading, never a penalty.
+            if session in {"LONDON_KILLZONE", "NY_KILLZONE"}:
+                return {
+                    "session": session,
+                    "score": 4,
+                    "note": f"{session.replace('_', ' ').title()}: peak volume hours (+4)",
+                }
+            return {
+                "session": session,
+                "score": 0,
+                "note": "24/7 market: session-neutral",
+            }
 
         if session in {"LONDON_KILLZONE", "NY_KILLZONE"}:
             score = 10
@@ -66,6 +84,7 @@ class SessionEngine:
         candles: Any,
         trade_direction: str,
         timestamp: int,
+        symbol: str = "XAUUSD",
     ) -> dict[str, Any]:
         """NY signals aligned with London's net direction get a bonus (MMM:
         'the direction taken in London often continues in New York')."""
@@ -91,7 +110,7 @@ class SessionEngine:
             return neutral
 
         net = float(london[-1].close) - float(london[0].open)
-        if abs(net) < 0.5:
+        if abs(net) < get_instrument(symbol).london_min_net:
             return neutral
         london_direction = "LONG" if net > 0 else "SHORT"
 

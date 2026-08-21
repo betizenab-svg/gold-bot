@@ -609,6 +609,24 @@ class Repository:
         )
         return [str(row[0]) for row in rows if row and row[0] is not None]
 
+    def get_closed_outcomes_since(self, cutoff_timestamp: int) -> List[tuple]:
+        """(strategy, status) for every closed trade since the cutoff."""
+        rows = self._fetchall(
+            """
+            SELECT COALESCE(strategy, 'UNKNOWN'), status
+            FROM signals
+            WHERE status IN ('CLOSED_TP2', 'CLOSED_SL', 'CLOSED_BE',
+                             'CLOSED_TIME', 'CLOSED_STRUCT')
+              AND COALESCE(timestamp, created_at, 0) >= ?;
+            """,
+            (int(cutoff_timestamp),),
+        )
+        return [
+            (str(row[0]), str(row[1]))
+            for row in rows
+            if row and row[1] is not None
+        ]
+
     def update_signal_excursions(self, signal_hash: str, mfe_r: float, mae_r: float) -> None:
         """Ratchet max favorable/adverse excursion (in R) for open signals."""
         self._execute(

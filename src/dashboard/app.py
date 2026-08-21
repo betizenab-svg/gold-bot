@@ -12,8 +12,18 @@ from typing import Any, Iterator
 from flask import Flask, flash, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 
+from config.instruments import active_symbols, get_instrument, state_key
 from config.settings import BASE_DIR, DB_PATH
 from src.dashboard.auth import AdminUser, DEFAULT_USERNAME, load_user, verify_credentials
+
+# Realized R by closing status (kept in sync with the calibration script).
+_STATUS_R = {
+    "CLOSED_TP2": 2.25,
+    "CLOSED_BE": 0.75,
+    "CLOSED_SL": -1.0,
+    "CLOSED_TIME": 0.0,
+    "CLOSED_STRUCT": 1.0,
+}
 
 
 def _to_int(value: Any, default: int = 0) -> int:
@@ -21,6 +31,13 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _fmt_price(value: Any, decimals: int) -> str:
+    try:
+        return f"{float(value):,.{decimals}f}"
+    except (TypeError, ValueError):
+        return "—"
 
 
 @contextmanager
@@ -83,6 +100,77 @@ def _format_unix_ts(value: Any) -> str:
     if timestamp <= 0:
         return "N/A"
     return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(timestamp))
+
+
+def _symbol_cards() -> list[dict[str, Any]]:
+    """Per-market snapshot for the mission-control home page: last price,
+    24h change, inline sparkline points, state and setup readouts."""
+    cards: list[dict[str, Any]] = []
+    now = int(time.time())
+    for sym in active_symbols():
+        instrument = get_instrument(sym)
+        rows = _query_rows(
+            """
+            SELECT timestamp, close FROM market_data
+            WHERE symbol = ? ORDER BY timestamp DESC LIMIT 288;
+            """,
+            (sym,),
+        )
+        rows.reverse()
+        closes = [float(r["close"]) for r in rows if r.get("close") is not None]
+        last_ts = _to_int(rows[-1]["timestamp"]) if rows else 0
+
+        change_pct = None
+        if len(closes) >= 2 and closes[0]:
+            change_pct = (closes[-1] - closes[0]) / closes[0] * 100.0
+
+        spark = ""
+        if len(closes) >= 2:
+            step = max(1, len(closes) // 48)
+            pts = closes[::step]
+            lo, hi = min(pts), max(pts)
+            span = (hi - lo) or 1.0
+            n = len(pts)
+            spark = " ".join(
+                f"{(i / (n - 1)) * 100:.1f},{28 - ((v - lo) / span) * 26:.1f}"
+                for i, v in enumerate(pts)
+            )
+
+        setup_class = _query_value(
+            "SELECT value FROM kv_store WHERE key = ?;",
+            (state_key("latest_setup_classification", sym),),
+            default=None,
+        )
+        setup_score = _query_value(
+            "SELECT value FROM kv_store WHERE key = ?;",
+            (state_key("latest_setup_score", sym),),
+            default=None,
+        )
+        structure = _query_value(
+            "SELECT value FROM kv_store WHERE key = ?;",
+            (state_key("current_structure_state", sym),),
+            default=None,
+        )
+
+        cards.append(
+            {
+                "symbol": sym,
+                "name": instrument.display_name,
+                "asset_class": instrument.asset_class,
+                "price": (
+                    f"{closes[-1]:,.{instrument.price_decimals}f}" if closes else "—"
+                ),
+                "change_pct": round(change_pct, 2) if change_pct is not None else None,
+                "up": (change_pct or 0.0) >= 0.0,
+                "spark": spark,
+                "fresh_min": ((now - last_ts) // 60) if last_ts else None,
+                "weekend": instrument.weekend_trading,
+                "setup_class": str(setup_class) if setup_class else "—",
+                "setup_score": str(setup_score) if setup_score else "",
+                "structure": str(structure).upper() if structure else "—",
+            }
+        )
+    return cards
 
 
 def create_app() -> Flask:
@@ -181,6 +269,52 @@ def create_app() -> Flask:
             """
         )
 
+        # Net realized R across all closed trades (the one number that matters).
+        status_counts = _query_rows(
+            "SELECT status, COUNT(*) AS n FROM signals GROUP BY status;"
+        )
+        net_r = 0.0
+        for row in status_counts:
+            net_r += _STATUS_R.get(str(row.get("status", "")).upper(), 0.0) * _to_int(
+                row.get("n")
+            )
+
+        # Open positions with instrument-correct price formatting.
+        open_rows = _query_rows(
+            """
+            SELECT signal_hash, symbol,
+                   COALESCE(signal_type, type) AS direction,
+                   COALESCE(entry_price, entry) AS entry_price,
+                   COALESCE(sl_price, sl) AS sl_price,
+                   COALESCE(tp2_price, tp2) AS tp2_price,
+                   score, status, timestamp,
+                   COALESCE(strategy,'') AS strategy,
+                   COALESCE(mfe_r, 0) AS mfe_r
+            FROM signals
+            WHERE status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
+            ORDER BY id DESC;
+            """
+        )
+        open_positions = []
+        for row in open_rows:
+            sym = str(row.get("symbol") or "XAUUSD")
+            nd = get_instrument(sym).price_decimals
+            open_positions.append(
+                {
+                    "hash": row.get("signal_hash"),
+                    "symbol": sym,
+                    "direction": row.get("direction"),
+                    "entry": _fmt_price(row.get("entry_price"), nd),
+                    "sl": _fmt_price(row.get("sl_price"), nd),
+                    "tp2": _fmt_price(row.get("tp2_price"), nd),
+                    "score": row.get("score"),
+                    "status": row.get("status"),
+                    "strategy": str(row.get("strategy") or "").replace("_", " ").title(),
+                    "mfe": round(float(row.get("mfe_r") or 0.0), 2),
+                    "when": _format_unix_ts(row.get("timestamp")),
+                }
+            )
+
         # Heartbeat: how long since the engine last pulsed?
         last_pulse = _to_int(
             _query_value(
@@ -204,13 +338,31 @@ def create_app() -> Flask:
             recent_signals=recent_signals,
             heartbeat_state=heartbeat_state,
             heartbeat_age_min=heartbeat_age_min,
+            symbol_cards=_symbol_cards(),
+            net_r=round(net_r, 2),
+            open_positions=open_positions,
         )
 
     @flask_app.route("/signals")
     @login_required
     def signals() -> Any:
+        symbol_filter = str(request.args.get("symbol", "")).upper().strip()
+        status_filter = str(request.args.get("status", "")).upper().strip()
+        clauses: list[str] = []
+        params: list[Any] = []
+        if symbol_filter:
+            clauses.append("symbol = ?")
+            params.append(symbol_filter)
+        if status_filter == "OPEN":
+            clauses.append("status IN ('PENDING','ACTIVE','PARTIAL_TP1')")
+        elif status_filter == "CLOSED":
+            clauses.append("status LIKE 'CLOSED%'")
+        elif status_filter:
+            clauses.append("status = ?")
+            params.append(status_filter)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = _query_rows(
-            """
+            f"""
             SELECT
                 id,
                 signal_hash,
@@ -225,10 +377,18 @@ def create_app() -> Flask:
                 timestamp,
                 closure_reason
             FROM signals
+            {where}
             ORDER BY id DESC;
-            """
+            """,
+            tuple(params),
         )
-        return render_template("signals.html", rows=rows)
+        return render_template(
+            "signals.html",
+            rows=rows,
+            all_symbols=active_symbols(),
+            symbol_filter=symbol_filter,
+            status_filter=status_filter,
+        )
 
     def _load_signal(signal_hash: str) -> dict[str, Any] | None:
         rows = _query_rows(
@@ -271,14 +431,15 @@ def create_app() -> Flask:
             return Response("not found", status=404)
 
         ts = _to_int(row.get("timestamp"))
+        chart_symbol = str(row.get("symbol") or "XAUUSD")
         candle_rows = _query_rows(
             """
             SELECT symbol, timeframe, timestamp, open, high, low, close, volume
             FROM market_data
-            WHERE symbol = 'XAUUSD' AND timestamp <= ?
+            WHERE symbol = ? AND timestamp <= ?
             ORDER BY timestamp DESC LIMIT 60;
             """,
-            (ts if ts > 0 else int(time.time()),),
+            (chart_symbol, ts if ts > 0 else int(time.time())),
         )
         candles = [
             Candle(
@@ -389,22 +550,29 @@ def create_app() -> Flask:
     @flask_app.route("/performance")
     @login_required
     def performance() -> Any:
-        from scripts.calibrate_from_history import OUTCOME_R, analyze
+        from scripts.calibrate_from_history import analyze
+
+        symbol_filter = str(request.args.get("symbol", "")).upper().strip()
+        where_symbol = "AND symbol = ?" if symbol_filter else ""
+        params: tuple[Any, ...] = (symbol_filter,) if symbol_filter else ()
 
         # Equity curve: cumulative realized R over closed signals, in order.
         closed = _query_rows(
-            """
-            SELECT id, timestamp, status, COALESCE(strategy,'UNKNOWN') AS strategy
+            f"""
+            SELECT id, timestamp, status, symbol,
+                   COALESCE(strategy,'UNKNOWN') AS strategy
             FROM signals
-            WHERE status IN ('CLOSED_TP2','CLOSED_BE','CLOSED_SL','CLOSED_TIME')
+            WHERE status IN ('CLOSED_TP2','CLOSED_BE','CLOSED_SL','CLOSED_TIME','CLOSED_STRUCT')
+            {where_symbol}
             ORDER BY id ASC;
-            """
+            """,
+            params,
         )
         cumulative = 0.0
         curve_labels: list[str] = []
         curve_values: list[float] = []
         for row in closed:
-            cumulative += OUTCOME_R.get(str(row.get("status", "")).upper(), 0.0)
+            cumulative += _STATUS_R.get(str(row.get("status", "")).upper(), 0.0)
             curve_labels.append(_format_unix_ts(row.get("timestamp"))[:10])
             curve_values.append(round(cumulative, 2))
 
@@ -422,15 +590,16 @@ def create_app() -> Flask:
         }
 
         excursions = _query_rows(
-            """
+            f"""
             SELECT COALESCE(strategy,'UNKNOWN') AS strategy,
                    ROUND(AVG(COALESCE(mfe_r,0)),2) AS avg_mfe,
                    ROUND(AVG(COALESCE(mae_r,0)),2) AS avg_mae,
                    COUNT(*) AS n
             FROM signals
-            WHERE status LIKE 'CLOSED%'
+            WHERE status LIKE 'CLOSED%' {where_symbol}
             GROUP BY COALESCE(strategy,'UNKNOWN');
-            """
+            """,
+            params,
         )
 
         # Net R split by killzone/session of signal creation.
@@ -440,12 +609,93 @@ def create_app() -> Flask:
         session_n: dict[str, int] = {}
         for row in closed:
             label = current_session_label(_to_int(row.get("timestamp")))
-            r_value = OUTCOME_R.get(str(row.get("status", "")).upper(), 0.0)
+            r_value = _STATUS_R.get(str(row.get("status", "")).upper(), 0.0)
             session_r[label] = session_r.get(label, 0.0) + r_value
             session_n[label] = session_n.get(label, 0) + 1
         session_split = [
             {"session": label, "net_r": round(value, 2), "n": session_n[label]}
             for label, value in sorted(session_r.items(), key=lambda kv: -kv[1])
+        ]
+
+        # Per-symbol scoreboard (net R, trades, win rate).
+        symbol_stats: dict[str, dict[str, Any]] = {}
+        for row in closed:
+            sym = str(row.get("symbol") or "XAUUSD")
+            stats = symbol_stats.setdefault(
+                sym, {"symbol": sym, "net_r": 0.0, "n": 0, "wins": 0}
+            )
+            status = str(row.get("status", "")).upper()
+            stats["net_r"] += _STATUS_R.get(status, 0.0)
+            stats["n"] += 1
+            if status == "CLOSED_TP2":
+                stats["wins"] += 1
+        symbol_split = sorted(
+            (
+                {
+                    "symbol": s["symbol"],
+                    "name": get_instrument(s["symbol"]).display_name,
+                    "net_r": round(s["net_r"], 2),
+                    "n": s["n"],
+                    "win_pct": round(100.0 * s["wins"] / s["n"], 1) if s["n"] else 0.0,
+                }
+                for s in symbol_stats.values()
+            ),
+            key=lambda item: -item["net_r"],
+        )
+
+        # Weekday x NY-hour heatmap of net R (when does the edge really pay?).
+        from zoneinfo import ZoneInfo
+        from datetime import datetime, timezone as _tz
+
+        ny_tz = ZoneInfo("America/New_York")
+        heat: dict[tuple[int, int], float] = {}
+        for row in closed:
+            ts = _to_int(row.get("timestamp"))
+            if ts <= 0:
+                continue
+            ny_dt = datetime.fromtimestamp(ts, tz=_tz.utc).astimezone(ny_tz)
+            key = (ny_dt.weekday(), ny_dt.hour)
+            heat[key] = heat.get(key, 0.0) + _STATUS_R.get(
+                str(row.get("status", "")).upper(), 0.0
+            )
+        heat_max = max((abs(v) for v in heat.values()), default=1.0) or 1.0
+        weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        heatmap = []
+        for day_index, day_name in enumerate(weekdays):
+            cells = []
+            for hour in range(24):
+                value = heat.get((day_index, hour))
+                intensity = round(abs(value) / heat_max, 2) if value else 0.0
+                cells.append(
+                    {
+                        "value": round(value, 2) if value is not None else None,
+                        "positive": (value or 0.0) > 0,
+                        "intensity": intensity,
+                    }
+                )
+            heatmap.append({"day": day_name, "cells": cells})
+
+        # R-multiple distribution (outcome histogram).
+        outcome_counts: dict[str, int] = {}
+        for row in closed:
+            status = str(row.get("status", "")).upper()
+            outcome_counts[status] = outcome_counts.get(status, 0) + 1
+        histogram_order = [
+            ("CLOSED_SL", "-1R stop", "neg"),
+            ("CLOSED_TIME", "0R time", "flat"),
+            ("CLOSED_BE", "+0.75R breakeven", "flat"),
+            ("CLOSED_STRUCT", "+1R structure", "pos"),
+            ("CLOSED_TP2", "+2.25R full win", "pos"),
+        ]
+        hist_max = max(outcome_counts.values(), default=1) or 1
+        histogram = [
+            {
+                "label": label,
+                "count": outcome_counts.get(status, 0),
+                "pct": round(100.0 * outcome_counts.get(status, 0) / hist_max),
+                "tone": tone,
+            }
+            for status, label, tone in histogram_order
         ]
 
         return render_template(
@@ -457,6 +707,11 @@ def create_app() -> Flask:
             totals=totals,
             excursions=excursions,
             session_split=session_split,
+            symbol_split=symbol_split,
+            heatmap=heatmap,
+            histogram=histogram,
+            all_symbols=active_symbols(),
+            symbol_filter=symbol_filter,
         )
 
     @flask_app.route("/risk", methods=["GET"])
@@ -564,6 +819,11 @@ def create_app() -> Flask:
     def market() -> Any:
         from src.analysis.pivots import current_session_label
 
+        selected = str(request.args.get("symbol", "XAUUSD")).upper().strip()
+        if selected not in set(active_symbols()):
+            selected = active_symbols()[0]
+        instrument = get_instrument(selected)
+
         macro_keys = (
             ("macro_regime", "Macro regime (gold vs real yields)"),
             ("global_macro_bias", "Global macro bias"),
@@ -576,13 +836,30 @@ def create_app() -> Flask:
             ("macro_smt_z", "SMT z-score"),
             ("macro_fsr_state", "Fundamental shift rate"),
             ("macro_consensus_state", "Consensus surprise state"),
-            ("current_structure_state", "Market structure"),
-            ("latest_setup_score", "Latest setup score"),
-            ("latest_setup_classification", "Latest setup classification"),
         )
         macro = [
             {"label": label, "value": str(_get_kv(key, "n/a"))}
             for key, label in macro_keys
+        ]
+
+        # Per-symbol state (namespaced kv keys; gold keeps legacy names).
+        symbol_state = [
+            {
+                "label": "Market structure",
+                "value": str(
+                    _get_kv(state_key("current_structure_state", selected), "n/a")
+                ),
+            },
+            {
+                "label": "Latest setup score",
+                "value": str(_get_kv(state_key("latest_setup_score", selected), "n/a")),
+            },
+            {
+                "label": "Latest setup classification",
+                "value": str(
+                    _get_kv(state_key("latest_setup_classification", selected), "n/a")
+                ),
+            },
         ]
 
         zones = _query_rows(
@@ -590,13 +867,17 @@ def create_app() -> Flask:
             SELECT id, type, price_top, price_bottom, status, created_at
             FROM zones
             WHERE status IN ('ACTIVE','UNMITIGATED','MITIGATED')
+              AND COALESCE(symbol, 'XAUUSD') = ?
             ORDER BY created_at DESC LIMIT 25;
-            """
+            """,
+            (selected,),
         )
         for zone in zones:
             zone["created"] = _format_unix_ts(zone.get("created_at"))
 
-        sweep_raw = str(_get_kv("latest_liquidity_sweep", "") or "")
+        sweep_raw = str(
+            _get_kv(state_key("latest_liquidity_sweep", selected), "") or ""
+        )
         sweep = None
         try:
             parsed_sweep = json.loads(sweep_raw) if sweep_raw else None
@@ -614,6 +895,11 @@ def create_app() -> Flask:
             zones=zones,
             sweep=sweep,
             session_label=current_session_label(),
+            all_symbols=active_symbols(),
+            selected_symbol=selected,
+            symbol_state=symbol_state,
+            instrument_name=instrument.display_name,
+            asset_class=instrument.asset_class,
         )
 
     return flask_app

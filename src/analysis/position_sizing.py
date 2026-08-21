@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from config.instruments import get_instrument
+
 
 class LotSizeCalculator:
-    """Dynamic XAUUSD position sizing using a fixed-risk model."""
+    """Dynamic position sizing using a fixed-risk model (per-instrument pips)."""
 
     ACCOUNT_BALANCES = [50, 100, 200, 500, 700, 1000, 2000, 5000, 10000, 50000]
     RISK_PERCENT = 0.02
@@ -12,29 +14,40 @@ class LotSizeCalculator:
     BASELINE_NOTE = "<b>Baseline Assumption ($100):</b>"
     LEGACY_BASELINE_TEXT = "Assumed baseline balance for this signal is $100."
 
-    def calculate_pips(self, entry_price: float, sl_price: float) -> float:
+    def calculate_pips(
+        self, entry_price: float, sl_price: float, symbol: str = "XAUUSD"
+    ) -> float:
         price_difference = abs(float(entry_price) - float(sl_price))
-        return round(price_difference * self.PIP_MULTIPLIER, 2)
+        pip_size = get_instrument(symbol).pip_size
+        return round(price_difference / pip_size, 2)
 
     def calculate_lot_size(
         self,
         balance: float,
         pips: float,
         risk_pct: float = 0.02,
+        symbol: str = "XAUUSD",
     ) -> float:
         pip_distance = float(pips)
         if pip_distance <= 0:
             raise ValueError("pips must be greater than zero")
 
+        pip_value = get_instrument(symbol).pip_value_per_lot
         risk_amount = float(balance) * float(risk_pct)
-        lot_size = risk_amount / (pip_distance * self.STANDARD_LOT_PIP_VALUE)
+        lot_size = risk_amount / (pip_distance * pip_value)
         return round(max(lot_size, 0.01), 2)
 
-    def generate_table(self, entry_price: float, sl_price: float, risk_pct: float = RISK_PERCENT) -> str:
-        pips = self.calculate_pips(entry_price, sl_price)
+    def generate_table(
+        self,
+        entry_price: float,
+        sl_price: float,
+        risk_pct: float = RISK_PERCENT,
+        symbol: str = "XAUUSD",
+    ) -> str:
+        pips = self.calculate_pips(entry_price, sl_price, symbol)
         if pips == 0:
             return "<b>Lot size unavailable:</b> <code>SL distance is zero.</code>"
-        return self._build_table_from_pips(pips, risk_pct)
+        return self._build_table_from_pips(pips, risk_pct, symbol)
 
     def calculate_table(self, sl_distance_pips: float) -> str:
         pip_distance = float(sl_distance_pips)
@@ -42,7 +55,13 @@ class LotSizeCalculator:
             raise ValueError("sl_distance_pips must be greater than zero")
         return self._build_table_from_pips(pip_distance, self.RISK_PERCENT)
 
-    def _build_table_from_pips(self, pips: float, risk_pct: float = RISK_PERCENT) -> str:
+    def _build_table_from_pips(
+        self,
+        pips: float,
+        risk_pct: float = RISK_PERCENT,
+        symbol: str = "XAUUSD",
+    ) -> str:
+        instrument = get_instrument(symbol)
         pre_lines_before_baseline = [
             "Balance   Lot Size",
             "-------   --------",
@@ -50,7 +69,9 @@ class LotSizeCalculator:
         pre_lines_from_baseline: list[str] = []
 
         for balance in self.ACCOUNT_BALANCES:
-            lot_size = self.calculate_lot_size(balance=balance, pips=pips, risk_pct=risk_pct)
+            lot_size = self.calculate_lot_size(
+                balance=balance, pips=pips, risk_pct=risk_pct, symbol=symbol
+            )
             row = f"${balance:<7} {lot_size:.2f}"
             if balance < self.BASELINE_BALANCE:
                 pre_lines_before_baseline.append(row)
@@ -62,7 +83,7 @@ class LotSizeCalculator:
         risk_label = f"{risk_pct * 100:g}%"
         return (
             f"{self.LEGACY_BASELINE_TEXT}\n"
-            f"<i>{risk_label} risk model for XAUUSD | 1.00 lot = $10 per pip</i>\n"
+            f"<i>{risk_label} risk model for {instrument.symbol} | {instrument.lot_note}</i>\n"
             f"{before_block}\n"
             f"{self.BASELINE_NOTE}\n"
             f"{baseline_block}"

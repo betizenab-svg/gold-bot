@@ -6,13 +6,16 @@ from zoneinfo import ZoneInfo
 
 from src.analysis.atr import ATREngine
 from src.domain.candle import Candle
+from config.instruments import get_instrument
 
 NY_TZ = ZoneInfo("America/New_York")
 
 
-def gold_session_start(now_ts: int) -> int:
-    """Gold's trading day rolls at 17:00 New York. Returns the epoch of the
-    current session's start (DST-aware)."""
+def gold_session_start(now_ts: int, roll: str = "ny17") -> int:
+    """Trading-day anchor. Gold/FX roll at 17:00 New York; 24/7 crypto
+    uses the UTC midnight day. Returns the current session's start epoch."""
+    if roll == "utc0":
+        return int(now_ts) - (int(now_ts) % 86400)
     now_ny = datetime.fromtimestamp(int(now_ts), tz=timezone.utc).astimezone(NY_TZ)
     session_start_ny = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
     if now_ny.hour < 17:
@@ -29,11 +32,17 @@ class PivotPointEngine:
     PROXIMITY_ATR_MULT = 0.3
     BONUS = 6
 
-    def calculate_levels(self, candles: List[Candle], now_ts: int) -> Optional[dict[str, float]]:
+    def calculate_levels(
+        self,
+        candles: List[Candle],
+        now_ts: int,
+        symbol: str = "XAUUSD",
+    ) -> Optional[dict[str, float]]:
         if not isinstance(candles, list) or not candles:
             return None
 
-        session_start = gold_session_start(now_ts)
+        instrument = get_instrument(symbol)
+        session_start = gold_session_start(now_ts, roll=instrument.pivot_roll)
         prev_day = [
             c
             for c in candles
@@ -45,16 +54,17 @@ class PivotPointEngine:
         high = max(float(c.high) for c in prev_day)
         low = min(float(c.low) for c in prev_day)
         close = float(prev_day[-1].close)
+        nd = instrument.price_decimals
 
         pp = (high + low + close) / 3.0
         return {
-            "PP": round(pp, 2),
-            "R1": round(2 * pp - low, 2),
-            "S1": round(2 * pp - high, 2),
-            "R2": round(pp + (high - low), 2),
-            "S2": round(pp - (high - low), 2),
-            "R3": round(high + 2 * (pp - low), 2),
-            "S3": round(low - 2 * (high - pp), 2),
+            "PP": round(pp, nd),
+            "R1": round(2 * pp - low, nd),
+            "S1": round(2 * pp - high, nd),
+            "R2": round(pp + (high - low), nd),
+            "S2": round(pp - (high - low), nd),
+            "R3": round(high + 2 * (pp - low), nd),
+            "S3": round(low - 2 * (high - pp), nd),
         }
 
     def evaluate(
@@ -63,16 +73,20 @@ class PivotPointEngine:
         trade_direction: str,
         entry_price: Optional[float],
         now_ts: int,
+        symbol: str = "XAUUSD",
     ) -> dict[str, Any]:
         neutral = {"score": 0, "note": None, "levels": None}
         if entry_price is None:
             return neutral
-        levels = self.calculate_levels(candles, now_ts)
+        levels = self.calculate_levels(candles, now_ts, symbol=symbol)
         if not levels:
             return neutral
 
+        instrument = get_instrument(symbol)
         atr = ATREngine().calculate_atr(candles[-30:], period=14)
-        tolerance = max(self.PROXIMITY_ATR_MULT * atr, 1.0)
+        tolerance = max(
+            self.PROXIMITY_ATR_MULT * atr, instrument.pivot_tolerance_floor
+        )
 
         direction = str(trade_direction).upper()
         supportive = (
@@ -84,7 +98,7 @@ class PivotPointEngine:
                 return {
                     "score": self.BONUS,
                     "note": (
-                        f"Entry sits at daily pivot {name} ({level:.2f}): "
+                        f"Entry sits at daily pivot {name} ({level:.{instrument.price_decimals}f}): "
                         f"objective S/R confluence (+{self.BONUS})"
                     ),
                     "levels": levels,

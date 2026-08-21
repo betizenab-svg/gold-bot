@@ -122,7 +122,9 @@ def test_orchestrator_persists_latest_liquidity_sweep_to_kv_store(tmp_path: Path
             assert timeframe == "M1"
             return candles
 
-    def persist_fractals_side_effect(repo: Repository, latest_fractals: dict) -> None:
+    def persist_fractals_side_effect(
+        repo: Repository, latest_fractals: dict, symbol: str = "XAUUSD"
+    ) -> None:
         repo.set_kv("last_swing_high", {"timestamp": candles[5].timestamp, "price": float(candles[5].high)})
         repo.set_kv("last_swing_low", {"timestamp": candles[6].timestamp, "price": float(candles[6].low)})
 

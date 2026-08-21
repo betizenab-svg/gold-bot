@@ -1,12 +1,22 @@
-{% extends "base.html" %} {% block title %}Market | XAUUSD Intelligence{%
+{% extends "base.html" %} {% block title %}Market | Signal Desk{%
 endblock %} {% block page_title %}Market State{% endblock %} {% block content %}
+<div class="mb-4 flex flex-wrap gap-2">
+  {% for sym in all_symbols %}
+  <a href="{{ url_for('market', symbol=sym) }}"
+     class="rounded-xl border px-4 py-2 text-sm font-semibold transition-colors {% if sym == selected_symbol %}border-goldlux/60 bg-goldlux/10 text-goldlux{% else %}border-white/10 bg-slatecore/55 text-slate-300 hover:border-cyanlux/40 hover:text-white{% endif %}">
+    <span class="symbol-dot sym-{{ sym|lower }}"></span> {{ sym }}
+  </a>
+  {% endfor %}
+</div>
+
 <section class="grid gap-4 md:grid-cols-3">
   <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-    <p class="text-xs text-slate-400">Current session (UTC)</p>
+    <p class="text-xs text-slate-400">Current session (New York clock)</p>
     <p class="mt-1 text-xl font-semibold text-cyanlux">{{ session_label }}</p>
+    <p class="mt-1 text-xs text-slate-500">{{ instrument_name }} · {{ asset_class }}{% if asset_class == 'crypto' %} · trades 24/7{% endif %}</p>
   </div>
   <div class="rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe md:col-span-2">
-    <p class="text-xs text-slate-400">Latest liquidity sweep</p>
+    <p class="text-xs text-slate-400">Latest liquidity sweep ({{ selected_symbol }})</p>
     {% if sweep %}
     <p class="mt-1 text-xl font-semibold">{{ sweep.type }}</p>
     <p class="text-xs text-slate-500">{{ sweep.when }}</p>
@@ -17,7 +27,19 @@ endblock %} {% block page_title %}Market State{% endblock %} {% block content %}
 </section>
 
 <section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-  <h2 class="text-sm font-semibold text-slate-300">Macro & structure intelligence</h2>
+  <h2 class="text-sm font-semibold text-slate-300">{{ selected_symbol }} state</h2>
+  <div class="mt-3 grid gap-3 md:grid-cols-3">
+    {% for item in symbol_state %}
+    <div class="rounded-xl bg-white/5 p-4">
+      <p class="text-xs text-slate-400">{{ item.label }}</p>
+      <p class="mt-1 font-mono text-sm text-slate-200">{{ item.value }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Gold macro intelligence <span class="font-normal text-slate-500">(informs gold only; other markets trade technicals)</span></h2>
   <div class="mt-3 grid gap-3 md:grid-cols-3">
     {% for item in macro %}
     <div class="rounded-xl bg-white/5 p-4">
@@ -29,7 +51,7 @@ endblock %} {% block page_title %}Market State{% endblock %} {% block content %}
 </section>
 
 <section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
-  <h2 class="text-sm font-semibold text-slate-300">Zone book (order blocks & FVGs)</h2>
+  <h2 class="text-sm font-semibold text-slate-300">Zone book — {{ selected_symbol }} (order blocks & FVGs)</h2>
   <div class="mt-3 overflow-x-auto">
     <table class="w-full min-w-[640px] text-sm">
       <thead class="border-b border-white/10 text-slate-400">
@@ -47,8 +69,8 @@ endblock %} {% block page_title %}Market State{% endblock %} {% block content %}
         <tr class="border-b border-white/5">
           <td class="py-3">{{ zone.id }}</td>
           <td class="py-3 font-mono text-xs text-cyanlux">{{ zone.type }}</td>
-          <td class="py-3">{{ "%.2f"|format(zone.price_bottom) if zone.price_bottom is not none else "—" }}</td>
-          <td class="py-3">{{ "%.2f"|format(zone.price_top) if zone.price_top is not none else "—" }}</td>
+          <td class="py-3">{{ zone.price_bottom if zone.price_bottom is not none else "—" }}</td>
+          <td class="py-3">{{ zone.price_top if zone.price_top is not none else "—" }}</td>
           <td class="py-3">
             <span class="rounded-full px-2 py-0.5 text-xs {% if zone.status == 'ACTIVE' or zone.status == 'UNMITIGATED' %}bg-emerald-500/15 text-emerald-300{% else %}bg-amber-500/15 text-amber-300{% endif %}">
               {{ zone.status }}

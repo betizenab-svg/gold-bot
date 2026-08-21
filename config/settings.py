@@ -44,8 +44,18 @@ PROXYSCRAPE_ENDPOINT = os.getenv(
 	"https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=ipport&format=text&timeout=6000",
 )
 
-SYMBOL_MAP = {"XAUUSD": "XAU/USD"}
-YAHOO_SYMBOL_MAP = {"XAUUSD": "GC=F"}
+SYMBOL_MAP = {
+	"XAUUSD": "XAU/USD",
+	"BTCUSD": "BTC/USD",
+	"EURUSD": "EUR/USD",
+	"GBPUSD": "GBP/USD",
+}
+YAHOO_SYMBOL_MAP = {
+	"XAUUSD": "GC=F",
+	"BTCUSD": "BTC-USD",
+	"EURUSD": "EURUSD=X",
+	"GBPUSD": "GBPUSD=X",
+}
 
 TIMEFRAME_SECONDS = {
 	"M1": 60,
@@ -128,11 +138,12 @@ CHART_ALERTS_ENABLED = _env_bool("CHART_ALERTS_ENABLED", True)
 MARKET_DATA_RETENTION_DAYS = int(os.getenv("MARKET_DATA_RETENTION_DAYS", "45"))
 
 # --- Risk Governor ---
-RISK_MAX_SIGNALS_PER_DAY = int(os.getenv("RISK_MAX_SIGNALS_PER_DAY", "6"))
+# Budgets are GLOBAL across all traded symbols (shared risk pool).
+RISK_MAX_SIGNALS_PER_DAY = int(os.getenv("RISK_MAX_SIGNALS_PER_DAY", "8"))
 RISK_SL_COOLDOWN_MINUTES = int(os.getenv("RISK_SL_COOLDOWN_MINUTES", "45"))
 RISK_CONSECUTIVE_SL_HALT = int(os.getenv("RISK_CONSECUTIVE_SL_HALT", "3"))
 RISK_HALT_HOURS = int(os.getenv("RISK_HALT_HOURS", "6"))
-RISK_MAX_CONCURRENT_SIGNALS = int(os.getenv("RISK_MAX_CONCURRENT_SIGNALS", "2"))
+RISK_MAX_CONCURRENT_SIGNALS = int(os.getenv("RISK_MAX_CONCURRENT_SIGNALS", "3"))
 # Escalation tier: this many consecutive stop losses suspends signals for 24h.
 RISK_TIER2_CONSECUTIVE_SL = int(os.getenv("RISK_TIER2_CONSECUTIVE_SL", "5"))
 # Daily realized-R circuit breakers (Link/Kiev/Bennett consensus).
@@ -154,5 +165,7 @@ WEEKLY_REPORT_INTERVAL_DAYS = int(os.getenv("WEEKLY_REPORT_INTERVAL_DAYS", "7"))
 WEEKLY_REPORT_MIN_TRADES = int(os.getenv("WEEKLY_REPORT_MIN_TRADES", "10"))
 # One proof-of-life message to Telegram per UTC day.
 DAILY_STATUS_ENABLED = _env_bool("DAILY_STATUS_ENABLED", True)
+# Self-coaching: auto-quarantine strategies with negative live expectancy.
+AUTO_QUARANTINE_ENABLED = _env_bool("AUTO_QUARANTINE_ENABLED", True)
 # Time stop: ACTIVE trades that never reached TP1 are closed after this.
 ACTIVE_MAX_HOLD_HOURS = int(os.getenv("ACTIVE_MAX_HOLD_HOURS", "24"))

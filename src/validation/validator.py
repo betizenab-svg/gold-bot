@@ -3,13 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Iterable, List
 
+from config.instruments import get_instrument
 from config.settings import TIMEFRAME_SECONDS
 from src.domain.candle import Candle
 
 
 class DataValidator:
     def validate_candle(self, candle: Candle) -> bool:
-        if candle.volume == 0:
+        instrument = get_instrument(getattr(candle, "symbol", None))
+        # Yahoo FX feeds legitimately report volume=0; crypto/futures must not.
+        if candle.volume == 0 and instrument.requires_volume:
             return False
         if candle.high < candle.low:
             return False
@@ -17,7 +20,8 @@ class DataValidator:
             return False
         timestamp = int(candle.timestamp)
         weekday = datetime.fromtimestamp(timestamp, timezone.utc).weekday()
-        if weekday >= 5:
+        # Crypto trades through the weekend; closed markets should not emit bars.
+        if weekday >= 5 and not instrument.weekend_trading:
             return False
         return True
 

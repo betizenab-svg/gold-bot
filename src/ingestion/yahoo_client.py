@@ -40,7 +40,10 @@ class YahooFinanceClient:
         return limited_timestamp
 
     def _get_last_timestamp(self, symbol: str, timeframe: str) -> int:
-        for key in (f"last_fetch_{symbol}_{timeframe}", "last_processed_timestamp"):
+        keys = [f"last_fetch_{symbol}_{timeframe}", f"last_processed_{symbol}"]
+        if symbol == "XAUUSD":
+            keys.append("last_processed_timestamp")  # legacy global watermark
+        for key in keys:
             value = self.repository.get_kv(key)
             if value is None:
                 continue

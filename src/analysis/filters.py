@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from config.instruments import get_instrument
+
 
 class PermissionEngine:
     """Absolute macro-structural gatekeeper for technical setups."""
@@ -10,7 +12,13 @@ class PermissionEngine:
         self,
         setup_dict: dict[str, Any],
         macro_context: dict[str, Any],
+        symbol: str = "XAUUSD",
     ) -> tuple[bool, str]:
+        # COT positioning, sovereign demand and gold-consensus states describe
+        # the GOLD market; they must not veto BTC or FX setups.
+        if not get_instrument(symbol).macro_gold_filters:
+            return True, "Permitted"
+
         trade_direction = str(setup_dict.get("trade_direction", "")).upper()
         macro_cot_state = self._normalize_text(macro_context.get("macro_cot_state"))
         macro_consensus_state = self._normalize_text(

@@ -64,7 +64,8 @@ class ChartRenderer:
                     zorder=2,
                 )
                 body_bottom = min(open_p, close_p)
-                body_height = max(abs(close_p - open_p), 0.01)
+                # Floor scales with price so doji bodies stay visible on any market.
+                body_height = max(abs(close_p - open_p), abs(close_p) * 1e-5 or 0.01)
                 ax.bar(
                     index,
                     body_height,
@@ -90,11 +91,17 @@ class ChartRenderer:
                 except (TypeError, ValueError):
                     pass
 
+            raw_symbol = getattr(signal, "symbol", "XAUUSD")
+            from config.instruments import get_instrument
+
+            nd = get_instrument(
+                raw_symbol if isinstance(raw_symbol, str) else "XAUUSD"
+            ).price_decimals
             levels = (
-                (entry, "#4da6ff", f"ENTRY {entry:.2f}"),
-                (sl, BEAR_COLOR, f"SL {sl:.2f}"),
-                (tp1, BULL_COLOR, f"TP1 {tp1:.2f}"),
-                (tp2, BULL_COLOR, f"TP2 {tp2:.2f}"),
+                (entry, "#4da6ff", f"ENTRY {entry:.{nd}f}"),
+                (sl, BEAR_COLOR, f"SL {sl:.{nd}f}"),
+                (tp1, BULL_COLOR, f"TP1 {tp1:.{nd}f}"),
+                (tp2, BULL_COLOR, f"TP2 {tp2:.{nd}f}"),
             )
             last_index = len(window) - 1
             for price, color, label in levels:
@@ -139,7 +146,7 @@ class ChartRenderer:
                 + [float(c.high) for c in window]
                 + [p for p in (entry, sl, tp1, tp2) if p > 0]
             )
-            pad = (max(all_prices) - min(all_prices)) * 0.06 or 1.0
+            pad = (max(all_prices) - min(all_prices)) * 0.06 or max(all_prices) * 0.001 or 1.0
             ax.set_ylim(min(all_prices) - pad, max(all_prices) + pad)
             ax.set_xlim(-1, last_index + 9)
 
