@@ -1,0 +1,54 @@
+{
+  "status_counts": {
+    "CANCELLED": 6,
+    "CLOSED_BE": 6,
+    "CLOSED_SL": 21,
+    "CLOSED_STRUCT": 1
+  },
+  "net_r": -16.5,
+  "full_win_rate_pct": 0.0,
+  "wins_tp2": 0,
+  "losses_sl": 21,
+  "breakeven": 6,
+  "strategies": {
+    "INSIDE_BAR_TRAP": {
+      "trades": 6,
+      "expectancy_r": -0.125,
+      "profit_factor": 0.75,
+      "median_loser_mfe_r": 0.458,
+      "median_winner_mae_r": 0.159
+    },
+    "H2_PULLBACK": {
+      "trades": 2,
+      "expectancy_r": -0.125,
+      "profit_factor": 0.75,
+      "median_loser_mfe_r": 0.907,
+      "median_winner_mae_r": 0.029
+    },
+    "L2_PULLBACK": {
+      "trades": 3,
+      "expectancy_r": -0.417,
+      "profit_factor": 0.375,
+      "median_loser_mfe_r": 0.318,
+      "median_winner_mae_r": 0.0
+    },
+    "ZONE_BOUNCE": {
+      "trades": 4,
+      "expectancy_r": -0.562,
+      "profit_factor": 0.25,
+      "median_loser_mfe_r": 0.3,
+      "median_winner_mae_r": 0.51
+    },
+    "PIN_BAR_REJECTION": {
+      "trades": 12,
+      "expectancy_r": -1.0,
+      "profit_factor": 0.0,
+      "median_loser_mfe_r": 0.378,
+      "median_winner_mae_r": null
+    }
+  },
+  "recommendations": [
+    "PIN_BAR_REJECTION: expectancy -1.00R over 12 trades - quarantine candidate; review or disable this strategy."
+  ],
+  "db_path": "/tmp/gold_replay_5swgivz1/replay.db"
+}

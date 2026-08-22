@@ -33,8 +33,12 @@ for _i, _arg in enumerate(sys.argv):
     elif _arg.startswith("--symbol="):
         _REPLAY_SYMBOL = _arg.split("=", 1)[1].upper()
 _REPLAY_DB = os.path.join(tempfile.mkdtemp(prefix="gold_replay_"), "replay.db")
+from config.instruments import get_instrument as _get_instrument  # noqa: E402
+
+_REPLAY_TF = _get_instrument(_REPLAY_SYMBOL).signal_timeframe or "M5"
+_TF_TO_YAHOO = {"M5": "5m", "M15": "15m", "M30": "30m", "H1": "1h"}
 os.environ["DB_PATH"] = _REPLAY_DB
-os.environ["SIGNAL_TIMEFRAME"] = "M5"
+os.environ["SIGNAL_TIMEFRAME"] = _REPLAY_TF
 os.environ["SYMBOLS"] = _REPLAY_SYMBOL
 os.environ["CHART_ALERTS_ENABLED"] = "0"
 os.environ["NEWS_AUTOFETCH_ENABLED"] = "0"
@@ -76,7 +80,11 @@ def _download_history(days: int) -> list[Candle]:
 
     instrument = get_instrument(_REPLAY_SYMBOL)
     ticker = instrument.yahoo_ticker
-    print(f"Downloading {days} days of {_REPLAY_SYMBOL} ({ticker}) 5-minute history...")
+    interval = _TF_TO_YAHOO.get(_REPLAY_TF, "5m")
+    print(
+        f"Downloading {days} days of {_REPLAY_SYMBOL} ({ticker}) "
+        f"{interval} history..."
+    )
     end = dt.datetime.now(dt.timezone.utc)
     start = end - dt.timedelta(days=min(days, 59))
 
@@ -84,7 +92,7 @@ def _download_history(days: int) -> list[Candle]:
     for attempt in range(3):
         frame = yf.download(
             tickers=ticker,
-            interval="5m",
+            interval=interval,
             start=start,
             end=end,
             progress=False,
@@ -96,6 +104,39 @@ def _download_history(days: int) -> list[Candle]:
         wait = 5 * (attempt + 1)
         print(f"  empty response (attempt {attempt + 1}/3), retrying in {wait}s...")
         time.sleep(wait)
+
+    if (frame is None or frame.empty) and interval != "5m":
+        # Yahoo sometimes rejects coarser intraday intervals; build the bars
+        # ourselves from 5-minute data.
+        print(f"  {interval} unavailable; downloading 5m and resampling locally...")
+        frame = yf.download(
+            tickers=ticker,
+            interval="5m",
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=False,
+            threads=False,
+        )
+        if frame is not None and not frame.empty:
+            if hasattr(frame.columns, "get_level_values") and frame.columns.nlevels > 1:
+                frame.columns = frame.columns.get_level_values(0)
+            rule = {"15m": "15min", "30m": "30min", "1h": "1h"}.get(interval, "15min")
+            frame = (
+                frame.resample(rule, label="left", closed="left")
+                .agg(
+                    {
+                        "Open": "first",
+                        "High": "max",
+                        "Low": "min",
+                        "Close": "last",
+                        "Volume": "sum",
+                    }
+                )
+                .dropna(subset=["Open", "High", "Low", "Close"])
+            )
+            # Drop the trailing bar: it may still be forming.
+            frame = frame.iloc[:-1]
     if frame is None or frame.empty:
         raise SystemExit("Yahoo returned no data; try fewer --days or later.")
 
@@ -108,7 +149,7 @@ def _download_history(days: int) -> list[Candle]:
         candles.append(
             Candle(
                 symbol=_REPLAY_SYMBOL,
-                timeframe="M5",
+                timeframe=_REPLAY_TF,
                 timestamp=int(timestamp.timestamp()),
                 open=float(row["Open"]),
                 high=float(row["High"]),
@@ -129,7 +170,7 @@ def _load_csv(path: str) -> list[Candle]:
 
     candles = CSVDataClient().load_data(path)
     for candle in candles:
-        object.__setattr__(candle, "timeframe", "M5")
+        object.__setattr__(candle, "timeframe", _REPLAY_TF)
     print(f"Loaded {len(candles)} candles from {path}")
     return candles
 

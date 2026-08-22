@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.instruments import get_instrument, scaled_buffer, scaled_proximity
 from config.settings import ENTRY_BUFFER_PTS
 from src.analysis.momentum import calculate_ema
 from src.domain.candle import Candle
@@ -82,19 +83,22 @@ class EngulfingZoneStrategy:
 
         if bias == "BULLISH":
             trade_direction = "LONG"
-            entry_price = float(current.high) + self.entry_buffer_pts
-            sl_price = float(current.low) - self.entry_buffer_pts
+            buffer = scaled_buffer(current.symbol, self.entry_buffer_pts)
+            entry_price = float(current.high) + buffer
+            sl_price = float(current.low) - buffer
         else:
             trade_direction = "SHORT"
-            entry_price = float(current.low) - self.entry_buffer_pts
-            sl_price = float(current.high) + self.entry_buffer_pts
+            buffer = scaled_buffer(current.symbol, self.entry_buffer_pts)
+            entry_price = float(current.low) - buffer
+            sl_price = float(current.high) + buffer
 
+        nd = get_instrument(current.symbol).price_decimals
         return {
             "strategy": "ENGULFING_ZONE",
             "trade_direction": trade_direction,
             "order_type": "STOP",
-            "entry_price": round(entry_price, 2),
-            "sl_price": round(sl_price, 2),
+            "entry_price": round(entry_price, nd),
+            "sl_price": round(sl_price, nd),
             "zone_id": matched_zone.get("id"),
             "zone": matched_zone,
             "timestamp": int(current.timestamp),
@@ -120,6 +124,7 @@ class EngulfingZoneStrategy:
             except (KeyError, TypeError, ValueError):
                 continue
             low, high = min(top, bottom), max(top, bottom)
-            if low <= probe <= high or min(abs(probe - top), abs(probe - bottom)) < self.ZONE_PROXIMITY_USD:
+            proximity = scaled_proximity(current.symbol, self.ZONE_PROXIMITY_USD)
+            if low <= probe <= high or min(abs(probe - top), abs(probe - bottom)) < proximity:
                 return zone
         return None

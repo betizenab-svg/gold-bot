@@ -390,6 +390,58 @@ def create_app() -> Flask:
             status_filter=status_filter,
         )
 
+    @flask_app.route("/signals.csv")
+    @login_required
+    def signals_csv() -> Any:
+        import csv
+        import io
+
+        from flask import Response
+
+        rows = _query_rows(
+            """
+            SELECT id, signal_hash, symbol,
+                   COALESCE(signal_type, type) AS direction,
+                   COALESCE(order_type,'LIMIT') AS order_type,
+                   COALESCE(strategy,'') AS strategy,
+                   COALESCE(entry_price, entry) AS entry_price,
+                   COALESCE(sl_price, sl) AS sl_price,
+                   COALESCE(tp1_price, tp1) AS tp1_price,
+                   COALESCE(tp2_price, tp2) AS tp2_price,
+                   score, status, timestamp,
+                   COALESCE(mfe_r,0) AS mfe_r, COALESCE(mae_r,0) AS mae_r,
+                   COALESCE(closure_reason,'') AS closure_reason
+            FROM signals ORDER BY id ASC;
+            """
+        )
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "id", "hash", "symbol", "direction", "order_type", "strategy",
+                "entry", "sl", "tp1", "tp2", "score", "status",
+                "timestamp_utc", "realized_r", "mfe_r", "mae_r", "closure_reason",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row.get("id"), row.get("signal_hash"), row.get("symbol"),
+                    row.get("direction"), row.get("order_type"), row.get("strategy"),
+                    row.get("entry_price"), row.get("sl_price"),
+                    row.get("tp1_price"), row.get("tp2_price"),
+                    row.get("score"), row.get("status"),
+                    _format_unix_ts(row.get("timestamp")),
+                    _STATUS_R.get(str(row.get("status", "")).upper(), ""),
+                    row.get("mfe_r"), row.get("mae_r"), row.get("closure_reason"),
+                ]
+            )
+        return Response(
+            buffer.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=trade_journal.csv"},
+        )
+
     def _load_signal(signal_hash: str) -> dict[str, Any] | None:
         rows = _query_rows(
             """

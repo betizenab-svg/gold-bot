@@ -1,0 +1,58 @@
+{
+  "status_counts": {
+    "CANCELLED": 8,
+    "CLOSED_BE": 13,
+    "CLOSED_SL": 24,
+    "CLOSED_STRUCT": 5,
+    "CLOSED_TP2": 8
+  },
+  "net_r": 8.75,
+  "full_win_rate_pct": 25.0,
+  "wins_tp2": 8,
+  "losses_sl": 24,
+  "breakeven": 13,
+  "strategies": {
+    "INSIDE_BAR_TRAP": {
+      "trades": 12,
+      "expectancy_r": 0.042,
+      "profit_factor": 1.1,
+      "median_loser_mfe_r": 0.484,
+      "median_winner_mae_r": 0.289
+    },
+    "ZONE_BOUNCE": {
+      "trades": 11,
+      "expectancy_r": -0.091,
+      "profit_factor": 0.857,
+      "median_loser_mfe_r": 0.143,
+      "median_winner_mae_r": 0.375
+    },
+    "H2_PULLBACK": {
+      "trades": 9,
+      "expectancy_r": 1.056,
+      "profit_factor": 5.75,
+      "median_loser_mfe_r": 0.194,
+      "median_winner_mae_r": 0.0
+    },
+    "PIN_BAR_REJECTION": {
+      "trades": 10,
+      "expectancy_r": 0.025,
+      "profit_factor": 1.042,
+      "median_loser_mfe_r": 0.407,
+      "median_winner_mae_r": 0.0
+    },
+    "L2_PULLBACK": {
+      "trades": 8,
+      "expectancy_r": -0.062,
+      "profit_factor": 0.875,
+      "median_loser_mfe_r": 0.036,
+      "median_winner_mae_r": 0.082
+    }
+  },
+  "recommendations": [
+    "INSIDE_BAR_TRAP: winners took only 0.29R median heat - the stop is wider than needed; consider lowering SL_MIN_ATR_MULT or ATR_SL_MULTIPLIER one notch.",
+    "ZONE_BOUNCE: expectancy -0.09R over 11 trades - quarantine candidate; review or disable this strategy.",
+    "ZONE_BOUNCE: winners took only 0.37R median heat - the stop is wider than needed; consider lowering SL_MIN_ATR_MULT or ATR_SL_MULTIPLIER one notch.",
+    "PIN_BAR_REJECTION: winners took only 0.00R median heat - the stop is wider than needed; consider lowering SL_MIN_ATR_MULT or ATR_SL_MULTIPLIER one notch."
+  ],
+  "db_path": "/tmp/gold_replay__ip_jqj6/replay.db"
+}

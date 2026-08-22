@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from config.instruments import get_instrument
 from src.domain.candle import Candle
 
 
@@ -23,11 +24,16 @@ class LiquiditySweepDetector:
         last_swing_high: Optional[float],
         last_swing_low: Optional[float],
     ) -> Optional[Dict[str, Any]]:
-        if avg_volume <= 0:
-            return None
+        # Yahoo FX feeds report volume=0; sweeps there are price-action only.
+        raw_symbol = getattr(current_candle, "symbol", None)
+        symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
+        volume_required = get_instrument(symbol).requires_volume
 
-        if float(current_candle.volume) <= (1.2 * float(avg_volume)):
-            return None
+        if volume_required:
+            if avg_volume <= 0:
+                return None
+            if float(current_candle.volume) <= (1.2 * float(avg_volume)):
+                return None
 
         if last_swing_low is not None:
             if float(current_candle.low) < float(last_swing_low) and float(current_candle.close) > float(last_swing_low):

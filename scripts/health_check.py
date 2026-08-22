@@ -24,15 +24,22 @@ def check_db_integrity() -> bool:
 
 
 def check_yahoo() -> bool:
-    frame = yf.download(
-        tickers="GC=F",
-        period="1d",
-        interval="1d",
-        progress=False,
-        auto_adjust=False,
-        threads=False,
-    )
-    return frame is not None and not frame.empty
+    from config.instruments import active_symbols, get_instrument
+
+    for symbol in active_symbols():
+        frame = yf.download(
+            tickers=get_instrument(symbol).yahoo_ticker,
+            period="1d",
+            interval="1d",
+            progress=False,
+            auto_adjust=False,
+            threads=False,
+        )
+        ok = frame is not None and not frame.empty
+        print(f"  {symbol}: {'ok' if ok else 'EMPTY'}")
+        if not ok:
+            return False
+    return True
 
 
 def check_telegram() -> bool:

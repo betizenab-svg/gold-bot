@@ -1,0 +1,49 @@
+{
+  "status_counts": {
+    "CANCELLED": 9,
+    "CLOSED_BE": 2,
+    "CLOSED_SL": 9,
+    "CLOSED_STRUCT": 2,
+    "CLOSED_TIME": 1,
+    "CLOSED_TP2": 7
+  },
+  "net_r": 10.25,
+  "full_win_rate_pct": 43.8,
+  "wins_tp2": 7,
+  "losses_sl": 9,
+  "breakeven": 2,
+  "strategies": {
+    "ZONE_BOUNCE": {
+      "trades": 13,
+      "expectancy_r": 0.519,
+      "profit_factor": 2.35,
+      "median_loser_mfe_r": 0.085,
+      "median_winner_mae_r": 0.811
+    },
+    "PIN_BAR_REJECTION": {
+      "trades": 3,
+      "expectancy_r": 0.667,
+      "profit_factor": 3.0,
+      "median_loser_mfe_r": 0.0,
+      "median_winner_mae_r": 0.0
+    },
+    "INSIDE_BAR_TRAP": {
+      "trades": 3,
+      "expectancy_r": 0.083,
+      "profit_factor": 1.125,
+      "median_loser_mfe_r": 0.0,
+      "median_winner_mae_r": 0.0
+    },
+    "H2_PULLBACK": {
+      "trades": 2,
+      "expectancy_r": 0.625,
+      "profit_factor": 2.25,
+      "median_loser_mfe_r": 0.0,
+      "median_winner_mae_r": 0.0
+    }
+  },
+  "recommendations": [
+    "Not enough closed-trade evidence yet - keep collecting (advice starts at 10 closed trades per strategy)."
+  ],
+  "db_path": "/tmp/gold_replay_hz3biwod/replay.db"
+}

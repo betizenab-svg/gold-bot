@@ -31,7 +31,21 @@ def build_weekly_report(analysis: dict[str, Any]) -> str:
             f"expectancy {float(stats.get('expectancy_r', 0.0)):+.2f}R, "
             f"PF {pf_text}"
         )
-
+    symbols = analysis.get("symbols", {})
+    if symbols:
+        lines.append("")
+        lines.append("<b>Per market</b>")
+        for name, stats in sorted(
+            symbols.items(), key=lambda kv: -float(kv[1].get("net_r", 0.0))
+        ):
+            trades = int(stats.get("trades", 0))
+            wins = int(stats.get("wins", 0))
+            win_pct = (100.0 * wins / trades) if trades else 0.0
+            lines.append(
+                f"\u2022 <code>{html.escape(str(name))}</code>: "
+                f"{float(stats.get('net_r', 0.0)):+.2f}R over {trades} "
+                f"({win_pct:.0f}% full wins)"
+            )
     if recommendations:
         lines.append("")
         lines.append("<b>What the evidence says</b>")

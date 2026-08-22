@@ -1460,6 +1460,14 @@ class PulseOrchestrator:
                 logging.error("Failed to persist forced UAT signal: %s", exc)
             return signals_generated, errors_encountered
 
+        if not get_instrument(symbol).signals_enabled:
+            # Watch-only market: data, zones and monitoring stay live, but no
+            # new signals are published (replay evidence gate).
+            del recent_fvgs
+            del recent_candles
+            del valid_candles
+            return signals_generated, errors_encountered
+
         potential_setup = self._detect_trade_setup(
             repository,
             symbol,
@@ -1706,10 +1714,18 @@ class PulseOrchestrator:
             validator = DataValidator()
             self._load_auto_quarantine(repository)
 
-            for symbol in symbols:
+            for index, symbol in enumerate(symbols):
                 try:
+                    instrument = get_instrument(symbol)
+                    symbol_timeframe = instrument.signal_timeframe or timeframe
                     sym_signals, sym_errors = self._pulse_symbol(
-                        repository, client, validator, symbol, timeframe, force_signal
+                        repository,
+                        client,
+                        validator,
+                        symbol,
+                        symbol_timeframe,
+                        # UAT force-signal fires once, on the primary symbol only.
+                        force_signal and index == 0,
                     )
                     signals_generated += sym_signals
                     errors_encountered += sym_errors

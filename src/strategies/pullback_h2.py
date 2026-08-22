@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.instruments import get_instrument, scaled_buffer
 from config.settings import ENTRY_BUFFER_PTS
 from src.analysis.momentum import calculate_ema
 from src.domain.candle import Candle
@@ -99,20 +100,22 @@ class PullbackH2L2Strategy:
         return self._build(signal_bar, "SHORT", "L2_PULLBACK")
 
     def _build(self, signal_bar: Candle, direction: str, strategy: str) -> dict[str, Any]:
+        buffer = scaled_buffer(signal_bar.symbol, self.entry_buffer_pts)
         if direction == "LONG":
-            entry = float(signal_bar.high) + self.entry_buffer_pts
-            sl = float(signal_bar.low) - self.entry_buffer_pts
+            entry = float(signal_bar.high) + buffer
+            sl = float(signal_bar.low) - buffer
         else:
-            entry = float(signal_bar.low) - self.entry_buffer_pts
-            sl = float(signal_bar.high) + self.entry_buffer_pts
+            entry = float(signal_bar.low) - buffer
+            sl = float(signal_bar.high) + buffer
 
+        nd = get_instrument(signal_bar.symbol).price_decimals
         return {
             "symbol": signal_bar.symbol,
             "timeframe": signal_bar.timeframe,
             "strategy": strategy,
             "trade_direction": direction,
             "order_type": "STOP",
-            "entry_price": round(entry, 2),
-            "sl_price": round(sl, 2),
+            "entry_price": round(entry, nd),
+            "sl_price": round(sl, nd),
             "timestamp": int(signal_bar.timestamp),
         }

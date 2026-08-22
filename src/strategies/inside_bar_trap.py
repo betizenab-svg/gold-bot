@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.instruments import get_instrument
 from config.settings import INSIDE_BAR_LOOKBACK_CANDLES
 from src.domain.candle import Candle
 

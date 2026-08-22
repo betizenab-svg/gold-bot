@@ -1,0 +1,35 @@
+{
+  "status_counts": {
+    "CANCELLED": 1,
+    "CLOSED_BE": 3,
+    "CLOSED_SL": 9,
+    "CLOSED_STRUCT": 7,
+    "CLOSED_TP2": 4
+  },
+  "net_r": 9.25,
+  "full_win_rate_pct": 30.8,
+  "wins_tp2": 4,
+  "losses_sl": 9,
+  "breakeven": 3,
+  "strategies": {
+    "ZONE_BOUNCE": {
+      "trades": 15,
+      "expectancy_r": -0.033,
+      "profit_factor": 0.938,
+      "median_loser_mfe_r": 0.176,
+      "median_winner_mae_r": 0.175
+    },
+    "INSIDE_BAR_TRAP": {
+      "trades": 8,
+      "expectancy_r": 1.219,
+      "profit_factor": 10.75,
+      "median_loser_mfe_r": 0.074,
+      "median_winner_mae_r": 0.0
+    }
+  },
+  "recommendations": [
+    "ZONE_BOUNCE: expectancy -0.03R over 15 trades - quarantine candidate; review or disable this strategy.",
+    "ZONE_BOUNCE: winners took only 0.17R median heat - the stop is wider than needed; consider lowering SL_MIN_ATR_MULT or ATR_SL_MULTIPLIER one notch."
+  ],
+  "db_path": "/tmp/gold_replay_keniftpq/replay.db"
+}

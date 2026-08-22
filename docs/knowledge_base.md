@@ -91,6 +91,27 @@ continue to referee every strategy from real outcomes.
 Re-run the validation anytime: `python scripts/replay.py --days 45`, or the
 "Replay Validation" workflow on GitHub (report as downloadable artifact).
 
+## Multi-asset replay evidence (45 days, full pipeline, 2026-08-22)
+
+Every market earned (or lost) its live-signal seat through the same replay:
+
+| Market | Config | Net R | Full-win rate | Verdict |
+|---|---|---|---|---|
+| XAUUSD | M5, re-validated post-refactor | **+8.75R** | 25.0% | LIVE (H2 pullback +1.06R/trade, PF 5.75) |
+| BTCUSD | M5 (first attempt) | -16.50R | 0.0% | REJECTED - crypto chop shreds M5 patterns |
+| BTCUSD | M15 (instrument override) | **+10.25R** | 43.8% | LIVE on M15 (zone bounce PF 2.35, pin bar PF 3.0) |
+| EURUSD | M5, gold-scale $0.50 buffer bug | +5.00R | 28.6% | bug: 157 cancelled entries, only zone-bounce traded |
+| EURUSD | M5, per-instrument buffers | **+25.25R** | 26.6% | LIVE (pin bar +0.28R/trade over 77, PF 1.64) |
+| GBPUSD | M5, per-instrument buffers | **+9.25R** | 30.8% | LIVE (inside-bar trap +1.22R/trade, PF 10.75) |
+
+Combined: +53.5R across the four markets over the same 45 days.
+
+The BTC and EURUSD rows are the whole argument for evidence-first releases:
+book-derived defaults looked reasonable and were catastrophically wrong in
+one case and half-crippled in the other. The fix set: per-instrument entry
+buffers and zone proximity (`config/instruments.py`), per-instrument signal
+timeframes (BTC M15), and volume-optional sweep detection for FX feeds.
+
 ## Deliberately not implemented (and why)
 
 1. **Range-day edge-fade strategy family** — the barbwire veto, day-extension

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.instruments import get_instrument, scaled_buffer, scaled_proximity
 from config.settings import ENTRY_BUFFER_PTS, PIN_BAR_TAIL_RATIO
 from src.domain.candle import Candle
 
@@ -121,19 +122,22 @@ class PinBarRejectionStrategy:
 
         if pin_bar_bias == "BULLISH":
             trade_direction = "LONG"
-            entry_price = float(current_candle.high) + self.entry_buffer_pts
-            sl_price = float(current_candle.low) - self.entry_buffer_pts
+            buffer = scaled_buffer(current_candle.symbol, self.entry_buffer_pts)
+            entry_price = float(current_candle.high) + buffer
+            sl_price = float(current_candle.low) - buffer
         else:
             trade_direction = "SHORT"
-            entry_price = float(current_candle.low) - self.entry_buffer_pts
-            sl_price = float(current_candle.high) + self.entry_buffer_pts
+            buffer = scaled_buffer(current_candle.symbol, self.entry_buffer_pts)
+            entry_price = float(current_candle.low) - buffer
+            sl_price = float(current_candle.high) + buffer
 
+        nd = get_instrument(current_candle.symbol).price_decimals
         return {
             "strategy": "PIN_BAR_REJECTION",
             "trade_direction": trade_direction,
             "order_type": "STOP",
-            "entry_price": round(entry_price, 2),
-            "sl_price": round(sl_price, 2),
+            "entry_price": round(entry_price, nd),
+            "sl_price": round(sl_price, nd),
             "zone_id": matched_zone.get("id"),
             "zone": matched_zone,
             "timestamp": int(current_candle.timestamp),
@@ -170,7 +174,7 @@ class PinBarRejectionStrategy:
             near_boundary = min(
                 abs(probe_price - price_top),
                 abs(probe_price - price_bottom),
-            ) < self.zone_proximity_usd
+            ) < scaled_proximity(current_candle.symbol, self.zone_proximity_usd)
 
             if intersects_zone or near_boundary:
                 return zone

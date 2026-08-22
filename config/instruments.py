@@ -32,6 +32,10 @@ class Instrument:
     pivot_tolerance_floor: float  # min price distance for pivot confluence
     london_min_net: float  # min London net move to call a direction
     requires_volume: bool  # Yahoo FX feeds report volume=0
+    entry_buffer: float = 0.50  # stop-order offset beyond the trigger bar
+    zone_proximity: float = 1.00  # "close enough to the zone" distance
+    signal_timeframe: str = ""  # override; empty = global SIGNAL_TIMEFRAME
+    signals_enabled: bool = True  # False = watch-only (data + zones, no signals)
 
 
 INSTRUMENTS: dict[str, Instrument] = {
@@ -74,6 +78,10 @@ INSTRUMENTS: dict[str, Instrument] = {
         pivot_tolerance_floor=40.0,
         london_min_net=100.0,
         requires_volume=True,
+        entry_buffer=25.0,
+        zone_proximity=300.0,
+        # M5 replay: -16.5R/45d, 0% full wins — BTC chop needs slower bars.
+        signal_timeframe="M15",
     ),
     "EURUSD": Instrument(
         symbol="EURUSD",
@@ -94,6 +102,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         pivot_tolerance_floor=0.0004,
         london_min_net=0.0008,
         requires_volume=False,
+        entry_buffer=0.0002,
+        zone_proximity=0.0015,
     ),
     "GBPUSD": Instrument(
         symbol="GBPUSD",
@@ -114,6 +124,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         pivot_tolerance_floor=0.0005,
         london_min_net=0.0010,
         requires_volume=False,
+        entry_buffer=0.0002,
+        zone_proximity=0.0018,
     ),
 }
 
@@ -147,3 +159,20 @@ def state_key(base: str, symbol: str | None) -> str:
     if not symbol or str(symbol).upper() == "XAUUSD":
         return base
     return f"{base}:{str(symbol).upper()}"
+
+
+def scaled_buffer(symbol: str | None, legacy_value: float) -> float:
+    """Entry buffer for a market; gold keeps the ctor/env legacy value so
+    existing tests and tuned behavior are untouched."""
+    instrument = get_instrument(symbol)
+    if instrument.symbol == "XAUUSD":
+        return float(legacy_value)
+    return instrument.entry_buffer
+
+
+def scaled_proximity(symbol: str | None, legacy_value: float) -> float:
+    """Zone-proximity distance for a market; gold keeps the legacy value."""
+    instrument = get_instrument(symbol)
+    if instrument.symbol == "XAUUSD":
+        return float(legacy_value)
+    return instrument.zone_proximity

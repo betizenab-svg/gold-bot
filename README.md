@@ -1,8 +1,10 @@
-# XAUUSD Signal Intelligence System
+# Signal Desk — Multi-Asset Signal Intelligence System
 
 ## Project Overview
 
-XAUUSD Signal Intelligence System is a stateless, cron-driven trading automation platform for gold (XAUUSD). It ingests live market and macro data, applies Smart Money Concepts (SMC) and macro-fundamental filters, scores opportunities through a multi-engine confluence stack, and publishes threaded Telegram alerts.
+Signal Desk is a stateless, cron-driven trading automation platform covering gold (XAUUSD), Bitcoin (BTCUSD), and the FX majors (EURUSD, GBPUSD). It ingests live market and macro data, applies Smart Money Concepts (SMC) and macro-fundamental filters, scores opportunities through a multi-engine confluence stack, and publishes threaded Telegram alerts.
+
+Multi-asset architecture (config/instruments.py): every market carries its own personality — price precision, minimum stop distance, round-number grid, pip value, trading calendar (crypto runs 24/7), pivot day anchor (17:00 New York vs UTC midnight), session scoring, and signal timeframe. Gold-specific macro gates (COT, sovereign demand, DXY divergence) apply to gold only. Per-market state (structure, swings, sweeps, setups) is fully isolated. Markets can be watch-only until replay evidence earns them live signals.
 
 Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 
@@ -10,7 +12,7 @@ Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 - Wider, structure-aware stops: 1.5x ATR with a hard minimum distance and round-number clearance, ending the noise stop-out problem.
 - Full trade lifecycle: TP1 partial, breakeven runner, pending-order expiry, and a time stop for stagnant trades.
 - Confluence engines: session killzones, volatility regime, RSI/EMA momentum with exhaustion vetoes, multi-timeframe bias, barbwire/climax market-state vetoes, and fib OTE confluence.
-- Self-learning: per-strategy weights driven by rolling expectancy (R), not win rate.
+- Self-learning: per-strategy weights driven by rolling expectancy (R), not win rate — plus daily auto-quarantine of strategies whose live expectancy turns clearly negative, and a 14-day regime-drift warning in the daily status message.
 - Risk governor: daily signal caps, stop-loss cooldowns, losing-streak halts, daily -3R circuit breaker, +4R profit lock, and news blackouts.
 - Trendline gate: counter-trend signals are blocked until the trendline through the last two swing pivots is broken by a body close.
 - Evidence loop: every trade records its max favorable/adverse excursion in R; scripts/calibrate_from_history.py turns that into concrete tuning recommendations.
@@ -19,14 +21,14 @@ Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 - Conviction-tiered sizing: Tier 1 signals size at 2% risk, Tier 2 at 1%.
 - Daily floor-trader pivots (BabyPips formulas) and London-to-NY continuation as confluence inputs.
 - Telegram reasoning is a full professional trade plan: tier, context, location, liquidity story, trigger, evidence, numbers with reasons, and pre-committed if-then management.
-- Web dashboard: performance analytics (equity curve in R, per-strategy expectancy, MFE/MAE), risk governor console with manual kill switch and news blackout editor, live market-state page.
-- Hosting: runs free and permanently on GitHub Actions (docs/hosting.md) - no cPanel required. Default signal timeframe is now M5.
+- Web dashboard: mission-control home (per-market watch cards with sparklines, net-R, open-positions board), performance analytics (equity curve in R, per-strategy and per-market splits, weekday-by-hour edge heatmap, outcome histogram, MFE/MAE), trade-journal CSV export, risk governor console with manual kill switch and news blackout editor, per-market state pages.
+- Hosting: runs free and permanently on GitHub Actions (docs/hosting.md) - no cPanel required. Signal timeframe is M5 (M15 for Bitcoin).
 
 The project remains compatible with any Linux host with cron.
 
 ## Purpose of the Platform
 
-The platform provides disciplined, repeatable signal generation for XAUUSD with clear lifecycle management. It is designed to replace ad-hoc discretionary workflows with a deterministic pulse architecture that can be audited, tested, and safely deployed.
+The platform provides disciplined, repeatable signal generation across gold, Bitcoin and the FX majors with clear lifecycle management. It is designed to replace ad-hoc discretionary workflows with a deterministic pulse architecture that can be audited, tested, and safely deployed.
 
 ## Problem It Solves
 

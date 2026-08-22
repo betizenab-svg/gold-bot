@@ -27,6 +27,7 @@ OUTCOME_R = {
     "CLOSED_BE": 0.75,
     "CLOSED_SL": -1.0,
     "CLOSED_TIME": 0.0,
+    "CLOSED_STRUCT": 1.0,
 }
 
 MIN_SAMPLE_FOR_ADVICE = 10
@@ -38,16 +39,29 @@ def analyze(db_path: str) -> dict[str, Any]:
         rows = connection.execute(
             """
             SELECT COALESCE(strategy, 'UNKNOWN'), status,
-                   COALESCE(mfe_r, 0.0), COALESCE(mae_r, 0.0)
+                   COALESCE(mfe_r, 0.0), COALESCE(mae_r, 0.0),
+                   COALESCE(symbol, 'XAUUSD')
             FROM signals
-            WHERE status IN ('CLOSED_TP2', 'CLOSED_BE', 'CLOSED_SL', 'CLOSED_TIME');
+            WHERE status IN ('CLOSED_TP2', 'CLOSED_BE', 'CLOSED_SL',
+                             'CLOSED_TIME', 'CLOSED_STRUCT');
             """
         ).fetchall()
     finally:
         connection.close()
 
     strategies: dict[str, dict[str, Any]] = {}
-    for strategy, status, mfe_r, mae_r in rows:
+    symbols: dict[str, dict[str, Any]] = {}
+    for strategy, status, mfe_r, mae_r, symbol in rows:
+        status = str(status).upper()
+        r_for_symbol = OUTCOME_R.get(status)
+        if r_for_symbol is not None:
+            symbol_stats = symbols.setdefault(
+                str(symbol), {"trades": 0, "net_r": 0.0, "wins": 0}
+            )
+            symbol_stats["trades"] += 1
+            symbol_stats["net_r"] = round(symbol_stats["net_r"] + r_for_symbol, 2)
+            if status == "CLOSED_TP2":
+                symbol_stats["wins"] += 1
         stats = strategies.setdefault(
             str(strategy),
             {
@@ -72,7 +86,7 @@ def analyze(db_path: str) -> dict[str, Any]:
             stats["gross_loss"] += abs(r_value)
             stats["loser_mfe"].append(float(mfe_r))
 
-    report: dict[str, Any] = {"strategies": {}, "recommendations": []}
+    report: dict[str, Any] = {"strategies": {}, "recommendations": [], "symbols": symbols}
     for strategy, stats in strategies.items():
         trades = stats["trades"]
         if trades == 0:

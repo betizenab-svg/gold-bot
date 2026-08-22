@@ -172,6 +172,53 @@ def test_auto_quarantine_blocks_strategy() -> None:
     assert orchestrator._strategy_allowed({"strategy": "PIN_BAR"}) is True
 
 
+def test_fx_strategy_entry_buffer_scaled() -> None:
+    from src.strategies.pullback_h2 import PullbackH2L2Strategy
+
+    bar = Candle(
+        symbol="EURUSD", timeframe="M5", timestamp=KILLZONE_TS,
+        open=1.0845, high=1.0850, low=1.0840, close=1.0848, volume=0.0,
+    )
+    setup = PullbackH2L2Strategy()._build(bar, "LONG", "H2_PULLBACK")
+    # The old $0.50 gold buffer produced impossible 1.585 entries on FX.
+    assert abs(setup["entry_price"] - 1.0852) < 1e-9
+    assert abs(setup["sl_price"] - 1.0838) < 1e-9
+
+    gold_bar = Candle(
+        symbol="XAUUSD", timeframe="M5", timestamp=KILLZONE_TS,
+        open=2400.0, high=2401.0, low=2399.0, close=2400.5, volume=100.0,
+    )
+    gold_setup = PullbackH2L2Strategy()._build(gold_bar, "LONG", "H2_PULLBACK")
+    assert gold_setup["entry_price"] == 2401.5  # legacy $0.50 preserved
+
+
+def test_fx_sweep_detection_without_volume() -> None:
+    from src.analysis.liquidity import LiquiditySweepDetector
+
+    sweep_bar = Candle(
+        symbol="EURUSD", timeframe="M5", timestamp=KILLZONE_TS,
+        open=1.0850, high=1.0852, low=1.0830, close=1.0849, volume=0.0,
+    )
+    sweep = LiquiditySweepDetector().detect_sweep(
+        current_candle=sweep_bar, avg_volume=0.0,
+        last_swing_high=1.0900, last_swing_low=1.0840,
+    )
+    assert sweep is not None and sweep["type"] == "LIQUIDITY_SWEEP_LONG"
+
+    gold_bar = Candle(
+        symbol="XAUUSD", timeframe="M5", timestamp=KILLZONE_TS,
+        open=2400.0, high=2401.0, low=2390.0, close=2400.0, volume=0.0,
+    )
+    # Gold still requires a volume spike (volume=0 -> no sweep).
+    assert (
+        LiquiditySweepDetector().detect_sweep(
+            current_candle=gold_bar, avg_volume=0.0,
+            last_swing_high=2450.0, last_swing_low=2395.0,
+        )
+        is None
+    )
+
+
 def test_multi_symbol_pulse_namespaces_state(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SYMBOLS", "XAUUSD,BTCUSD")
 
