@@ -36,6 +36,7 @@ class Instrument:
     zone_proximity: float = 1.00  # "close enough to the zone" distance
     signal_timeframe: str = ""  # override; empty = global SIGNAL_TIMEFRAME
     signals_enabled: bool = True  # False = watch-only (data + zones, no signals)
+    correlation_group: str = ""  # same group + same direction = doubled bet
 
 
 INSTRUMENTS: dict[str, Instrument] = {
@@ -104,6 +105,7 @@ INSTRUMENTS: dict[str, Instrument] = {
         requires_volume=False,
         entry_buffer=0.0002,
         zone_proximity=0.0015,
+        correlation_group="EUR_GBP_BLOC",
     ),
     "GBPUSD": Instrument(
         symbol="GBPUSD",
@@ -126,6 +128,7 @@ INSTRUMENTS: dict[str, Instrument] = {
         requires_volume=False,
         entry_buffer=0.0002,
         zone_proximity=0.0018,
+        correlation_group="EUR_GBP_BLOC",
     ),
 }
 

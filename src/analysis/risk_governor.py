@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any, Optional
 
+from config.instruments import get_instrument
 from config.settings import (
     NEWS_BLACKOUT_AFTER_MIN,
     NEWS_BLACKOUT_BEFORE_MIN,
@@ -61,7 +62,13 @@ class RiskGovernor:
         self.halt_hours = int(halt_hours)
         self.max_concurrent_signals = int(max_concurrent_signals)
 
-    def is_trading_allowed(self, repository: Any, now_ts: int) -> tuple[bool, str]:
+    def is_trading_allowed(
+        self,
+        repository: Any,
+        now_ts: int,
+        symbol: Optional[str] = None,
+        direction: Optional[str] = None,
+    ) -> tuple[bool, str]:
         now_ts = int(now_ts)
 
         try:
@@ -80,6 +87,33 @@ class RiskGovernor:
                 )
         except Exception as exc:
             logging.debug("Risk governor open-signal check skipped: %s", exc)
+
+        # Correlated markets moving together are one bet, not two: never stack
+        # same-direction exposure inside a correlation bloc (EURUSD/GBPUSD).
+        if symbol and direction:
+            try:
+                group = get_instrument(symbol).correlation_group
+                if group:
+                    open_signals = repository.get_open_signals()
+                    for open_signal in open_signals if isinstance(open_signals, list) else []:
+                        open_symbol = getattr(open_signal, "symbol", None)
+                        if not isinstance(open_symbol, str) or not open_symbol:
+                            continue
+                        if open_symbol.upper() == str(symbol).upper():
+                            continue
+                        if get_instrument(open_symbol).correlation_group != group:
+                            continue
+                        open_direction = str(
+                            getattr(open_signal, "signal_type", "") or ""
+                        ).upper()
+                        if open_direction == str(direction).upper():
+                            return False, (
+                                f"Risk governor: correlated exposure blocked "
+                                f"({open_symbol} already {open_direction}; "
+                                f"{symbol} would double the same bet)"
+                            )
+            except Exception as exc:
+                logging.debug("Risk governor correlation check skipped: %s", exc)
 
         try:
             day_start = now_ts - (now_ts % 86400)

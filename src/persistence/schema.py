@@ -78,6 +78,19 @@ class SchemaInitializer:
             );
             """,
             """
+            CREATE TABLE IF NOT EXISTS setup_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT,
+                strategy TEXT,
+                direction TEXT,
+                order_type TEXT,
+                score INTEGER,
+                classification TEXT,
+                vetoes TEXT,
+                timestamp INTEGER
+            );
+            """,
+            """
             CREATE TABLE IF NOT EXISTS errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 provider TEXT,

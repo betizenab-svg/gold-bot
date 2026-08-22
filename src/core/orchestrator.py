@@ -1494,7 +1494,10 @@ class PulseOrchestrator:
 
             governor = RiskGovernor()
             trading_allowed, governor_reason = governor.is_trading_allowed(
-                repository, int(current_candle.timestamp)
+                repository,
+                int(current_candle.timestamp),
+                symbol=symbol,
+                direction=str(potential_setup.get("trade_direction", "")),
             )
             if not trading_allowed:
                 logging.info("Setup blocked: %s", governor_reason)
@@ -1569,6 +1572,7 @@ class PulseOrchestrator:
                 except (TypeError, ValueError):
                     swing_history = None
 
+            vetoes_text = ""
             try:
                 confluence = ConfluenceEngineV2().evaluate(
                     trade_direction=trade_direction,
@@ -1591,9 +1595,8 @@ class PulseOrchestrator:
                 total_score = int(confluence["score"])
                 classification = str(confluence["classification"])
                 if confluence.get("vetoes"):
-                    logging.info(
-                        "Confluence vetoes applied: %s", "; ".join(confluence["vetoes"])
-                    )
+                    vetoes_text = "; ".join(str(v) for v in confluence["vetoes"])
+                    logging.info("Confluence vetoes applied: %s", vetoes_text)
                 potential_setup["confluence_notes"] = list(confluence.get("notes", []))
             except Exception as exc:
                 logging.error("Confluence v2 failed; using legacy scoring: %s", exc)
@@ -1654,6 +1657,19 @@ class PulseOrchestrator:
             repository.set_kv(
                 state_key("latest_setup_classification", symbol), classification
             )
+            try:
+                repository.log_setup(
+                    symbol=symbol,
+                    strategy=str(setup_strategy or "SMC_ZONE"),
+                    direction=trade_direction,
+                    order_type=setup_order_type,
+                    score=int(total_score),
+                    classification=str(classification),
+                    vetoes=vetoes_text,
+                    timestamp=int(current_candle.timestamp),
+                )
+            except Exception as exc:
+                logging.debug("Setup funnel logging skipped: %s", exc)
             logging.info(
                 "Setup scored: symbol=%s direction=%s score=%d classification=%s",
                 symbol,

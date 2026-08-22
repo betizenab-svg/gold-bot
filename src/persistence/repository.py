@@ -627,6 +627,49 @@ class Repository:
             if row and row[1] is not None
         ]
 
+    def log_setup(
+        self,
+        symbol: str,
+        strategy: str,
+        direction: str,
+        order_type: str,
+        score: int,
+        classification: str,
+        vetoes: str,
+        timestamp: int,
+    ) -> None:
+        """Detection-funnel telemetry: every scored setup, published or not."""
+        self._execute(
+            """
+            INSERT INTO setup_log
+                (symbol, strategy, direction, order_type, score,
+                 classification, vetoes, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                str(symbol), str(strategy), str(direction), str(order_type),
+                int(score), str(classification), str(vetoes), int(timestamp),
+            ),
+        )
+
+    def get_recent_setups(self, limit: int = 20) -> List[dict]:
+        rows = self._fetchall(
+            """
+            SELECT symbol, strategy, direction, order_type, score,
+                   classification, vetoes, timestamp
+            FROM setup_log ORDER BY id DESC LIMIT ?;
+            """,
+            (int(limit),),
+        )
+        return [
+            {
+                "symbol": row[0], "strategy": row[1], "direction": row[2],
+                "order_type": row[3], "score": row[4],
+                "classification": row[5], "vetoes": row[6], "timestamp": row[7],
+            }
+            for row in rows
+        ]
+
     def update_signal_excursions(self, signal_hash: str, mfe_r: float, mae_r: float) -> None:
         """Ratchet max favorable/adverse excursion (in R) for open signals."""
         self._execute(

@@ -47,6 +47,13 @@ block content %}
   {% endif %}
 </section>
 
+{% if symbol_curves and not symbol_filter %}
+<section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
+  <h2 class="text-sm font-semibold text-slate-300">Race of markets — cumulative R per market (trade #)</h2>
+  <canvas id="symbolChart" height="90"></canvas>
+</section>
+{% endif %}
+
 <section class="mt-6 rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe">
   <h2 class="text-sm font-semibold text-slate-300">Per-strategy edge (realized)</h2>
   <div class="mt-3 overflow-x-auto">
@@ -205,5 +212,32 @@ block content %}
       },
     },
   });
+  {% if symbol_curves and not symbol_filter %}
+  new Chart(document.getElementById("symbolChart"), {
+    type: "line",
+    data: {
+      labels: Array.from({length: {{ max_curve_len }}}, (_, i) => i + 1),
+      datasets: [
+        {% for curve in symbol_curves %}
+        {
+          label: {{ curve.symbol | tojson }},
+          data: {{ curve.data | tojson }},
+          borderColor: {{ curve.color | tojson }},
+          backgroundColor: "transparent",
+          tension: 0.25,
+          pointRadius: 1.5,
+        },
+        {% endfor %}
+      ],
+    },
+    options: {
+      plugins: { legend: { labels: { color: "#94a3b8" } } },
+      scales: {
+        x: { ticks: { color: "#64748b" }, grid: { color: "rgba(255,255,255,0.05)" } },
+        y: { ticks: { color: "#64748b" }, grid: { color: "rgba(255,255,255,0.05)" } },
+      },
+    },
+  });
+  {% endif %}
 </script>
 {% endif %} {% endblock %}

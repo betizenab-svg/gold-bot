@@ -327,6 +327,26 @@ def create_app() -> Flask:
         if heartbeat_age_min is not None:
             heartbeat_state = "LIVE" if heartbeat_age_min <= 15 else "STALLED"
 
+        # Detection funnel: what the brain considered, not just what it published.
+        recent_setups = _query_rows(
+            """
+            SELECT symbol, strategy, direction, order_type, score,
+                   classification, vetoes, timestamp
+            FROM setup_log ORDER BY id DESC LIMIT 12;
+            """
+        )
+        for setup in recent_setups:
+            setup["when"] = _format_unix_ts(setup.get("timestamp"))
+        funnel_counts = {"REJECTED": 0, "WATCHLIST": 0, "ACTIONABLE": 0}
+        for row in _query_rows(
+            "SELECT classification, COUNT(*) AS n FROM setup_log "
+            "WHERE timestamp >= ? GROUP BY classification;",
+            (int(time.time()) - 7 * 86400,),
+        ):
+            key = str(row.get("classification", "")).upper()
+            if key in funnel_counts:
+                funnel_counts[key] = _to_int(row.get("n"))
+
         return render_template(
             "index.html",
             signals_total=signals_total,
@@ -341,7 +361,40 @@ def create_app() -> Flask:
             symbol_cards=_symbol_cards(),
             net_r=round(net_r, 2),
             open_positions=open_positions,
+            recent_setups=recent_setups,
+            funnel_counts=funnel_counts,
         )
+
+    @flask_app.route("/api/summary")
+    @login_required
+    def api_summary() -> Any:
+        last_pulse = _to_int(
+            _query_value(
+                "SELECT value FROM kv_store WHERE key = 'last_pulse_wallclock';",
+                default=0,
+            )
+        )
+        status_counts = _query_rows(
+            "SELECT status, COUNT(*) AS n FROM signals GROUP BY status;"
+        )
+        net_r = sum(
+            _STATUS_R.get(str(row.get("status", "")).upper(), 0.0) * _to_int(row.get("n"))
+            for row in status_counts
+        )
+        return {
+            "heartbeat_age_min": (
+                int((time.time() - last_pulse) // 60) if last_pulse else None
+            ),
+            "net_r": round(net_r, 2),
+            "open_signals": _to_int(
+                _query_value(
+                    "SELECT COUNT(*) FROM signals "
+                    "WHERE status IN ('PENDING','ACTIVE','PARTIAL_TP1');",
+                    default=0,
+                )
+            ),
+            "markets": _symbol_cards(),
+        }
 
     @flask_app.route("/signals")
     @login_required
@@ -750,6 +803,36 @@ def create_app() -> Flask:
             for status, label, tone in histogram_order
         ]
 
+        # Per-market cumulative curves for the overlay chart.
+        curve_colors = {
+            "XAUUSD": "#e6c174",
+            "BTCUSD": "#f7931a",
+            "EURUSD": "#49d7ff",
+            "GBPUSD": "#b48cf2",
+        }
+        symbol_curve_map: dict[str, list[float]] = {}
+        for row in closed:
+            sym = str(row.get("symbol") or "XAUUSD")
+            series = symbol_curve_map.setdefault(sym, [])
+            previous = series[-1] if series else 0.0
+            series.append(
+                round(
+                    previous
+                    + _STATUS_R.get(str(row.get("status", "")).upper(), 0.0),
+                    2,
+                )
+            )
+        symbol_curves = [
+            {
+                "symbol": sym,
+                "data": series,
+                "color": curve_colors.get(sym, "#94a3b8"),
+            }
+            for sym, series in symbol_curve_map.items()
+            if len(series) >= 2
+        ]
+        max_curve_len = max((len(c["data"]) for c in symbol_curves), default=0)
+
         return render_template(
             "performance.html",
             curve_labels=curve_labels,
@@ -764,6 +847,8 @@ def create_app() -> Flask:
             histogram=histogram,
             all_symbols=active_symbols(),
             symbol_filter=symbol_filter,
+            symbol_curves=symbol_curves,
+            max_curve_len=max_curve_len,
         )
 
     @flask_app.route("/risk", methods=["GET"])

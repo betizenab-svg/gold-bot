@@ -1,13 +1,16 @@
 name: Replay Validation
 
-# On-demand: replays the full live pipeline over recent history and
-# publishes the performance report as a downloadable artifact.
+# Weekly self-audit (and on-demand): replays the full live pipeline over
+# recent history for EVERY market and publishes the performance reports
+# as downloadable artifacts.
 
 on:
+  schedule:
+    - cron: "0 2 * * 0" # Sunday 02:00 UTC, while markets are closed
   workflow_dispatch:
     inputs:
       days:
-        description: "Days of 5m history to replay (max 59)"
+        description: "Days of history to replay (max 59)"
         required: false
         default: "45"
 
@@ -15,6 +18,10 @@ jobs:
   replay:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [XAUUSD, BTCUSD, EURUSD, GBPUSD]
     steps:
       - uses: actions/checkout@v4
 
@@ -27,10 +34,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run replay
-        run: python scripts/replay.py --days "${{ github.event.inputs.days }}" --out replay_report.json
+        run: >
+          python scripts/replay.py
+          --days "${{ github.event.inputs.days || '45' }}"
+          --symbol "${{ matrix.symbol }}"
+          --out "replay_${{ matrix.symbol }}.json"
 
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: replay-report
-          path: replay_report.json
+          name: replay-report-${{ matrix.symbol }}
+          path: replay_${{ matrix.symbol }}.json
