@@ -278,10 +278,19 @@ class SignalLifecycleManager:
 
             signal_hash = str(self._get_required_value(signal, "signal_hash"))
             new_status = self.EVENT_STATUS_MAP[event_type]
-            active_repository.update_signal_status(signal_hash, new_status)
+            reason = self._build_lifecycle_reason(signal, event_type)
+            is_closure = new_status.startswith("CLOSED") or new_status == "CANCELLED"
+            if is_closure and hasattr(active_repository, "update_signal_closure"):
+                # Persist WHY it closed, not just that it closed (journal/CSV).
+                try:
+                    active_repository.update_signal_closure(signal_hash, reason, new_status)
+                except Exception as exc:
+                    logging.debug("Closure reason persist failed: %s", exc)
+                    active_repository.update_signal_status(signal_hash, new_status)
+            else:
+                active_repository.update_signal_status(signal_hash, new_status)
             self._record_risk_outcome(active_repository, event_type, current_candle, signal)
 
-            reason = self._build_lifecycle_reason(signal, event_type)
             try:
                 message_id = int(active_repository.get_signal_message_id(signal_hash))
             except KeyError:
