@@ -169,3 +169,6 @@ DAILY_STATUS_ENABLED = _env_bool("DAILY_STATUS_ENABLED", True)
 AUTO_QUARANTINE_ENABLED = _env_bool("AUTO_QUARANTINE_ENABLED", True)
 # Time stop: ACTIVE trades that never reached TP1 are closed after this.
 ACTIVE_MAX_HOLD_HOURS = int(os.getenv("ACTIVE_MAX_HOLD_HOURS", "24"))
+# Runner protection: move stop to entry once the trade has run this many R.
+# 0.75 is replay-confirmed (EUR +17%, BTC +20% vs 1.0 over 45d, 2026-08-26).
+BE_ARM_R = float(os.getenv("BE_ARM_R", "0.75"))

@@ -112,6 +112,22 @@ one case and half-crippled in the other. The fix set: per-instrument entry
 buffers and zone proximity (`config/instruments.py`), per-instrument signal
 timeframes (BTC M15), and volume-optional sweep detection for FX feeds.
 
+## Breakeven-arm tuning (live-loss hypothesis, replay-confirmed 2026-08-26)
+
+First live week: 4 of 4 losers ran +0.30R to +0.84R favorable before dying.
+Hypothesis: arm breakeven protection at +0.75R instead of +1.0R. Tested on
+identical 45-day data before shipping:
+
+| Market | BE at 1.00R | BE at 0.75R | Verdict |
+|---|---|---|---|
+| EURUSD | +25.25R | **+29.50R** | +17% (5 fewer stops, 13 more breakevens) |
+| BTCUSD | +10.25R | **+12.25R** | +20% |
+| XAUUSD | +8.75R | **+14.25R** | +63% (same wins, 2 fewer stops, 6 more BEs) |
+
+Shipped as the default (`BE_ARM_R`, env-overridable). GBP verification
+via the weekly scheduled cloud replay (Yahoo rate limits blocked local runs);
+the workflow now accepts a `be_arm_r` input for future experiments.
+
 ## Deliberately not implemented (and why)
 
 1. **Range-day edge-fade strategy family** — the barbwire veto, day-extension

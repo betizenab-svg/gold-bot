@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Sequence
 
 from config.instruments import get_instrument, state_key
-from config.settings import ACTIVE_MAX_HOLD_HOURS, SIGNAL_EXPIRY_MINUTES
+from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
 from src.alerting.telegram_client import TelegramClient
 from src.analysis.position_sizing import LotSizeCalculator
@@ -40,7 +40,7 @@ class SignalLifecycleManager:
 
     # Once a trade has run this far in R, the stop moves to entry
     # (Trendline/Brooks: breakeven after the move equals the risk).
-    BE_ARM_R = 1.0
+    BE_ARM_R = float(BE_ARM_R_SETTING)
 
     def __init__(
         self,

@@ -13,6 +13,10 @@ on:
         description: "Days of history to replay (max 59)"
         required: false
         default: "45"
+      be_arm_r:
+        description: "Breakeven-arm threshold in R (experiment knob)"
+        required: false
+        default: ""
 
 jobs:
   replay:
@@ -34,6 +38,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run replay
+        env:
+          BE_ARM_R: ${{ github.event.inputs.be_arm_r || '' }}
         run: >
           python scripts/replay.py
           --days "${{ github.event.inputs.days || '45' }}"

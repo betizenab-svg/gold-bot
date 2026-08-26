@@ -337,7 +337,7 @@ def create_app() -> Flask:
         )
         for setup in recent_setups:
             setup["when"] = _format_unix_ts(setup.get("timestamp"))
-        funnel_counts = {"REJECTED": 0, "WATCHLIST": 0, "ACTIONABLE": 0}
+        funnel_counts = {"BLOCKED": 0, "REJECTED": 0, "WATCHLIST": 0, "ACTIONABLE": 0}
         for row in _query_rows(
             "SELECT classification, COUNT(*) AS n FROM setup_log "
             "WHERE timestamp >= ? GROUP BY classification;",

@@ -1244,6 +1244,30 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Pulse health recording skipped: %s", exc)
 
+    def _log_blocked_setup(
+        self,
+        repository: Repository,
+        symbol: str,
+        setup: dict[str, Any],
+        current_candle: Candle,
+        reason: str,
+    ) -> None:
+        """Funnel visibility for pre-scoring blocks (macro gates, governor):
+        a benched market must look benched, not broken."""
+        try:
+            repository.log_setup(
+                symbol=symbol,
+                strategy=str(setup.get("strategy") or "SMC_ZONE"),
+                direction=str(setup.get("trade_direction", "")),
+                order_type=str(setup.get("order_type", "LIMIT")).upper(),
+                score=0,
+                classification="BLOCKED",
+                vetoes=str(reason),
+                timestamp=int(current_candle.timestamp),
+            )
+        except Exception as exc:
+            logging.debug("Blocked-setup funnel logging skipped: %s", exc)
+
     def _load_auto_quarantine(self, repository: Repository) -> None:
         """Refresh the in-memory set of live-quarantined strategies."""
         self._extra_disabled = set()
@@ -1490,6 +1514,9 @@ class PulseOrchestrator:
                     potential_setup.get("trade_direction"),
                     permission_reason,
                 )
+                self._log_blocked_setup(
+                    repository, symbol, potential_setup, current_candle, permission_reason
+                )
                 return signals_generated, errors_encountered
 
             governor = RiskGovernor()
@@ -1501,6 +1528,9 @@ class PulseOrchestrator:
             )
             if not trading_allowed:
                 logging.info("Setup blocked: %s", governor_reason)
+                self._log_blocked_setup(
+                    repository, symbol, potential_setup, current_candle, governor_reason
+                )
                 return signals_generated, errors_encountered
 
             raw_macro_bias_state = repository.get_kv("macro_bias_state")

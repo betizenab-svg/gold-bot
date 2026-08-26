@@ -22,6 +22,9 @@ os.environ.setdefault("NEWS_AUTOFETCH_ENABLED", "0")
 os.environ.setdefault("WEEKLY_REPORT_ENABLED", "0")
 os.environ.setdefault("DAILY_STATUS_ENABLED", "0")
 os.environ.setdefault("AUTO_QUARANTINE_ENABLED", "0")
+# Legacy lifecycle tests assert the original 1R breakeven-arm behavior;
+# production default is replay-tuned in settings.
+os.environ.setdefault("BE_ARM_R", "1.0")
 # Legacy suites exercise the single-symbol pipeline; multi-symbol paths have
 # their own dedicated tests that override this.
 os.environ.setdefault("SYMBOLS", "XAUUSD")
