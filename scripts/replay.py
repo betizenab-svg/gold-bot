@@ -50,6 +50,7 @@ os.environ["TELEGRAM_CHAT_ID"] = ""
 os.environ["TELEGRAM_API_BASE_URL"] = "http://127.0.0.1:9"
 
 from config.database import get_connection  # noqa: E402
+from src.core.logger import StructuredLogger  # noqa: E402
 from src.core.orchestrator import PulseOrchestrator  # noqa: E402
 from src.domain.candle import Candle  # noqa: E402
 from src.persistence.repository import Repository  # noqa: E402
@@ -168,9 +169,7 @@ def _download_history(days: int) -> list[Candle]:
 def _load_csv(path: str) -> list[Candle]:
     from src.backtest.csv_reader import CSVDataClient
 
-    candles = CSVDataClient().load_data(path)
-    for candle in candles:
-        object.__setattr__(candle, "timeframe", _REPLAY_TF)
+    candles = CSVDataClient(symbol=_REPLAY_SYMBOL, timeframe=_REPLAY_TF).load_data(path)
     print(f"Loaded {len(candles)} candles from {path}")
     return candles
 
@@ -191,13 +190,16 @@ def run_replay(candles: list[Candle], warmup: int = 600) -> dict:
     total_pulses = len(candles) - warmup
 
     def repository_factory() -> Repository:
-        conn = get_connection()
-        SchemaInitializer(conn).initialize()
-        return Repository(conn)
+        # Schema was initialized once above; repeating it per pulse is pure overhead.
+        return Repository(get_connection())
 
     orchestrator = PulseOrchestrator(
         repository_factory=repository_factory,
         client_factory=lambda _repo: replay_client,
+        # Keep thousands of simulated pulses out of the live telemetry log.
+        structured_logger=StructuredLogger(
+            os.path.join(os.path.dirname(_REPLAY_DB), "telemetry.jsonl")
+        ),
     )
 
     started = time.time()

@@ -41,6 +41,7 @@ class BacktestEngine:
         self.signal_factory = SignalFactory()
         self.lot_size_calculator = LotSizeCalculator()
         self.minimum_window = max(getattr(self.strategy, "TREND_PERIOD", 200), 200)
+        self.lookback = self._strategy_lookback()
         self.open_trades: list[SimulatedTrade] = []
         self.trade_history: list[SimulatedTrade] = []
         self.current_balance = float(initial_balance)
@@ -59,7 +60,8 @@ class BacktestEngine:
             if self._has_open_trade():
                 continue
 
-            window = self.candles[: index + 1]
+            window_start = 0 if self.lookback is None else max(0, index + 1 - self.lookback)
+            window = self.candles[window_start : index + 1]
             setup = self.strategy.detect_setup(window)
             if setup is None:
                 continue
@@ -283,6 +285,16 @@ class BacktestEngine:
 
     def _has_open_trade(self) -> bool:
         return any(trade.status in {"PENDING", "ACTIVE", "PARTIAL_TP1"} for trade in self.open_trades)
+
+    def _strategy_lookback(self) -> Optional[int]:
+        """Bars the strategy can read back from the newest candle, or None if
+        unknown. Bounding the window keeps long backtests linear, not O(n^2)."""
+        trend_period = getattr(self.strategy, "trend_period", None)
+        value_period = getattr(self.strategy, "value_period", None)
+        if trend_period is None or value_period is None:
+            return None
+        # +2: the value SMA is checked up to two bars before the newest candle.
+        return max(self.minimum_window, int(trend_period), int(value_period) + 2)
 
     @staticmethod
     def _build_setup_key(setup: dict[str, Any]) -> str:

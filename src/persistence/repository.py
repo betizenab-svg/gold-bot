@@ -15,6 +15,7 @@ class Repository:
         self.connection: Optional[sqlite3.Connection] = None
         self._db_path: Optional[str] = None
         self._shared_connection_mode = False
+        self._file_connection: Optional[sqlite3.Connection] = None
 
         db_path = self._extract_db_path(connection)
         if db_path in {"", ":memory:"}:
@@ -25,7 +26,8 @@ class Repository:
 
         self._db_path = db_path
         self._configure_connection(connection)
-        connection.close()
+        # Reconnecting per query cost ~30 connects + PRAGMA rounds per pulse.
+        self._file_connection = connection
 
     def _extract_db_path(self, connection: sqlite3.Connection) -> str:
         try:
@@ -59,69 +61,57 @@ class Repository:
                 raise RuntimeError("Repository connection is closed")
             return self.connection
 
+        if self._file_connection is not None:
+            return self._file_connection
+
         if not self._db_path:
             raise RuntimeError("Repository database path is not configured")
 
+        # File-backed repositories stay usable after close(): reopen lazily.
         connection = sqlite3.connect(self._db_path)
         self._configure_connection(connection)
+        self._file_connection = connection
         return connection
 
     def _fetchall(self, query: str, params: Iterable[Any] = ()) -> List[tuple[Any, ...]]:
-        if self._shared_connection_mode:
-            connection = self._open_connection()
-            with closing(connection.cursor()) as cursor:
-                cursor.execute(query, tuple(params))
-                return cursor.fetchall()
-
-        with closing(self._open_connection()) as connection:
-            with closing(connection.cursor()) as cursor:
-                cursor.execute(query, tuple(params))
-                return cursor.fetchall()
+        connection = self._open_connection()
+        with closing(connection.cursor()) as cursor:
+            cursor.execute(query, tuple(params))
+            return cursor.fetchall()
 
     def _fetchone(self, query: str, params: Iterable[Any] = ()) -> Optional[tuple[Any, ...]]:
-        if self._shared_connection_mode:
-            connection = self._open_connection()
-            with closing(connection.cursor()) as cursor:
-                cursor.execute(query, tuple(params))
-                return cursor.fetchone()
-
-        with closing(self._open_connection()) as connection:
-            with closing(connection.cursor()) as cursor:
-                cursor.execute(query, tuple(params))
-                return cursor.fetchone()
+        connection = self._open_connection()
+        with closing(connection.cursor()) as cursor:
+            cursor.execute(query, tuple(params))
+            return cursor.fetchone()
 
     def _execute(self, query: str, params: Iterable[Any] = ()) -> None:
-        if self._shared_connection_mode:
-            connection = self._open_connection()
-            with connection:
-                with closing(connection.cursor()) as cursor:
-                    cursor.execute(query, tuple(params))
-            return
-
-        with closing(self._open_connection()) as connection:
-            with connection:
-                with closing(connection.cursor()) as cursor:
-                    cursor.execute(query, tuple(params))
+        connection = self._open_connection()
+        with connection:
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(query, tuple(params))
 
     def _executemany(self, query: str, payload: List[tuple[Any, ...]]) -> None:
         if not payload:
             return
 
+        connection = self._open_connection()
         if self._shared_connection_mode:
-            connection = self._open_connection()
             connection.executemany(query, payload)
             connection.commit()
             return
 
-        with closing(self._open_connection()) as connection:
-            with connection:
-                with closing(connection.cursor()) as cursor:
-                    cursor.executemany(query, payload)
+        with connection:
+            with closing(connection.cursor()) as cursor:
+                cursor.executemany(query, payload)
 
     def close(self) -> None:
         if self._shared_connection_mode and self.connection is not None:
             self.connection.close()
             self.connection = None
+        if self._file_connection is not None:
+            self._file_connection.close()
+            self._file_connection = None
 
     def save_candle(self, candle: Dict[str, Any]) -> None:
         self._execute(

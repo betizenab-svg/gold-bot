@@ -18,6 +18,10 @@ class ProxyAwareHttpClient:
 
     def __init__(self, logger: Optional[logging.Logger] = None) -> None:
         self.logger = logger or logging.getLogger(__name__)
+        # Retries through one client reuse the list and never re-try a proxy
+        # (each sweep can cost minutes of timeouts).
+        self._proxy_hosts: Optional[List[str]] = None
+        self._tried_proxies: set[str] = set()
 
     @staticmethod
     def _is_retryable_status(code: int) -> bool:
@@ -68,13 +72,16 @@ class ProxyAwareHttpClient:
                 return last_response
             raise requests.RequestException("Direct request failed and proxy fallback is disabled")
 
-        proxy_hosts = self._load_proxy_list()
+        if self._proxy_hosts is None:
+            self._proxy_hosts = self._load_proxy_list()
+        proxy_hosts = [host for host in self._proxy_hosts if host not in self._tried_proxies]
         if not proxy_hosts:
             if last_response is not None:
                 return last_response
-            raise requests.RequestException("No proxies available from ProxyScrape")
+            raise requests.RequestException("No untried proxies available from ProxyScrape")
 
         for host in proxy_hosts:
+            self._tried_proxies.add(host)
             proxy_cfg: Dict[str, str] = {
                 "http": f"http://{host}",
                 "https": f"http://{host}",

@@ -4,7 +4,6 @@ import json
 import os
 import sqlite3
 import time
-from collections import deque
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -82,10 +81,25 @@ def _query_rows(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]
 def _read_last_lines(path: Path, line_count: int = 100) -> list[str]:
     if not path.exists():
         return [f"File not found: {path}"]
+    if line_count <= 0:
+        return []
 
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        lines = deque(handle, maxlen=line_count)
-    return [line.rstrip("\n") for line in lines]
+    # Read backwards from the end: log files grow without bound.
+    block_size = 64 * 1024
+    data = b""
+    with path.open("rb") as handle:
+        position = handle.seek(0, os.SEEK_END)
+        while position > 0 and data.count(b"\n") <= line_count:
+            read_size = min(block_size, position)
+            position -= read_size
+            handle.seek(position)
+            data = handle.read(read_size) + data
+
+    text = data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines[-line_count:]
 
 
 def _safe_next_url() -> str:

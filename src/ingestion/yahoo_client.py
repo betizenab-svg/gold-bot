@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import gc
 from typing import Any, List, Optional, Tuple, cast
 import logging
 
@@ -178,7 +177,6 @@ class YahooFinanceClient:
             )
 
         del df
-        gc.collect()
 
         validator = DataValidator()
         valid_candles = validator.filter_candles(candles)

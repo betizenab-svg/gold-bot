@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import time
-import gc
 # Trigger linter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Optional, cast
@@ -919,7 +918,7 @@ class PulseOrchestrator:
         )
 
         # --- Crisis Filter (DXY Correlation) ---
-        gold_daily_for_dxy = self._fetch_gold_daily_closes(repository)
+        gold_daily_for_dxy = gold_series
         dxy_series = self._fetch_dxy_daily_closes()
         if not gold_daily_for_dxy.empty and not dxy_series.empty:
             dxy_corr = self.crisis_detector.calculate_dxy_correlation(
@@ -1785,7 +1784,6 @@ class PulseOrchestrator:
             self._maybe_send_weekly_report(repository)
             self._maybe_update_strategy_quarantine(repository)
             self._maybe_send_daily_status(repository)
-            gc.collect()
         except Exception:
             errors_encountered += 1
             logging.exception("Pulse failed unexpectedly")

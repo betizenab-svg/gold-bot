@@ -22,6 +22,8 @@ os.environ.setdefault("NEWS_AUTOFETCH_ENABLED", "0")
 os.environ.setdefault("WEEKLY_REPORT_ENABLED", "0")
 os.environ.setdefault("DAILY_STATUS_ENABLED", "0")
 os.environ.setdefault("AUTO_QUARANTINE_ENABLED", "0")
+# Free-proxy sweeps (up to 8 proxies x 15s per request) made the suite take minutes.
+os.environ.setdefault("PROXY_FALLBACK_ENABLED", "0")
 # Legacy lifecycle tests assert the original 1R breakeven-arm behavior;
 # production default is replay-tuned in settings.
 os.environ.setdefault("BE_ARM_R", "1.0")

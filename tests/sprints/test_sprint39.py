@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import os
 import sqlite3
+import tempfile
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import patch
 
 import pandas as pd
@@ -11,14 +13,27 @@ import pytest
 import scripts.backup_db as backup_db
 import scripts.health_check as health_check
 import scripts.reset_state as reset_state
-from config.settings import BASE_DIR
 
 
-def _paths() -> tuple[Path, Path, Path]:
-    data_dir = Path(BASE_DIR) / "data"
+def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
     db_path = data_dir / "trading_engine.db"
     backups_dir = data_dir / "backups"
     return data_dir, db_path, backups_dir
+
+
+@contextmanager
+def _scripts_pointed_at(data_dir: Path) -> Iterator[None]:
+    # The DR scripts hard-code the production DB; never let tests touch it.
+    _, db_path, backups_dir = _paths(data_dir)
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(backup_db, "_production_db_path", lambda: db_path))
+        stack.enter_context(patch.object(backup_db, "_backup_dir", lambda: backups_dir))
+        stack.enter_context(patch.object(reset_state, "_production_db_path", lambda: db_path))
+        stack.enter_context(
+            patch.object(reset_state, "_lock_path", lambda: data_dir / "bot.lock")
+        )
+        stack.enter_context(patch.object(health_check, "_production_db_path", lambda: db_path))
+        yield
 
 
 def _seed_dummy_db(db_path: Path) -> None:
@@ -46,8 +61,9 @@ def _seed_dummy_db(db_path: Path) -> None:
 
 
 @pytest.fixture
-def data_dir() -> Path:
-    return Path(BASE_DIR) / "data"
+def data_dir(tmp_path: Path) -> Iterator[Path]:
+    with _scripts_pointed_at(tmp_path):
+        yield tmp_path
 
 
 @pytest.fixture
@@ -56,28 +72,10 @@ def backups_dir(data_dir: Path) -> Path:
 
 
 @pytest.fixture
-def db_path(data_dir: Path, backups_dir: Path):
-    # These scripts operate on the production DB path, so tests seed a
-    # disposable DB there and restore whatever existed before.
+def db_path(data_dir: Path) -> Path:
     target = data_dir / "trading_engine.db"
-    backup_of_original = None
-    if target.exists():
-        backup_of_original = target.read_bytes()
     _seed_dummy_db(target)
-    yield target
-    try:
-        if backup_of_original is not None:
-            target.write_bytes(backup_of_original)
-        elif target.exists():
-            target.unlink()
-    except PermissionError:
-        pass
-    if backups_dir.exists():
-        for path in backups_dir.glob("trading_engine_*.db"):
-            try:
-                path.unlink()
-            except PermissionError:
-                pass
+    return target
 
 
 def test_backup_script(db_path: Path, backups_dir: Path) -> None:
@@ -109,7 +107,7 @@ def test_reset_state_script(db_path: Path, data_dir: Path) -> None:
     assert row is not None and row[0] == "CANCELLED"
 
 
-def test_health_check_mocked() -> None:
+def test_health_check_mocked(db_path: Path) -> None:
     class _DummyResponse:
         status_code = 200
 
@@ -123,27 +121,15 @@ def test_health_check_mocked() -> None:
 
 
 def main() -> int:
-    data_dir, db_path, backups_dir = _paths()
-    _seed_dummy_db(db_path)
-
-    try:
-        test_backup_script(db_path, backups_dir)
-        test_reset_state_script(db_path, data_dir)
-        test_health_check_mocked()
-        print("Sprint 39 Disaster Recovery & Deployment Verified")
-        return 0
-    finally:
-        if db_path.exists():
-            try:
-                db_path.unlink()
-            except PermissionError:
-                pass
-        if backups_dir.exists():
-            for path in backups_dir.glob("trading_engine_*.db"):
-                try:
-                    path.unlink()
-                except PermissionError:
-                    pass
+    with tempfile.TemporaryDirectory(prefix="sprint39_") as raw_dir:
+        data_dir, db_path, backups_dir = _paths(Path(raw_dir))
+        with _scripts_pointed_at(data_dir):
+            _seed_dummy_db(db_path)
+            test_backup_script(db_path, backups_dir)
+            test_reset_state_script(db_path, data_dir)
+            test_health_check_mocked(db_path)
+    print("Sprint 39 Disaster Recovery & Deployment Verified")
+    return 0
 
 
 if __name__ == "__main__":
