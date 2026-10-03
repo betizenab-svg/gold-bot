@@ -7,7 +7,7 @@ from typing import Any, Optional, Sequence
 from config.instruments import get_instrument, state_key
 from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
-from src.alerting.telegram_client import TelegramClient
+from src.alerting.telegram_client import TelegramAPIError, TelegramClient
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
 from src.domain.candle import Candle
@@ -258,7 +258,8 @@ class SignalLifecycleManager:
         telegram_client: Optional[TelegramClient] = None,
         repository: Optional[Repository] = None,
         formatter: Optional[SignalFormatter] = None,
-    ) -> None:
+    ) -> int:
+        """Returns how many lifecycle updates could not be delivered."""
         active_repository = repository or self.repository
         active_telegram_client = telegram_client or self.telegram_client
         active_formatter = formatter or self.formatter
@@ -266,6 +267,7 @@ class SignalLifecycleManager:
         if active_repository is None:
             raise ValueError("repository is required to process open signals")
 
+        undelivered = 0
         for signal in open_signals:
             event_type = self.evaluate_signal(signal, current_candle)
             if event_type is None:
@@ -308,20 +310,32 @@ class SignalLifecycleManager:
                 event_type,
                 reason,
             )
-            active_telegram_client.send_message(
-                alert_message,
-                reply_to_message_id=message_id,
-            )
-            active_telegram_client.send_message(
-                explanation_message,
-                reply_to_message_id=message_id,
-            )
+            try:
+                active_telegram_client.send_message(
+                    alert_message,
+                    reply_to_message_id=message_id,
+                )
+                active_telegram_client.send_message(
+                    explanation_message,
+                    reply_to_message_id=message_id,
+                )
+            except (TelegramAPIError, ValueError) as exc:
+                # The new status is already saved; a lost message must not stop
+                # the remaining trades and candles from being checked.
+                undelivered += 1
+                logging.error(
+                    "Lifecycle update not delivered: signal=%s event=%s error=%s",
+                    signal_hash,
+                    event_type,
+                    exc,
+                )
             logging.info(
                 "Processed signal lifecycle event: signal=%s event=%s status=%s",
                 signal_hash,
                 event_type,
                 new_status,
             )
+        return undelivered
 
     def send_lifecycle_update(
         self,

@@ -568,11 +568,13 @@ class PulseOrchestrator:
         self,
         repository: Repository,
         new_candles: List[Candle],
-    ) -> None:
+    ) -> int:
         """Walk EVERY new candle since the last pulse (oldest first) so TP/SL
-        touches inside scheduler gaps are never skipped."""
+        touches inside scheduler gaps are never skipped. Returns how many
+        lifecycle updates could not be delivered."""
+        undelivered = 0
         if not new_candles:
-            return
+            return undelivered
         lifecycle_manager = self.lifecycle_manager_factory(repository)
         for candle in sorted(new_candles, key=lambda item: item.timestamp):
             open_signals = repository.get_open_signals()
@@ -583,7 +585,7 @@ class PulseOrchestrator:
                     open_signals = list(open_signals)
                 except TypeError:
                     logging.info("Open signal payload is not iterable; skipping lifecycle monitor")
-                    return
+                    return undelivered
             candle_symbol = getattr(candle, "symbol", None)
             if isinstance(candle_symbol, str) and candle_symbol:
                 open_signals = [
@@ -594,13 +596,16 @@ class PulseOrchestrator:
             if not open_signals:
                 continue
 
-            lifecycle_manager.process_open_signals(
+            result = lifecycle_manager.process_open_signals(
                 open_signals=open_signals,
                 current_candle=candle,
                 telegram_client=lifecycle_manager.telegram_client,
                 repository=repository,
                 formatter=lifecycle_manager.formatter,
             )
+            if isinstance(result, int):
+                undelivered += result
+        return undelivered
 
     def _evaluate_market_structure(
         self,
@@ -1438,7 +1443,7 @@ class PulseOrchestrator:
             # Legacy global watermark (heartbeats, mock clock, old dashboards).
             repository.set_kv("last_processed_timestamp", latest_timestamp)
         current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
-        self._monitor_open_signals(repository, valid_candles)
+        errors_encountered += self._monitor_open_signals(repository, valid_candles)
         self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
 
         detector = FractalDetector()
