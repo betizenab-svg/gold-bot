@@ -1,13 +1,17 @@
 name: Gold Bot Pulse
 
-# Runs the signal engine every 5 minutes on GitHub's free runners.
-# State (SQLite DB) is committed back to the repo after each pulse so the
-# next run continues where this one stopped.
+# Runs one pulse of the signal engine. An outside timer (cron-job.org) starts
+# it every 5 minutes through workflow_dispatch; GitHub's own schedule below
+# skips most runs and is only a backup.
+#
+# The bot's database travels between runs in the Actions cache (a new entry per
+# run, old ones expire automatically). A copy is committed to the repository at
+# most every 6 hours, so the git history stays small.
 
 on:
+  workflow_dispatch: {}
   schedule:
     - cron: "*/5 * * * *"
-  workflow_dispatch: {}
 
 # Never allow two pulses to run at the same time (replaces the cPanel file lock).
 concurrency:
@@ -16,42 +20,113 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   pulse:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out repository (with state DB)
+      - name: Check out the latest code
         uses: actions/checkout@v4
+        with:
+          # A run that waited in the queue must not start from older code/state.
+          ref: ${{ github.ref }}
 
       - name: Set up Python
+        id: python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+
+      # A fresh pip install took ~17s of every ~34s run. Restore a ready-made
+      # environment instead; the date in the key rebuilds it daily so library
+      # fixes (yfinance especially) still arrive.
+      - name: Pick cache day
+        id: day
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore installed packages
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}-${{ steps.day.outputs.day }}
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          if ! .venv/bin/python -c "import dotenv, requests, pandas, yfinance, matplotlib" 2>/dev/null; then
+            rm -rf .venv
+            python -m venv .venv
+            .venv/bin/pip install -r requirements.txt
+          fi
+
+      - name: Restore the bot's latest state
+        id: state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/trading_engine.db
+          key: bot-state-${{ github.run_id }}
+          restore-keys: bot-state-
+
+      - name: Check the restored state
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESTORED_KEY: ${{ steps.state.outputs.cache-matched-key }}
+        run: |
+          if [ -n "$RESTORED_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$(gh cache list --key bot-state- --limit 1 --json key --jq length)" = "0" ]; then
+            echo "No saved state yet: starting from the copy in the repository."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            # Running on the older repository copy would repeat alerts already sent.
+            echo "::warning::The saved bot state could not be restored; skipping this pulse."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run one pulse
+        id: pulse
+        if: steps.guard.outputs.run == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           SIGNAL_TIMEFRAME: "M5"
           BOT_LOG_LEVEL: "INFO"
-        run: python src/bot_runner.py
+        run: .venv/bin/python src/bot_runner.py
 
-      - name: Save state back to the repository
+      # Saved even if the pulse failed part-way: alerts it already sent are in it.
+      - name: Save the bot's state
+        if: always() && steps.pulse.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: data/trading_engine.db
+          key: bot-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Copy the state into the repository (at most every 6 hours)
+        if: always() && steps.pulse.outcome != 'skipped'
         run: |
+          git show HEAD:data/trading_engine.db > "$RUNNER_TEMP/repo_copy.db"
+          age=$(.venv/bin/python - "$RUNNER_TEMP/repo_copy.db" <<'PY'
+          import sqlite3, sys, time
+          row = sqlite3.connect(sys.argv[1]).execute(
+              "SELECT value FROM kv_store WHERE key = 'last_pulse_wallclock'"
+          ).fetchone()
+          print(int(time.time()) - int(row[0]) if row else 10**9)
+          PY
+          )
+          if [ "$age" -lt 21600 ]; then
+            echo "Repository copy is recent enough."
+            exit 0
+          fi
           git config user.name "gold-bot"
           git config user.email "gold-bot@users.noreply.github.com"
           git add data/trading_engine.db
           if git diff --cached --quiet; then
-            echo "No state changes to commit."
             exit 0
           fi
-          git commit -m "pulse: state update [skip ci]"
+          git commit -m "pulse: state snapshot [skip ci]"
           # Retry push once after rebasing, in case a manual commit landed meanwhile.
           git push || (git pull --rebase && git push)

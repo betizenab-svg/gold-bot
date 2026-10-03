@@ -22,7 +22,7 @@ Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 - Daily floor-trader pivots (BabyPips formulas) and London-to-NY continuation as confluence inputs.
 - Telegram reasoning is a full professional trade plan: tier, context, location, liquidity story, trigger, evidence, numbers with reasons, and pre-committed if-then management.
 - Web dashboard: mission-control home (per-market watch cards with sparklines, net-R, open-positions board), performance analytics (equity curve in R, per-strategy and per-market splits, weekday-by-hour edge heatmap, outcome histogram, MFE/MAE), trade-journal CSV export, risk governor console with manual kill switch and news blackout editor, per-market state pages.
-- Hosting: runs free and permanently on GitHub Actions (docs/hosting.md) - no cPanel required. Signal timeframe is M5 (M15 for Bitcoin).
+- Hosting: runs free on GitHub Actions, started every 5 minutes by a free outside timer (docs/hosting.md) - no cPanel or card required. Signal timeframe is M5 (M15 for Bitcoin).
 
 The project remains compatible with any Linux host with cron.
 
