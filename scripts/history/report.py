@@ -407,6 +407,46 @@ def render_markdown(report: dict, evidence: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def merge_evidence(old: dict, new: dict) -> dict:
+    """Markets missing from this batch (for example after a failed download)
+    keep their previous evidence instead of being wiped."""
+    if not old:
+        return new
+    tested = set(new.get("markets") or {})
+    merged = dict(new)
+    for key in ("quiet_hours", "luck", "markets"):
+        values = {s: v for s, v in (old.get(key) or {}).items() if s not in tested and s != "ALL"}
+        values.update(new.get(key) or {})
+        merged[key] = values
+    baselines = {k: v for k, v in (old.get("baselines") or {}).items() if k.split("|")[0] not in tested}
+    baselines.update(new.get("baselines") or {})
+    merged["baselines"] = baselines
+    merged["disabled_pairs"] = [
+        p for p in old.get("disabled_pairs") or [] if p.get("symbol") not in tested
+    ] + list(new.get("disabled_pairs") or [])
+    suggested: dict = {}
+    for key, per_symbol in (old.get("suggested_settings") or {}).items():
+        kept = {s: v for s, v in per_symbol.items() if s not in tested}
+        if kept:
+            suggested[key] = kept
+    for key, per_symbol in (new.get("suggested_settings") or {}).items():
+        suggested.setdefault(key, {}).update(per_symbol)
+    merged["suggested_settings"] = suggested
+    old_check = old.get("check_window") or {}
+    new_check = dict(new.get("check_window") or {})
+    if old_check and new_check and (old_check.get("from"), old_check.get("to")) == (
+        new_check.get("from"), new_check.get("to")
+    ):
+        for field in ("net_r_after_costs", "trades"):
+            values = dict(old_check.get(field) or {})
+            values.update(new_check.get(field) or {})
+            new_check[field] = values
+        merged["check_window"] = new_check
+    elif old_check and not new_check:
+        merged["check_window"] = old_check
+    return merged
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--proof-dir", default=str(PROOF_DIR))
@@ -422,6 +462,11 @@ def main() -> int:
     (proof_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     (proof_dir / "report.md").write_text(markdown, encoding="utf-8")
     if args.write_evidence:
+        try:
+            old = json.loads(EVIDENCE_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            old = {}
+        evidence = merge_evidence(old if isinstance(old, dict) else {}, evidence)
         EVIDENCE_PATH.write_text(json.dumps(evidence, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(markdown)
     return 0

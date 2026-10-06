@@ -82,6 +82,9 @@ os.environ.update(
         "SQLITE_SYNCHRONOUS": "OFF",
         "EVIDENCE_ENABLED": "0",
         "MONTHLY_RISK_REVIEW_ENABLED": "0",
+        # Judge trial markets and strategies exactly as if they were public.
+        "PROMOTED_SYMBOLS": _SYMBOL,
+        "TRIAL_STRATEGIES": "NONE",
     }
 )
 os.environ.update(_overrides())
