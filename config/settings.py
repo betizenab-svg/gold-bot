@@ -230,6 +230,8 @@ WEEKEND_ACTION = (os.getenv("WEEKEND_ACTION") or "close").strip().lower()
 WEEKEND_EXIT_MINUTES = int(os.getenv("WEEKEND_EXIT_MINUTES") or "30")
 # Monthly risk review in the owner's chat (first run of each month).
 MONTHLY_RISK_REVIEW_ENABLED = _env_bool("MONTHLY_RISK_REVIEW_ENABLED", True)
+# Strong one-way day: "block" signals against the day's direction, or "off".
+TREND_DAY_FILTER = (os.getenv("TREND_DAY_FILTER") or "block").strip().lower()
 
 # --- Evidence ---
 # Follow every blocked/rejected idea to see what it would have done.

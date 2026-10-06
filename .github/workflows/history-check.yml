@@ -34,35 +34,39 @@ jobs:
   prepare:
     runs-on: ubuntu-24.04
     outputs:
-      symbols: ${{ steps.window.outputs.symbols }}
+      matrix: ${{ steps.window.outputs.matrix }}
       start: ${{ steps.window.outputs.start }}
       end: ${{ steps.window.outputs.end }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: Read the stored check window
         id: window
         run: |
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
+          from config.instruments import history_key
           window = {}
           try:
               window = json.load(open("config/evidence.json")).get("check_window") or {}
           except (OSError, ValueError):
               pass
-          print("symbols=" + json.dumps(sorted((window.get("net_r_after_costs") or {}).keys())))
+          symbols = sorted((window.get("net_r_after_costs") or {}).keys())
+          print("matrix=" + json.dumps({"include": [{"symbol": s, "key": history_key(s)} for s in symbols]}))
           print("start=" + window.get("from", ""))
           print("end=" + window.get("to", ""))
           PY
 
   check:
     needs: prepare
-    if: needs.prepare.outputs.symbols != '[]'
+    if: needs.prepare.outputs.start != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        symbol: ${{ fromJSON(needs.prepare.outputs.symbols) }}
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -72,9 +76,9 @@ jobs:
       - run: pip install -r requirements.txt
       - uses: actions/cache/restore@v6
         with:
-          path: data/history/${{ matrix.symbol }}
-          key: history-${{ matrix.symbol }}-check
-          restore-keys: history-${{ matrix.symbol }}-
+          path: data/history/${{ matrix.key }}
+          key: history-${{ matrix.key }}-check
+          restore-keys: history-${{ matrix.key }}-
       - name: Make sure the history is present
         run: >
           python scripts/history/fetch.py --symbols "${{ matrix.symbol }}"

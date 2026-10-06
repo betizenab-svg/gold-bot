@@ -94,6 +94,11 @@ jobs:
           BOT_PAUSED: ${{ vars.BOT_PAUSED }}
           CB_NET_PURCHASES_TONNES: ${{ vars.CB_NET_PURCHASES_TONNES }}
           CB_NET_PURCHASES_QUARTER: ${{ vars.CB_NET_PURCHASES_QUARTER }}
+          # Optional: limit the markets (default: every market with an on-time free feed),
+          # promote trial markets (e.g. US100) and trial strategies (NONE = all public).
+          SYMBOLS: ${{ vars.SYMBOLS }}
+          PROMOTED_SYMBOLS: ${{ vars.PROMOTED_SYMBOLS }}
+          TRIAL_STRATEGIES: ${{ vars.TRIAL_STRATEGIES }}
           SIGNAL_TIMEFRAME: "M5"
           BOT_LOG_LEVEL: "INFO"
         run: .venv/bin/python src/bot_runner.py

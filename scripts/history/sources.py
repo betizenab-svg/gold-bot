@@ -202,31 +202,63 @@ class BinanceSource:
         return self.parse_csv(text)
 
 
+def derive_month(symbol: str, timeframe: str, year: int, month: int) -> bool:
+    """Build a slower chart month from a faster one already stored (no download)."""
+    target = TIMEFRAME_SECONDS[timeframe]
+    for finer, seconds in sorted(TIMEFRAME_SECONDS.items(), key=lambda item: item[1]):
+        if seconds >= target or target % seconds:
+            continue
+        rows = load_month(symbol, finer, year, month)
+        if rows:
+            save_month(symbol, timeframe, year, month, resample(rows, target))
+            return True
+    return False
+
+
 def fetch_symbol(
     symbol: str,
     source: str,
     source_symbol: str,
-    timeframe: str,
+    timeframe: str | list[str],
     months: list[tuple[int, int]],
     histdata: Optional[HistDataSource] = None,
     binance: Optional[BinanceSource] = None,
     now: Optional[datetime] = None,
 ) -> int:
-    """Download every missing finished month; returns how many months were saved."""
+    """Download every missing finished month (every chart timeframe asked
+    for); returns how many month files were saved."""
+    timeframes = sorted(
+        {timeframe} if isinstance(timeframe, str) else set(timeframe),
+        key=lambda tf: TIMEFRAME_SECONDS[tf],
+    )
     moment = now or datetime.now(timezone.utc)
     finished = [m for m in months if m < (moment.year, moment.month)]
-    missing = [m for m in finished if not month_path(symbol, timeframe, *m).exists()]
-    if not missing:
-        return 0
     saved = 0
-    seconds = TIMEFRAME_SECONDS[timeframe]
+    # Slower charts are built from faster months already on disk first.
+    for tf in timeframes[1:]:
+        for year, month in finished:
+            if not month_path(symbol, tf, year, month).exists() and derive_month(symbol, tf, year, month):
+                saved += 1
+    missing = [
+        m for m in finished if any(not month_path(symbol, tf, *m).exists() for tf in timeframes)
+    ]
+    if not missing:
+        return saved
+
+    def store(year: int, month: int, rows: list[Row]) -> int:
+        count = 0
+        for tf in timeframes:
+            if not month_path(symbol, tf, year, month).exists():
+                save_month(symbol, tf, year, month, resample(rows, TIMEFRAME_SECONDS[tf]))
+                count += 1
+        return count
+
     if source == "BINANCE":
         client = binance or BinanceSource()
         for year, month in missing:
-            rows = client.fetch_month(source_symbol, timeframe, year, month)
+            rows = client.fetch_month(source_symbol, timeframes[0], year, month)
             if rows:
-                save_month(symbol, timeframe, year, month, rows)
-                saved += 1
+                saved += store(year, month, rows)
         return saved
 
     if source != "HISTDATA":
@@ -241,9 +273,8 @@ def fetch_symbol(
         else:
             pieces = [client.fetch(source_symbol, year, month) for month in wanted]
         minute_rows = sorted((row for piece in pieces for row in piece), key=lambda r: r[0])
-        for (row_year, row_month), rows in split_by_month(resample(minute_rows, seconds)).items():
+        for (row_year, row_month), rows in split_by_month(minute_rows).items():
             if row_year == year and row_month in wanted:
-                save_month(symbol, timeframe, row_year, row_month, rows)
-                saved += 1
-        logging.info("%s %s: saved %d month(s)", symbol, year, saved)
+                saved += store(row_year, row_month, rows)
+        logging.info("%s %s: saved %d month file(s)", symbol, year, saved)
     return saved

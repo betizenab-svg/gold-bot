@@ -31,6 +31,7 @@ jobs:
       start: ${{ steps.window.outputs.start }}
       end: ${{ steps.window.outputs.end }}
       symbols: ${{ steps.window.outputs.symbols }}
+      keys: ${{ steps.window.outputs.keys }}
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
@@ -45,13 +46,15 @@ jobs:
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from datetime import date
-          from config.instruments import INSTRUMENTS
+          from config.instruments import INSTRUMENTS, history_key
           today = date.today()
           last = today.year * 12 + today.month - 2
           first = last - 35
+          symbols = [s for s, i in INSTRUMENTS.items() if i.history_source]
           print(f"start={first // 12:04d}-{first % 12 + 1:02d}")
           print(f"end={last // 12:04d}-{last % 12 + 1:02d}")
-          print("symbols=" + json.dumps([s for s, i in INSTRUMENTS.items() if i.history_source]))
+          print("symbols=" + json.dumps(symbols))
+          print("keys=" + json.dumps(sorted({history_key(s) for s in symbols})))
           PY
       - name: Weekly gold positioning history (free CFTC data)
         continue-on-error: true
@@ -72,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        symbol: ${{ fromJSON(needs.prepare.outputs.symbols) }}
+        key: ${{ fromJSON(needs.prepare.outputs.keys) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -83,19 +86,19 @@ jobs:
       - name: Restore downloaded history
         uses: actions/cache/restore@v6
         with:
-          path: data/history/${{ matrix.symbol }}
-          key: history-${{ matrix.symbol }}-${{ github.run_id }}
-          restore-keys: history-${{ matrix.symbol }}-
+          path: data/history/${{ matrix.key }}
+          key: history-${{ matrix.key }}-${{ github.run_id }}
+          restore-keys: history-${{ matrix.key }}-
       - name: Download missing months (free sources)
         continue-on-error: true
         run: >
-          python scripts/history/fetch.py --symbols "${{ matrix.symbol }}"
+          python scripts/history/fetch.py --symbols "${{ matrix.key }}"
           --from "${{ needs.prepare.outputs.start }}" --to "${{ needs.prepare.outputs.end }}"
       - name: Keep the history for next time
         uses: actions/cache/save@v6
         with:
-          path: data/history/${{ matrix.symbol }}
-          key: history-${{ matrix.symbol }}-${{ github.run_id }}
+          path: data/history/${{ matrix.key }}
+          key: history-${{ matrix.key }}-${{ github.run_id }}
 
   prove:
     needs: [prepare, fetch]
@@ -115,9 +118,9 @@ jobs:
       - name: Restore downloaded history
         uses: actions/cache/restore@v6
         with:
-          path: data/history/${{ matrix.symbol }}
-          key: history-${{ matrix.symbol }}-${{ github.run_id }}
-          restore-keys: history-${{ matrix.symbol }}-
+          path: data/history/${{ matrix.key }}
+          key: history-${{ matrix.key }}-${{ github.run_id }}
+          restore-keys: history-${{ matrix.key }}-
       - name: Gold positioning history
         if: contains(matrix.args, '--cot')
         run: python scripts/history/cot.py

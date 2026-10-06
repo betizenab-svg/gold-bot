@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Optional, Sequence
 
 from config import settings as app_settings
@@ -10,7 +10,7 @@ from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING,
 from src.alerting.formatter import SignalFormatter
 from src.alerting.messenger import deliver, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
-from src.analysis.market_hours import WEEK_CLOSE_MINUTE_FRIDAY, minutes_to_weekly_close
+from src.analysis.market_hours import friday_close, minutes_to_weekly_close
 from src.analysis.outcomes import realized_r_for_event
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
@@ -271,13 +271,10 @@ class SignalLifecycleManager:
         except (TypeError, ValueError):
             return False
         now = int(current_candle.timestamp)
-        moment = datetime.fromtimestamp(now, tz=timezone.utc)
-        friday = (moment - timedelta(days=(moment.weekday() - 4) % 7)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        plan_start = int(friday.timestamp()) + (
-            WEEK_CLOSE_MINUTE_FRIDAY - int(app_settings.WEEKEND_EXIT_MINUTES)
-        ) * 60
+        close = friday_close(SignalLifecycleManager._signal_instrument(signal).symbol, now)
+        if close is None:
+            return False
+        plan_start = close - int(app_settings.WEEKEND_EXIT_MINUTES) * 60
         if plan_start > now:
             plan_start -= 7 * 86400
         return created < plan_start <= now
@@ -618,6 +615,8 @@ class SignalLifecycleManager:
         signal: Any = None,
     ) -> None:
         try:
+            if signal is not None and bool(SignalLifecycleManager._get_value(signal, "trial", default=False)):
+                return  # trial results never touch the public cooldowns and loss limits
             governor = RiskGovernor()
             event_ts = int(current_candle.timestamp)
             if event_type == "SL_HIT":

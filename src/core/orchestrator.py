@@ -20,7 +20,7 @@ from config.database import get_connection
 from src.core.logger import StructuredLogger
 from src.core.telemetry import MemoryProfiler
 from src.alerting.lifecycle_manager import LifecycleManager, SignalLifecycleManager
-from src.alerting.messenger import OutboxFlusher, deliver, notify_admin, uses_outbox
+from src.alerting.messenger import OutboxFlusher, admin_chat_id, deliver, notify_admin, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
 from src.analysis.outcomes import realized_r_for_event
 from src.analysis.crisis import CrisisDetector
@@ -38,6 +38,8 @@ from src.analysis.liquidity import LiquiditySweepDetector
 from src.analysis.mitigation import ZoneLifecycleManager
 from src.analysis.order_block import OrderBlockScanner
 from src.analysis.signal_factory import SignalFactory
+from src.analysis.trend_day import against_trend_day
+from src.strategies.range_breakout import AsianRangeBreakoutStrategy, OpeningRangeBreakoutStrategy
 from src.analysis.scoring import ScoringEngine
 from src.analysis.structure import MarketStructureEngine
 from src.ingestion.factory import (
@@ -55,7 +57,7 @@ from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
-from config.instruments import active_symbols, get_instrument, state_key
+from config.instruments import active_symbols, get_instrument, is_trial, state_key
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
     AUTO_QUARANTINE_ENABLED,
@@ -519,6 +521,11 @@ class PulseOrchestrator:
         if self._strategy_allowed(inside_bar_setup, symbol):
             return inside_bar_setup
 
+        for breakout in (OpeningRangeBreakoutStrategy(), AsianRangeBreakoutStrategy()):
+            breakout_setup = breakout.detect_setup(window)
+            if self._strategy_allowed(breakout_setup, symbol):
+                return breakout_setup
+
         try:
             order_blocks = repository.get_recent_order_blocks(symbol, limit=20)
         except Exception:
@@ -929,9 +936,10 @@ class PulseOrchestrator:
             score=total_score,
             timestamp=int(current_candle.timestamp),
         )
+        trial = is_trial(current_candle.symbol, signal.strategy)
         try:
             signal = dataclass_replace(
-                signal, price_source=price_source, code_version=CODE_VERSION
+                signal, price_source=price_source, code_version=CODE_VERSION, trial=trial
             )
         except TypeError:
             pass
@@ -945,6 +953,9 @@ class PulseOrchestrator:
 
         lifecycle_manager = self.lifecycle_manager_factory(repository)
         target_chat_id = getattr(lifecycle_manager.telegram_client, "chat_id", None)
+        if trial:
+            # Trial markets and strategies prove themselves in the owner's chat first.
+            target_chat_id = admin_chat_id() or None
         if not target_chat_id:
             logging.info(
                 "Telegram chat id not configured (including UAT routing); skipping signal dispatch for %s",
@@ -1807,7 +1818,11 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Feed health record skipped: %s", exc)
             return
-        if lag is None or lag < FEED_LAG_ALERT_MINUTES * 60 or not market_open(symbol, now):
+        if (
+            lag is None
+            or lag < FEED_LAG_ALERT_MINUTES * 60 + max(0, step - 300)
+            or not market_open(symbol, now)
+        ):
             return
         alert_key = f"feed_lag_alert_at:{symbol}"
         try:
@@ -1954,6 +1969,17 @@ class PulseOrchestrator:
                 )
                 return signals_generated, errors_encountered
 
+            if str(app_settings.TREND_DAY_FILTER).lower() == "block":
+                one_way = against_trend_day(
+                    recent_candles, str(potential_setup.get("trade_direction", ""))
+                )
+                if one_way:
+                    self._log_blocked_setup(
+                        repository, symbol, potential_setup, current_candle, one_way,
+                        levels=self._hypothetical_levels(potential_setup, recent_candles, symbol),
+                    )
+                    return signals_generated, errors_encountered
+
             permission_engine = PermissionEngine()
             macro_context = self._build_macro_permission_context(repository)
             is_permitted, permission_reason = permission_engine.is_trade_permitted(
@@ -1980,6 +2006,7 @@ class PulseOrchestrator:
                 int(current_candle.timestamp),
                 symbol=symbol,
                 direction=str(potential_setup.get("trade_direction", "")),
+                trial=is_trial(symbol, potential_setup.get("strategy")),
             )
             if not trading_allowed:
                 logging.info("Setup blocked: %s", governor_reason)

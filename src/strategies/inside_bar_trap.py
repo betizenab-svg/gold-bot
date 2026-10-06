@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from config.instruments import get_instrument
 from config.settings import INSIDE_BAR_LOOKBACK_CANDLES
 from src.domain.candle import Candle
 
@@ -68,6 +69,9 @@ class InsideBarTrapStrategy:
         entry_price: float,
         sl_price: float,
     ) -> dict[str, Any]:
+        # Each market's own decimals: 2-decimal rounding turned a GBPUSD entry
+        # of 1.31987 into 1.32.
+        nd = get_instrument(trigger_candle.symbol).price_decimals
         return {
             "symbol": trigger_candle.symbol,
             "timeframe": trigger_candle.timeframe,
@@ -75,7 +79,7 @@ class InsideBarTrapStrategy:
             "trade_direction": trade_direction,
             "order_type": "STOP",
             "trigger": trigger,
-            "entry_price": round(float(entry_price), 2),
-            "sl_price": round(float(sl_price), 2),
+            "entry_price": round(float(entry_price), nd),
+            "sl_price": round(float(sl_price), nd),
             "timestamp": int(trigger_candle.timestamp),
         }

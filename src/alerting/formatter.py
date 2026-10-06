@@ -33,6 +33,11 @@ class SignalFormatter:
                 "\u26a0\ufe0f <b>Backup prices:</b> the main price feed was down. "
                 "Check these levels against your broker's chart before entering.\n"
             )
+        if bool(self._get_value(signal_obj, "trial", default=False)):
+            backup_line = (
+                "\U0001f9ea <b>TRIAL</b> (owner only): this market or strategy is still "
+                "proving itself and is not shown to subscribers.\n"
+            ) + backup_line
 
         return (
             "\U0001f6a8 <b>Signal Alert</b>\n"

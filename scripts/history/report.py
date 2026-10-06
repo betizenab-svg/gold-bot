@@ -108,6 +108,7 @@ def reason_category(classification: str, vetoes: str) -> str:
             ("profit locked", "Daily profit lock"),
             ("news", "News pause"),
             ("quiet hour", "Quiet hour"),
+            ("one-way day", "One-way day block"),
             ("weekend", "Weekend close"),
             ("paused", "Owner pause"),
         ):

@@ -594,11 +594,12 @@ class Repository:
         )
 
     def count_signals_since(self, cutoff_timestamp: int) -> int:
+        """Public signals since the cutoff (trial signals use no public budget)."""
         row = self._fetchone(
             """
             SELECT COUNT(*)
             FROM signals
-            WHERE COALESCE(timestamp, created_at, 0) >= ?;
+            WHERE COALESCE(timestamp, created_at, 0) >= ? AND COALESCE(trial, 0) = 0;
             """,
             (int(cutoff_timestamp),),
         )

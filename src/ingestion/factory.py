@@ -7,7 +7,7 @@ from statistics import median
 from typing import Any, Callable, Dict, List, Optional
 
 from config.instruments import INSTRUMENTS
-from config.settings import PRICE_BASIS_MAX_AGE_HOURS, SPOT_FEED_ENABLED, TWELVEDATA_API_KEY
+from config.settings import PRICE_BASIS_MAX_AGE_HOURS, SPOT_FEED_ENABLED, TIMEFRAME_SECONDS, TWELVEDATA_API_KEY
 from src.domain.candle import Candle
 from src.ingestion.twelvedata import DataIngestionError as TwelveDataError
 from src.ingestion.twelvedata import TwelveDataClient
@@ -21,6 +21,7 @@ SOURCE_BACKUP = "BACKUP"
 SOURCE_YAHOO = "YAHOO"
 SOURCE_TWELVEDATA = "TWELVEDATA"
 SOURCE_NONE = "NONE"
+SOURCE_WAIT = "WAIT"
 
 BASIS_CHECK_SECONDS = 3600
 _YAHOO_INTERVALS = {"M5": "5m", "M15": "15m", "M30": "30m", "H1": "1h"}
@@ -106,7 +107,22 @@ class MarketDataRouter:
             return instrument is not None and bool(instrument.spot_source)
         return spot_feed_configured(symbol)
 
+    def _bar_due(self, symbol: str, timeframe: str) -> bool:
+        seconds = int(TIMEFRAME_SECONDS.get(timeframe, 0) or 0)
+        if seconds < 3600:
+            return True
+        try:
+            last = int(self.repository.get_kv(f"last_processed_{str(symbol).upper()}") or 0)
+        except (TypeError, ValueError):
+            return True
+        return last <= 0 or time.time() >= last + 2 * seconds
+
     def fetch_latest_candles(self, symbol: str, timeframe: str) -> List[Candle]:
+        if not self._bar_due(symbol, timeframe):
+            # Slow charts: no new closed candle can exist yet, so save the call
+            # (and TwelveData's free daily credits).
+            self.last_source[symbol] = SOURCE_WAIT
+            return []
         if self.uses_spot(symbol):
             return self._fetch_spot_market(symbol, timeframe)
 

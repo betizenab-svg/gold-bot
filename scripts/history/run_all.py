@@ -18,6 +18,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from config.instruments import INSTRUMENTS, history_key  # noqa: E402
 from scripts.history.sources import iter_months, parse_month  # noqa: E402
 
 PYTHON = sys.executable
@@ -33,6 +34,7 @@ SETTING_VARIANTS: list[tuple[str, list[str]]] = [
     ("tp2_2.0", ["--set", "TP2_R=2.0"]),  # where the second half is taken
     ("entry_market", ["--set", "ENTRY_MODE=market"]),  # enter now instead of waiting
     ("expiry_180", ["--set", "SIGNAL_EXPIRY_MINUTES=180"]),  # wait longer for the entry
+    ("trendday_off", ["--set", "TREND_DAY_FILTER=off"]),  # does the one-way-day block help?
 ]
 
 Job = tuple[str, str, list[str], str, str]
@@ -47,6 +49,8 @@ def jobs(symbols: list[str], start: str, end: str) -> list[Job]:
     for symbol in symbols:
         batch.append((symbol, "check", [], check_start, end))
     for symbol in symbols:
+        if INSTRUMENTS.get(symbol) is not None and INSTRUMENTS[symbol].trial:
+            continue  # trial markets first have to pass at all; settings come later
         for variant, extra in SETTING_VARIANTS:
             batch.append((symbol, variant, list(extra), start, end))
     if "XAUUSD" in symbols and COT_FILE.exists():
@@ -92,7 +96,7 @@ def main() -> int:
         batch = [job for job in batch if job[1] in wanted]
     if args.matrix:
         print(json.dumps({"include": [
-            {"symbol": s, "variant": v, "args": " ".join(extra), "from": a, "to": b}
+            {"symbol": s, "key": history_key(s), "variant": v, "args": " ".join(extra), "from": a, "to": b}
             for s, v, extra, a, b in batch
         ]}))
         return 0

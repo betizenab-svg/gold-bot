@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
+from config.instruments import get_instrument, scaled_buffer, scaled_proximity
 from config.settings import ENTRY_BUFFER_PTS, TIMEFRAME_SECONDS
 from src.domain.candle import Candle
 
@@ -41,12 +42,12 @@ class QuasimodoStrategy:
 
         bearish = self._detect_bearish(highs, lows, current, max_age_seconds)
         if bearish is not None and self._shoulder_at_zone(
-            float(bearish["entry_price"]), active_zones, "BEARISH"
+            float(bearish["entry_price"]), active_zones, "BEARISH", current.symbol
         ):
             return bearish
         bullish = self._detect_bullish(highs, lows, current, max_age_seconds)
         if bullish is not None and self._shoulder_at_zone(
-            float(bullish["entry_price"]), active_zones, "BULLISH"
+            float(bullish["entry_price"]), active_zones, "BULLISH", current.symbol
         ):
             return bullish
         return None
@@ -56,11 +57,13 @@ class QuasimodoStrategy:
         shoulder_price: float,
         active_zones: Optional[List[dict[str, Any]]],
         wanted: str,
+        symbol: Optional[str] = None,
     ) -> bool:
         """Book spec (RTM): the QM shoulder must coincide with a mapped
         supply/demand zone — without it the pattern overfires (replay-proven)."""
         if not isinstance(active_zones, list):
             return False
+        proximity = scaled_proximity(symbol, self.ZONE_PROXIMITY_USD)
         for zone in active_zones:
             if str(zone.get("status", "")).upper() not in {"ACTIVE", "UNMITIGATED"}:
                 continue
@@ -72,7 +75,7 @@ class QuasimodoStrategy:
             except (KeyError, TypeError, ValueError):
                 continue
             low, high = min(top, bottom), max(top, bottom)
-            if low - self.ZONE_PROXIMITY_USD <= shoulder_price <= high + self.ZONE_PROXIMITY_USD:
+            if low - proximity <= shoulder_price <= high + proximity:
                 return True
         return False
 
@@ -116,8 +119,11 @@ class QuasimodoStrategy:
         if close >= neckline["price"] or close >= sh1["price"]:
             return None
 
-        entry = round(float(sh1["price"]), 2)
-        sl = round(float(sh2["price"]) + self.entry_buffer_pts, 2)
+        nd = get_instrument(current.symbol).price_decimals
+        buffer = scaled_buffer(current.symbol, self.entry_buffer_pts)
+
+        entry = round(float(sh1["price"]), nd)
+        sl = round(float(sh2["price"]) + buffer, nd)
         return {
             "symbol": current.symbol,
             "timeframe": current.timeframe,
@@ -152,8 +158,10 @@ class QuasimodoStrategy:
         if close <= neckline["price"] or close <= sl1["price"]:
             return None
 
-        entry = round(float(sl1["price"]), 2)
-        stop = round(float(sl2["price"]) - self.entry_buffer_pts, 2)
+        nd = get_instrument(current.symbol).price_decimals
+        buffer = scaled_buffer(current.symbol, self.entry_buffer_pts)
+        entry = round(float(sl1["price"]), nd)
+        stop = round(float(sl2["price"]) - buffer, nd)
         return {
             "symbol": current.symbol,
             "timeframe": current.timeframe,

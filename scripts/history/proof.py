@@ -112,10 +112,18 @@ class _MonthFeed:
 
 
 def _candles(year: int, month: int) -> list[Candle]:
-    return [
+    from config.instruments import history_key
+    from src.analysis.market_hours import market_open
+
+    instrument = _get_instrument(_SYMBOL)
+    candles = [
         Candle(_SYMBOL, _TIMEFRAME, ts, o, h, low, c, v)
-        for ts, o, h, low, c, v in load_month(_SYMBOL, _TIMEFRAME, year, month)
+        for ts, o, h, low, c, v in load_month(history_key(_SYMBOL), _TIMEFRAME, year, month)
     ]
+    if instrument.cash_session:
+        # Live prices for US indices exist only in the New York session.
+        candles = [c for c in candles if market_open(_SYMBOL, c.timestamp)]
+    return candles
 
 
 def _load_cot(path: str) -> list[tuple[int, str]]:

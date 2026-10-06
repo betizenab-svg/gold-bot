@@ -9,7 +9,7 @@ profile so existing behaviour (and tests) are unchanged.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True)
@@ -47,6 +47,30 @@ class Instrument:
     trial: bool = False  # True = signals go to the owner's chat only
     history_source: str = ""  # "HISTDATA" | "BINANCE": free multi-year history for tests
     history_symbol: str = ""  # name at the history source
+    base_symbol: str = ""  # swing versions share the real market's prices and history
+    cash_session: bool = False  # prices only in the New York cash session (US indices)
+    # False = no free price feed that is on time: history tests only, never live.
+    live_feed: bool = True
+
+
+def _swing(base: "Instrument", timeframe: str, prefix: str, scale: float) -> "Instrument":
+    """Slower signals on the same market: own chart timeframe, own memory
+    (zones, swings), wider distances, starting in trial."""
+    label = {"H1": "1-hour swing", "H4": "4-hour swing"}[timeframe]
+    return replace(
+        base,
+        symbol=f"{base.symbol}_{timeframe}",
+        display_name=f"{base.display_name} {label}",
+        signal_timeframe=timeframe,
+        min_stop_abs=base.min_stop_abs * scale,
+        entry_buffer=base.entry_buffer * scale,
+        zone_proximity=base.zone_proximity * scale,
+        pivot_tolerance_floor=base.pivot_tolerance_floor * scale,
+        london_min_net=base.london_min_net * scale,
+        code_prefix=prefix,
+        trial=True,
+        base_symbol=base.symbol,
+    )
 
 
 INSTRUMENTS: dict[str, Instrument] = {
@@ -170,7 +194,233 @@ INSTRUMENTS: dict[str, Instrument] = {
         history_source="HISTDATA",
         history_symbol="GBPUSD",
     ),
+    # --- Trial markets: signals go to the owner's chat until they prove themselves ---
+    "XAGUSD": Instrument(
+        symbol="XAGUSD",
+        display_name="Silver",
+        # Yahoo's silver is futures, 10 minutes late; TwelveData spot silver is paid.
+        yahoo_ticker="SI=F",
+        asset_class="metal",
+        price_decimals=3,
+        round_grid=0.50,
+        round_buffer=0.03,
+        min_stop_abs=0.09,
+        pip_size=0.01,
+        pip_value_per_lot=50.0,
+        lot_note="1.00 lot = 5,000 oz = $50 per 0.01 move (check your broker)",
+        weekend_trading=False,
+        session_scored=True,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=0.03,
+        london_min_net=0.015,
+        requires_volume=False,
+        entry_buffer=0.015,
+        zone_proximity=0.03,
+        typical_spread=0.025,
+        slippage=0.005,
+        news_currencies=("USD",),
+        usd_exposure=-1,
+        code_prefix="S",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="XAGUSD",
+        live_feed=False,
+    ),
+    "US100": Instrument(
+        symbol="US100",
+        display_name="US100 (Nasdaq)",
+        yahoo_ticker="^NDX",  # the cash index, live during the New York session
+        asset_class="index",
+        price_decimals=1,
+        round_grid=50.0,
+        round_buffer=3.0,
+        min_stop_abs=24.0,
+        pip_size=1.0,
+        pip_value_per_lot=1.0,
+        lot_note="1.00 lot = $1 per point (many brokers; check yours)",
+        weekend_trading=False,
+        session_scored=False,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=8.0,
+        london_min_net=4.0,
+        requires_volume=False,
+        entry_buffer=4.0,
+        zone_proximity=8.0,
+        typical_spread=1.5,
+        slippage=0.5,
+        news_currencies=("USD",),
+        code_prefix="N",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="NSXUSD",
+        cash_session=True,
+    ),
+    # The Dow (US30) has no free multi-year history to test on; the S&P 500 does.
+    "US500": Instrument(
+        symbol="US500",
+        display_name="US500 (S&P 500)",
+        yahoo_ticker="^GSPC",
+        asset_class="index",
+        price_decimals=1,
+        round_grid=25.0,
+        round_buffer=1.0,
+        min_stop_abs=5.0,
+        pip_size=1.0,
+        pip_value_per_lot=1.0,
+        lot_note="1.00 lot = $1 per point (many brokers; check yours)",
+        weekend_trading=False,
+        session_scored=False,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=1.7,
+        london_min_net=0.8,
+        requires_volume=False,
+        entry_buffer=0.8,
+        zone_proximity=1.7,
+        typical_spread=0.5,
+        slippage=0.2,
+        news_currencies=("USD",),
+        code_prefix="U",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="SPXUSD",
+        cash_session=True,
+    ),
+    "USDJPY": Instrument(
+        symbol="USDJPY",
+        display_name="Dollar/Yen",
+        yahoo_ticker="JPY=X",
+        asset_class="fx",
+        price_decimals=3,
+        round_grid=0.50,
+        round_buffer=0.03,
+        min_stop_abs=0.08,
+        pip_size=0.01,
+        pip_value_per_lot=6.3,
+        lot_note="1.00 lot = about $6.30 per pip at 158 (changes with the price)",
+        weekend_trading=False,
+        session_scored=True,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=0.04,
+        london_min_net=0.08,
+        requires_volume=False,
+        entry_buffer=0.02,
+        zone_proximity=0.15,
+        typical_spread=0.010,
+        slippage=0.003,
+        news_currencies=("USD", "JPY"),
+        usd_exposure=1,
+        code_prefix="J",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="USDJPY",
+    ),
+    "AUDUSD": Instrument(
+        symbol="AUDUSD",
+        display_name="Aussie dollar",
+        yahoo_ticker="AUDUSD=X",
+        asset_class="fx",
+        price_decimals=5,
+        round_grid=0.0050,
+        round_buffer=0.0003,
+        min_stop_abs=0.0008,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        lot_note="1.00 lot = $10 per pip",
+        weekend_trading=False,
+        session_scored=True,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=0.0004,
+        london_min_net=0.0008,
+        requires_volume=False,
+        entry_buffer=0.0002,
+        zone_proximity=0.0015,
+        typical_spread=0.00012,
+        slippage=0.00003,
+        news_currencies=("USD", "AUD"),
+        usd_exposure=-1,
+        code_prefix="A",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="AUDUSD",
+    ),
+    "WTIUSD": Instrument(
+        symbol="WTIUSD",
+        display_name="Oil (WTI)",
+        # Yahoo's oil is futures, 10 minutes late; TwelveData spot oil is paid.
+        yahoo_ticker="CL=F",
+        asset_class="energy",
+        price_decimals=2,
+        round_grid=1.0,
+        round_buffer=0.05,
+        min_stop_abs=0.20,
+        pip_size=0.01,
+        pip_value_per_lot=10.0,
+        lot_note="1.00 lot = 1,000 barrels = $10 per 0.01 move (check your broker)",
+        weekend_trading=False,
+        session_scored=True,
+        macro_gold_filters=False,
+        pivot_roll="ny17",
+        pivot_tolerance_floor=0.07,
+        london_min_net=0.03,
+        requires_volume=False,
+        entry_buffer=0.03,
+        zone_proximity=0.07,
+        signal_timeframe="M15",
+        typical_spread=0.03,
+        slippage=0.01,
+        news_currencies=("USD",),
+        code_prefix="O",
+        trial=True,
+        history_source="HISTDATA",
+        history_symbol="WTIUSD",
+        live_feed=False,
+    ),
+    "ETHUSD": Instrument(
+        symbol="ETHUSD",
+        display_name="Ethereum",
+        yahoo_ticker="ETH-USD",
+        asset_class="crypto",
+        price_decimals=2,
+        round_grid=50.0,
+        round_buffer=2.0,
+        min_stop_abs=6.0,
+        pip_size=1.0,
+        pip_value_per_lot=1.0,
+        lot_note="1.00 lot = 1 ETH | $1 per $1 move",
+        weekend_trading=True,
+        session_scored=False,
+        macro_gold_filters=False,
+        pivot_roll="utc0",
+        pivot_tolerance_floor=1.6,
+        london_min_net=4.0,
+        requires_volume=False,
+        entry_buffer=1.0,
+        zone_proximity=12.0,
+        signal_timeframe="M15",
+        typical_spread=2.0,
+        slippage=0.5,
+        news_currencies=("USD",),
+        code_prefix="H",
+        trial=True,
+        history_source="BINANCE",
+        history_symbol="ETHUSDT",
+    ),
 }
+
+# Slower swing signals for people who cannot watch every 5 minutes.
+for _base, _timeframe, _prefix, _scale in (
+    ("XAUUSD", "H1", "GH", 3.5),
+    ("XAUUSD", "H4", "GF", 7.0),
+    ("EURUSD", "H1", "EH", 3.5),
+    ("GBPUSD", "H1", "PH", 3.5),
+):
+    _swing_instrument = _swing(INSTRUMENTS[_base], _timeframe, _prefix, _scale)
+    INSTRUMENTS[_swing_instrument.symbol] = _swing_instrument
 
 _DEFAULT = INSTRUMENTS["XAUUSD"]
 
@@ -183,8 +433,11 @@ def get_instrument(symbol: str | None) -> Instrument:
 
 
 def active_symbols() -> list[str]:
-    """Symbols the pulse trades, from the SYMBOLS env (comma-separated)."""
-    raw = os.getenv("SYMBOLS", "XAUUSD,BTCUSD,EURUSD,GBPUSD")
+    """Symbols the pulse trades, from the SYMBOLS env (comma-separated).
+    Default: every market with a free, on-time price feed (trials included)."""
+    raw = os.getenv("SYMBOLS") or ",".join(
+        name for name, instrument in INSTRUMENTS.items() if instrument.live_feed
+    )
     seen: list[str] = []
     for part in raw.split(","):
         name = part.strip().upper()
@@ -194,6 +447,33 @@ def active_symbols() -> list[str]:
 
 
 ACTIVE_SYMBOLS: list[str] = active_symbols()
+
+
+def history_key(symbol: str | None) -> str:
+    """Name the stored history files use: swing versions share the real market's."""
+    instrument = get_instrument(symbol)
+    return instrument.base_symbol or instrument.symbol
+
+
+def _env_set(name: str) -> set[str]:
+    return {part.strip().upper() for part in (os.getenv(name) or "").split(",") if part.strip()}
+
+
+# New strategies start in trial too. GitHub variable TRIAL_STRATEGIES replaces
+# this list; the value NONE promotes every strategy.
+DEFAULT_TRIAL_STRATEGIES = "OPENING_RANGE_BREAKOUT,ASIAN_RANGE_BREAKOUT"
+
+
+def is_trial(symbol: str | None, strategy: str | None = None) -> bool:
+    """Trial signals go to the owner's chat only and are kept out of the
+    public results until promoted (GitHub variables PROMOTED_SYMBOLS and
+    TRIAL_STRATEGIES)."""
+    instrument = get_instrument(symbol)
+    if instrument.trial and instrument.symbol not in _env_set("PROMOTED_SYMBOLS"):
+        return True
+    raw = (os.getenv("TRIAL_STRATEGIES") or DEFAULT_TRIAL_STRATEGIES).strip().upper()
+    trial_strategies = set() if raw == "NONE" else {s.strip() for s in raw.split(",") if s.strip()}
+    return bool(strategy) and str(strategy).upper() in trial_strategies
 
 
 def state_key(base: str, symbol: str | None) -> str:

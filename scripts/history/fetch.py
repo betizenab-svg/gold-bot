@@ -16,8 +16,19 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from config.instruments import INSTRUMENTS  # noqa: E402
+from config.instruments import INSTRUMENTS, history_key  # noqa: E402
 from scripts.history.sources import fetch_symbol, iter_months, parse_month  # noqa: E402
+
+
+def timeframes_for(key: str) -> list[str]:
+    """Every chart timeframe used by the markets sharing this history."""
+    return sorted(
+        {
+            instrument.signal_timeframe or "M5"
+            for instrument in INSTRUMENTS.values()
+            if history_key(instrument.symbol) == key
+        }
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,24 +42,28 @@ def main(argv: list[str] | None = None) -> int:
 
     months = iter_months(parse_month(args.start), parse_month(args.end))
     failed: list[str] = []
+    keys: list[str] = []
     for symbol in [s.strip().upper() for s in args.symbols.split(",") if s.strip()]:
-        instrument = INSTRUMENTS.get(symbol)
+        key = history_key(symbol) if symbol in INSTRUMENTS else symbol
+        if key not in keys:
+            keys.append(key)
+    for key in keys:
+        instrument = INSTRUMENTS.get(key)
         if instrument is None or not instrument.history_source:
-            logging.warning("%s has no free history source; skipped", symbol)
+            logging.warning("%s has no free history source; skipped", key)
             continue
-        timeframe = instrument.signal_timeframe or "M5"
         for attempt in range(1, args.attempts + 1):
             try:
                 saved = fetch_symbol(
-                    symbol, instrument.history_source, instrument.history_symbol, timeframe, months
+                    key, instrument.history_source, instrument.history_symbol, timeframes_for(key), months
                 )
-                logging.info("%s: %d new month(s) saved", symbol, saved)
+                logging.info("%s: %d new month file(s) saved", key, saved)
                 break
             except Exception as exc:
-                logging.warning("%s attempt %d failed: %s", symbol, attempt, exc)
+                logging.warning("%s attempt %d failed: %s", key, attempt, exc)
                 time.sleep(30 * attempt)
         else:
-            failed.append(symbol)
+            failed.append(key)
     if failed:
         logging.error("History download failed for: %s", ", ".join(failed))
         return 1

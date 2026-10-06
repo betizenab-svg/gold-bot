@@ -88,7 +88,10 @@ class RiskGovernor:
         now_ts: int,
         symbol: Optional[str] = None,
         direction: Optional[str] = None,
+        trial: bool = False,
     ) -> tuple[bool, str]:
+        """Trial signals (owner's chat only) skip the public risk budgets but
+        still respect the pause switches, the weekend close and news."""
         now_ts = int(now_ts)
 
         if settings.BOT_PAUSED:
@@ -101,9 +104,14 @@ class RiskGovernor:
         except Exception as exc:
             logging.debug("Risk governor pause check skipped: %s", exc)
 
+        if trial:
+            return self._trial_checks(repository, now_ts, symbol)
+
         try:
-            open_signals = repository.get_open_signals()
-            if isinstance(open_signals, list) and len(open_signals) >= self.max_concurrent_signals:
+            open_signals = [
+                s for s in repository.get_open_signals() if not getattr(s, "trial", False)
+            ]
+            if len(open_signals) >= self.max_concurrent_signals:
                 return False, (
                     f"Risk governor: {len(open_signals)} signals already open "
                     f"(max {self.max_concurrent_signals})"
@@ -119,6 +127,8 @@ class RiskGovernor:
                 if group:
                     open_signals = repository.get_open_signals()
                     for open_signal in open_signals if isinstance(open_signals, list) else []:
+                        if getattr(open_signal, "trial", False):
+                            continue
                         open_symbol = getattr(open_signal, "symbol", None)
                         if not isinstance(open_symbol, str) or not open_symbol:
                             continue
@@ -142,13 +152,9 @@ class RiskGovernor:
         if dollar_reason:
             return False, dollar_reason
 
-        if symbol and str(settings.WEEKEND_ACTION).lower() in {"close", "breakeven"}:
-            remaining = minutes_to_weekly_close(symbol, now_ts)
-            if remaining is not None and remaining <= WEEKEND_NO_NEW_MINUTES:
-                return False, (
-                    "Risk governor: the market closes for the weekend in "
-                    f"{remaining} min; no new trades"
-                )
+        weekend = self._weekend_reason(symbol, now_ts)
+        if weekend:
+            return False, weekend
 
         try:
             day_start = now_ts - (now_ts % 86400)
@@ -207,6 +213,25 @@ class RiskGovernor:
             return False, blackout_reason
 
         return True, "Risk governor: trading allowed"
+
+    def _weekend_reason(self, symbol: Optional[str], now_ts: int) -> Optional[str]:
+        if symbol and str(settings.WEEKEND_ACTION).lower() in {"close", "breakeven"}:
+            remaining = minutes_to_weekly_close(symbol, now_ts)
+            if remaining is not None and remaining <= WEEKEND_NO_NEW_MINUTES:
+                return (
+                    "Risk governor: the market closes for the weekend in "
+                    f"{remaining} min; no new trades"
+                )
+        return None
+
+    def _trial_checks(self, repository: Any, now_ts: int, symbol: Optional[str]) -> tuple[bool, str]:
+        weekend = self._weekend_reason(symbol, now_ts)
+        if weekend:
+            return False, weekend
+        blackout_reason = self._news_blackout_reason(repository, now_ts, symbol)
+        if blackout_reason:
+            return False, blackout_reason
+        return True, "Risk governor: trial signal allowed"
 
     @staticmethod
     def _weekly_r(repository: Any, now_ts: int) -> Optional[float]:

@@ -15,6 +15,7 @@ SOURCE_LABELS = {
     "YAHOO": "Yahoo",
     "TWELVEDATA": "TwelveData (Yahoo down)",
     "NONE": "no prices (skipped)",
+    "WAIT": "waiting for the next candle",
 }
 
 
@@ -81,7 +82,51 @@ def build_daily_check(repository: Any, now: Optional[int] = None) -> str:
     if setups:
         lines.append("")
         lines.append("Last ideas: " + " | ".join(setups))
+    trials = trial_scorecard(repository)
+    if trials:
+        lines.append("")
+        lines.append("<b>Trials</b> (owner only, after costs)")
+        lines.extend(trials)
     return "\n".join(lines)
+
+
+TRIAL_READY_TRADES = 30
+
+
+def trial_scorecard(repository: Any) -> list[str]:
+    """One line per trial market/strategy: trades, result after costs, and
+    whether it has earned a place in the public channel."""
+    from config import settings
+    from src.analysis.evidence import cost_in_r, summarize
+    from src.analysis.outcomes import row_r
+
+    rows = repository.query(
+        "SELECT symbol, COALESCE(strategy, 'UNKNOWN'), status, realized_r, "
+        "COALESCE(entry_price, entry), COALESCE(sl_price, sl) FROM signals "
+        "WHERE COALESCE(trial, 0) = 1 AND status LIKE 'CLOSED%';"
+    )
+    groups: dict[tuple[str, str], list[float]] = {}
+    for symbol, strategy, status, realized, entry, sl in rows:
+        value = row_r(status, realized)
+        if value is None:
+            continue
+        cost = cost_in_r(str(symbol), entry, sl, bool(settings.SPREAD_CUSHION_ENABLED))
+        groups.setdefault((str(symbol), str(strategy)), []).append(float(value) - cost)
+    lines = []
+    for (symbol, strategy), values in sorted(groups.items()):
+        stats = summarize(values)
+        ready = (
+            stats["trades"] >= TRIAL_READY_TRADES
+            and stats["net_r"] > 0
+            and (stats.get("profit_factor") or 0) >= 1.1
+        )
+        lines.append(
+            f"\u2022 {html.escape(get_instrument(symbol).display_name)} / "
+            f"{html.escape(strategy.replace('_', ' ').title())}: {stats['trades']} trades, "
+            f"{stats['net_r']:+.1f}R"
+            + (" \u2705 ready to go public" if ready else "")
+        )
+    return lines
 
 
 def run_detail(feed: dict[str, Any]) -> str:
