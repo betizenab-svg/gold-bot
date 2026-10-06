@@ -7,16 +7,26 @@ from typing import Any, List, Optional
 
 import requests
 
+from config.instruments import INSTRUMENTS
 from config.settings import NEWS_CALENDAR_URL
 
 
+def traded_currencies() -> set[str]:
+    """Every currency whose news matters to at least one market."""
+    currencies: set[str] = set()
+    for instrument in INSTRUMENTS.values():
+        currencies.update(c.upper() for c in instrument.news_currencies)
+    return currencies or {"USD"}
+
+
 class NewsCalendarClient:
-    """Fetch this week's high-impact USD events from the free ForexFactory
-    JSON feed so the news blackout runs hands-free."""
+    """Fetch this week's high-impact events (US dollar, euro, pound, ...)
+    from the free ForexFactory JSON feed so the news pause runs hands-free."""
 
-    MAX_EVENTS = 50
+    MAX_EVENTS = 80
 
-    def fetch_high_impact_events(self) -> List[dict[str, Any]]:
+    def fetch_high_impact_events(self, currencies: Optional[set[str]] = None) -> List[dict[str, Any]]:
+        wanted = {c.upper() for c in (currencies or traded_currencies())}
         response = requests.get(
             NEWS_CALENDAR_URL,
             timeout=15,
@@ -35,7 +45,7 @@ class NewsCalendarClient:
                 continue
             country = str(item.get("country", "")).upper()
             impact = str(item.get("impact", "")).upper()
-            if country != "USD" or impact != "HIGH":
+            if country not in wanted or impact != "HIGH":
                 continue
             timestamp = self._parse_date(item.get("date"))
             if timestamp is None:
@@ -44,6 +54,7 @@ class NewsCalendarClient:
                 {
                     "timestamp": timestamp,
                     "label": str(item.get("title", "high-impact event"))[:80],
+                    "currency": country,
                 }
             )
 
@@ -100,5 +111,5 @@ def refresh_news_blackouts(repository: Any, now_ts: int) -> int:
         existing_raw if isinstance(existing_raw, str) else None, fetched, now_ts
     )
     repository.set_kv("upcoming_news_events_json", json.dumps(merged))
-    logging.info("News calendar refreshed: %d upcoming high-impact USD events", len(merged))
+    logging.info("News calendar refreshed: %d upcoming high-impact events", len(merged))
     return len(merged)

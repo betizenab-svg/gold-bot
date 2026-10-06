@@ -1,0 +1,83 @@
+name: History check
+
+# Any change to strategy or trade-handling code is replayed over the latest
+# months of real history and compared with the stored result. A clearly worse
+# result fails this check before the change can hurt live trading.
+
+on:
+  push:
+    paths:
+      - "src/analysis/**"
+      - "src/strategies/**"
+      - "src/core/orchestrator.py"
+      - "src/alerting/lifecycle_manager.py"
+      - "config/settings.py"
+      - "config/instruments.py"
+  pull_request:
+    paths:
+      - "src/analysis/**"
+      - "src/strategies/**"
+      - "src/core/orchestrator.py"
+      - "src/alerting/lifecycle_manager.py"
+      - "config/settings.py"
+      - "config/instruments.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: history-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      symbols: ${{ steps.window.outputs.symbols }}
+      start: ${{ steps.window.outputs.start }}
+      end: ${{ steps.window.outputs.end }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the stored check window
+        id: window
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          window = {}
+          try:
+              window = json.load(open("config/evidence.json")).get("check_window") or {}
+          except (OSError, ValueError):
+              pass
+          print("symbols=" + json.dumps(sorted((window.get("net_r_after_costs") or {}).keys())))
+          print("start=" + window.get("from", ""))
+          print("end=" + window.get("to", ""))
+          PY
+
+  check:
+    needs: prepare
+    if: needs.prepare.outputs.symbols != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: ${{ fromJSON(needs.prepare.outputs.symbols) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - uses: actions/cache/restore@v6
+        with:
+          path: data/history/${{ matrix.symbol }}
+          key: history-${{ matrix.symbol }}-check
+          restore-keys: history-${{ matrix.symbol }}-
+      - name: Make sure the history is present
+        run: >
+          python scripts/history/fetch.py --symbols "${{ matrix.symbol }}"
+          --from "${{ needs.prepare.outputs.start }}" --to "${{ needs.prepare.outputs.end }}"
+      - name: Replay with this change and compare
+        run: python scripts/history/check.py --symbols "${{ matrix.symbol }}"

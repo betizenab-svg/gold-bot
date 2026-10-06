@@ -13,3 +13,7 @@ sprint*_result.txt
 # Copyrighted reference material - never publish
 books/
 data/replay_report.json
+
+# Downloaded price history and proof-engine working files (rebuilt on demand)
+data/history/
+data/proof/

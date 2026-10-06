@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from config import settings as app_settings
 from config.instruments import get_instrument
 from config.settings import (
     ACTIVE_MAX_HOLD_HOURS,
@@ -28,6 +29,22 @@ def risk_fraction_for_score(score: int) -> float:
     if CONVICTION_SIZING_ENABLED and int(score) >= 85:
         return base * 2.0
     return base
+
+
+def spread_cushion(symbol: str) -> float:
+    """Broker spread added to every price that is filled on the ask side.
+
+    Charts show the bid. A buy is filled at the ask and a sell position is
+    closed at the ask, so buy entries and the stops and targets of sells sit
+    one spread further away; they then trigger when the chart itself reaches
+    the level."""
+    if not app_settings.SPREAD_CUSHION_ENABLED:
+        return 0.0
+    return float(get_instrument(symbol).typical_spread)
+
+
+def market_entry_requested(zone_dict: dict[str, Any]) -> bool:
+    return app_settings.ENTRY_MODE == "market" and zone_dict.get("market_price") is not None
 
 
 class SignalFactory:
@@ -159,12 +176,14 @@ class SignalFactory:
                 lines.append(f"- {note}")
 
         risk = abs(entry - sl)
+        tp1_r = float(app_settings.TP1_R)
+        tp2_r = float(app_settings.TP2_R)
         lines.append(
             f"Numbers: entry {entry:.{nd}f} ({order_type}) | SL {sl:.{nd}f} "
             f"(structure + ATR floor, round numbers cleared, risk {risk:.{nd}f}) | "
-            f"TP1 {tp1:.{nd}f} (1.5R, bank half) | TP2 {tp2:.{nd}f} "
-            f"({'measured-move capped' if zone_dict.get('measured_move') else '3R'}) | "
-            "blended 2.25R if both targets pay"
+            f"TP1 {tp1:.{nd}f} ({tp1_r:g}R, bank half) | TP2 {tp2:.{nd}f} "
+            f"({'measured-move capped' if zone_dict.get('measured_move') else f'{tp2_r:g}R'}) | "
+            f"blended {(tp1_r + tp2_r) / 2:g}R if both targets pay"
         )
 
         risk_bits = []
@@ -211,27 +230,42 @@ class SignalFactory:
                 sl = price_top + (ATR_SL_MULTIPLIER * atr_value)
 
         # Enforce a minimum stop distance so normal noise cannot wick out the trade.
+        if market_entry_requested(zone_dict):
+            # Tested alternative: enter now at the signal close instead of
+            # waiting for a pullback that often never comes.
+            entry = float(zone_dict["market_price"])
         min_risk = self._minimum_risk(atr, symbol)
         sl = self._clear_round_number(direction, sl, symbol)
+        tp1_r = float(app_settings.TP1_R)
+        tp2_r = float(app_settings.TP2_R)
         if direction == "LONG":
             risk = entry - sl
             if 0 < risk < min_risk:
                 sl = entry - min_risk
                 risk = min_risk
-            tp1 = entry + (1.5 * risk)
-            tp2 = entry + (3.0 * risk)
+            tp1 = entry + (tp1_r * risk)
+            tp2 = entry + (tp2_r * risk)
         else:
             risk = sl - entry
             if 0 < risk < min_risk:
                 sl = entry + min_risk
                 risk = min_risk
-            tp1 = entry - (1.5 * risk)
-            tp2 = entry - (3.0 * risk)
+            tp1 = entry - (tp1_r * risk)
+            tp2 = entry - (tp2_r * risk)
 
         if risk <= 0:
             raise ValueError("Signal risk must be positive")
 
         tp2 = self._cap_tp2_at_measured_move(direction, entry, tp1, tp2, zone_dict, atr)
+
+        cushion = spread_cushion(symbol)
+        if cushion:
+            if direction == "LONG":
+                entry += cushion
+            else:
+                sl += cushion
+                tp1 += cushion
+                tp2 += cushion
 
         nd = get_instrument(symbol).price_decimals
         return (
@@ -276,12 +310,16 @@ class SignalFactory:
         zone_id = zone_dict.get("id", zone_dict.get("zone_id"))
         strategy_key: Optional[str] = zone_dict.get("strategy")
         nd = get_instrument(symbol).price_decimals
+        dedupe_entry = entry
+        if market_entry_requested(zone_dict) and zone_dict.get("entry_price") is not None:
+            # A market entry moves with every candle; the setup itself must not re-fire.
+            dedupe_entry = float(zone_dict["entry_price"])
         dedupe_target = zone_id
         if dedupe_target is None:
             dedupe_target = (
-                f"{strategy_key}|{round(entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
+                f"{strategy_key}|{round(dedupe_entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
                 if strategy_key is not None
-                else f"{round(entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
+                else f"{round(dedupe_entry, nd):.{nd}f}|{round(sl, nd):.{nd}f}"
             )
         # Date from the signal candle (not wall clock) so a pending setup
         # cannot re-fire as a "new" signal across the midnight rollover.
@@ -292,6 +330,9 @@ class SignalFactory:
         order_type = str(zone_dict.get("order_type", "LIMIT")).upper()
         if order_type not in {"STOP", "LIMIT"}:
             order_type = "LIMIT"
+        status = "PENDING"
+        if market_entry_requested(zone_dict):
+            order_type, status = "MARKET", "ACTIVE"
 
         return Signal(
             symbol=symbol,
@@ -305,6 +346,7 @@ class SignalFactory:
             timestamp=int(timestamp),
             signal_hash=signal_hash,
             order_type=order_type,
+            status=status,
             strategy=str(strategy_key) if strategy_key is not None else None,
             risk_pct=round(risk_fraction * 100.0, 3),
         )

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from config import settings
 from config.instruments import get_instrument
+from src.analysis.market_hours import minutes_to_weekly_close
 from config.settings import (
     NEWS_BLACKOUT_AFTER_MIN,
     NEWS_BLACKOUT_BEFORE_MIN,
@@ -24,6 +26,23 @@ KV_CONSECUTIVE_SL_COUNT = "risk_consecutive_sl_count"
 KV_DAILY_R_DATE = "risk_daily_r_date"
 KV_DAILY_R_VALUE = "risk_daily_r_value"
 KV_NEWS_EVENTS = "upcoming_news_events_json"
+
+# No new trades this close to Friday's close when the weekend plan is on.
+WEEKEND_NO_NEW_MINUTES = 120
+
+
+def week_start(now_ts: int) -> int:
+    """Monday 00:00 UTC of the week containing now_ts."""
+    day_start = int(now_ts) - (int(now_ts) % 86400)
+    weekday = datetime.fromtimestamp(day_start, tz=timezone.utc).weekday()
+    return day_start - weekday * 86400
+
+
+def event_currency(event: Any) -> str:
+    """Events without a currency (older rows, owner-added) count as US news."""
+    if isinstance(event, dict):
+        return str(event.get("currency") or "USD").upper()
+    return "USD"
 
 
 def _safe_int(raw_value: Any, default: int = 0) -> int:
@@ -119,6 +138,18 @@ class RiskGovernor:
             except Exception as exc:
                 logging.debug("Risk governor correlation check skipped: %s", exc)
 
+        dollar_reason = self._same_dollar_bet_reason(repository, symbol, direction)
+        if dollar_reason:
+            return False, dollar_reason
+
+        if symbol and str(settings.WEEKEND_ACTION).lower() in {"close", "breakeven"}:
+            remaining = minutes_to_weekly_close(symbol, now_ts)
+            if remaining is not None and remaining <= WEEKEND_NO_NEW_MINUTES:
+                return False, (
+                    "Risk governor: the market closes for the weekend in "
+                    f"{remaining} min; no new trades"
+                )
+
         try:
             day_start = now_ts - (now_ts % 86400)
             todays_signals = repository.count_signals_since(day_start)
@@ -164,13 +195,76 @@ class RiskGovernor:
                     "protecting the day"
                 )
 
-        blackout_reason = self._news_blackout_reason(repository, now_ts)
+        weekly_r = self._weekly_r(repository, now_ts)
+        if weekly_r is not None and weekly_r <= -abs(float(settings.RISK_WEEKLY_MAX_LOSS_R)):
+            return False, (
+                f"Risk governor: weekly loss brake ({weekly_r:+.2f}R this week); "
+                "new signals resume on Monday"
+            )
+
+        blackout_reason = self._news_blackout_reason(repository, now_ts, symbol)
         if blackout_reason:
             return False, blackout_reason
 
         return True, "Risk governor: trading allowed"
 
-    def _news_blackout_reason(self, repository: Any, now_ts: int) -> Optional[str]:
+    @staticmethod
+    def _weekly_r(repository: Any, now_ts: int) -> Optional[float]:
+        try:
+            results = repository.get_closed_results_since(week_start(now_ts))
+        except Exception:
+            return None
+        if not isinstance(results, list):
+            return None
+        total = 0.0
+        for row in results:
+            try:
+                total += float(row[2])
+            except (TypeError, ValueError, IndexError):
+                continue
+        return round(total, 4)
+
+    @staticmethod
+    def _same_dollar_bet_reason(
+        repository: Any, symbol: Optional[str], direction: Optional[str]
+    ) -> Optional[str]:
+        """Gold, EUR and GBP all move against the US dollar: buying any of them
+        is partly the same bet. Cap how many run at once the same way."""
+        if not symbol or not direction:
+            return None
+        try:
+            exposure = get_instrument(symbol).usd_exposure
+            if not exposure:
+                return None
+            wanted = exposure * (1 if str(direction).upper() == "LONG" else -1)
+            open_signals = repository.get_open_signals()
+            same = 0
+            for open_signal in open_signals if isinstance(open_signals, list) else []:
+                if getattr(open_signal, "trial", False):
+                    continue
+                open_symbol = getattr(open_signal, "symbol", None)
+                if not isinstance(open_symbol, str) or not open_symbol:
+                    continue
+                open_exposure = get_instrument(open_symbol).usd_exposure
+                if not open_exposure:
+                    continue
+                open_direction = str(getattr(open_signal, "signal_type", "") or "").upper()
+                if open_exposure * (1 if open_direction == "LONG" else -1) == wanted:
+                    same += 1
+            limit = int(settings.RISK_MAX_SAME_USD_BET)
+            if same >= limit:
+                side = "against" if wanted < 0 else "on"
+                return (
+                    f"Risk governor: same dollar bet already open ({same} trades already bet "
+                    f"{side} the US dollar; max {limit})"
+                )
+        except Exception as exc:
+            logging.debug("Risk governor dollar check skipped: %s", exc)
+        return None
+
+    def _news_blackout_reason(
+        self, repository: Any, now_ts: int, symbol: Optional[str] = None
+    ) -> Optional[str]:
         try:
             raw = repository.get_kv(KV_NEWS_EVENTS)
         except Exception:
@@ -184,7 +278,10 @@ class RiskGovernor:
         if not isinstance(events, list):
             return None
 
+        currencies = set(get_instrument(symbol).news_currencies) if symbol else None
         for event in events:
+            if currencies is not None and event_currency(event) not in currencies:
+                continue
             if isinstance(event, dict):
                 event_ts = _safe_int(event.get("timestamp"), default=-1)
             else:

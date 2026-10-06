@@ -121,6 +121,12 @@ class SignalFormatter:
         elif normalized_type == "STRUCTURE_EXIT":
             alert_message = "🔀 <b>Structure Exit</b>\nTrend flipped; runner closed with TP1 already banked."
             explanation_title = "Reason"
+        elif normalized_type == "WEEKEND_CANCEL":
+            alert_message = "📅 <b>Order Withdrawn</b>\nThe market closes for the weekend soon; this order will not open."
+            explanation_title = "Reason"
+        elif normalized_type in {"WEEKEND_CLOSE", "WEEKEND_RUNNER_CLOSE"}:
+            alert_message = "📅 <b>Closed Before The Weekend</b>\nClose this trade now; prices can jump when the market reopens."
+            explanation_title = "Reason"
         else:
             raise ValueError(f"Unsupported lifecycle update type: {update_type}")
 

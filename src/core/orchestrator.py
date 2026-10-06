@@ -2,6 +2,7 @@
 # pyright: reportMissingImports=false
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from typing import Any, Callable, List, Optional, cast
 import numpy as np
 import pandas as pd
 
+from config import settings as app_settings
 from config.database import get_connection
 from src.core.logger import StructuredLogger
 from src.core.telemetry import MemoryProfiler
@@ -28,6 +30,7 @@ from src.analysis.cot_index import CotAnalyzer
 from src.analysis.consensus import SurpriseFactorEngine
 from src.analysis.atr import ATREngine
 from src.analysis.displacement import DisplacementEngine
+from src.analysis.evidence import baseline as evidence_baseline, disabled_pair, load_evidence, quiet_hour
 from src.analysis.filters import PermissionEngine
 from src.analysis.fractals import FractalDetector
 from src.analysis.fvg import FVGScanner
@@ -437,7 +440,7 @@ class PulseOrchestrator:
 
         return None
 
-    def _strategy_allowed(self, setup: Optional[dict[str, Any]]) -> bool:
+    def _strategy_allowed(self, setup: Optional[dict[str, Any]], symbol: Optional[str] = None) -> bool:
         if setup is None:
             return False
         strategy = str(setup.get("strategy", "")).upper()
@@ -446,6 +449,9 @@ class PulseOrchestrator:
             return False
         if strategy and strategy in self._extra_disabled:
             logging.info("Setup from auto-quarantined strategy skipped: %s", strategy)
+            return False
+        if strategy and symbol and disabled_pair(symbol, strategy):
+            logging.info("Setup skipped: %s on %s loses in history tests", strategy, symbol)
             return False
         return True
 
@@ -491,26 +497,26 @@ class PulseOrchestrator:
         swing_history: Optional[dict[str, Any]],
     ) -> Optional[dict[str, Any]]:
         pin_bar_setup = PinBarRejectionStrategy().detect_setup(window, active_zones)
-        if self._strategy_allowed(pin_bar_setup):
+        if self._strategy_allowed(pin_bar_setup, symbol):
             return pin_bar_setup
 
         engulfing_setup = EngulfingZoneStrategy().detect_setup(window, active_zones)
-        if self._strategy_allowed(engulfing_setup):
+        if self._strategy_allowed(engulfing_setup, symbol):
             return engulfing_setup
 
         pullback_setup = PullbackH2L2Strategy().detect_setup(window)
-        if self._strategy_allowed(pullback_setup):
+        if self._strategy_allowed(pullback_setup, symbol):
             return pullback_setup
 
         if isinstance(swing_history, dict):
             quasimodo_setup = QuasimodoStrategy().detect_setup(
                 window, swing_history, active_zones
             )
-            if self._strategy_allowed(quasimodo_setup):
+            if self._strategy_allowed(quasimodo_setup, symbol):
                 return quasimodo_setup
 
         inside_bar_setup = InsideBarTrapStrategy().detect_setup(window)
-        if self._strategy_allowed(inside_bar_setup):
+        if self._strategy_allowed(inside_bar_setup, symbol):
             return inside_bar_setup
 
         try:
@@ -525,6 +531,8 @@ class PulseOrchestrator:
             trade_direction = self._zone_bounce_direction(bounce_candle, zone)
             if trade_direction is None:
                 continue
+            if disabled_pair(symbol, "ZONE_BOUNCE"):
+                return None
             return {
                 "trade_direction": trade_direction,
                 "strategy": "ZONE_BOUNCE",
@@ -886,9 +894,11 @@ class PulseOrchestrator:
             return None
         try:
             atr_value = ATREngine().calculate_atr(recent_candles[-15:], period=14)
+            context = self._signal_context(potential_setup)
+            context["market_price"] = float(recent_candles[-1].close)
             return SignalFactory().calculate_parameters(
                 str(potential_setup.get("trade_direction", "")),
-                self._signal_context(potential_setup),
+                context,
                 atr_value,
                 symbol,
             )
@@ -907,6 +917,7 @@ class PulseOrchestrator:
         zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
         trade_direction = str(potential_setup["trade_direction"])
         signal_context = self._signal_context(potential_setup)
+        signal_context["market_price"] = float(current_candle.close)
 
         signal_factory = SignalFactory()
         atr_value = ATREngine().calculate_atr(recent_candles[-15:], period=14)
@@ -1454,6 +1465,146 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Strategy quarantine check skipped: %s", exc)
 
+    def _maybe_check_live_vs_history(self, repository: Repository) -> None:
+        """Weekly: warn the owner when a strategy's live results fall clearly
+        below what years of history predict (it may be wearing out). Live
+        results are before costs and history after costs, so only a clear drop
+        is flagged."""
+        now = int(time.time())
+        try:
+            if now - int(repository.get_kv("history_drift_check_at") or 0) < 7 * 86400:
+                return
+        except (TypeError, ValueError):
+            pass
+        try:
+            baselines = load_evidence().get("baselines") or {}
+            if not baselines:
+                return
+            repository.set_kv("history_drift_check_at", str(now))
+            groups: dict[str, list[float]] = {}
+            for strategy, symbol, r_value in repository.get_closed_results_since(now - 60 * 86400):
+                groups.setdefault(f"{str(symbol).upper()}|{str(strategy).upper()}", []).append(float(r_value))
+            flagged = []
+            for key, values in groups.items():
+                symbol, strategy = key.split("|", 1)
+                base = evidence_baseline(symbol, strategy)
+                if len(values) < 10 or not base or int(base.get("trades") or 0) < 30:
+                    continue
+                live_mean = sum(values) / len(values)
+                floor = float(base.get("expectancy_r") or 0.0) - 2.0 * float(base.get("std_r") or 0.0) / (len(values) ** 0.5)
+                if live_mean < floor:
+                    flagged.append(
+                        f"\u2022 {strategy} on {symbol}: {live_mean:+.2f}R per trade live over {len(values)} "
+                        f"trades vs {float(base['expectancy_r']):+.2f}R in history"
+                    )
+            if flagged:
+                notify_admin(
+                    "\U0001f4c9 <b>Live results below history</b>\n" + "\n".join(flagged)
+                    + "\n<i>Not switched off automatically; the monthly history proof decides.</i>",
+                    repository=repository,
+                    telegram_client=self.telegram_client_factory(),
+                )
+        except Exception as exc:
+            logging.debug("Live-vs-history check skipped: %s", exc)
+
+    def _maybe_send_monthly_risk_review(self, repository: Repository) -> None:
+        """First run of each month: last month's worst day, worst losing
+        streak and biggest loss against the plan, in the owner's chat."""
+        if not app_settings.MONTHLY_RISK_REVIEW_ENABLED:
+            return
+        moment = datetime.now(timezone.utc)
+        year, month = (moment.year, moment.month - 1) if moment.month > 1 else (moment.year - 1, 12)
+        label = f"{year:04d}-{month:02d}"
+        try:
+            if repository.get_kv("monthly_risk_review_month") == label:
+                return
+            from src.alerting.owner_reports import build_monthly_risk_review
+
+            message = build_monthly_risk_review(repository, year, month)
+            repository.set_kv("monthly_risk_review_month", label)
+            if message:
+                notify_admin(
+                    message, repository=repository, telegram_client=self.telegram_client_factory()
+                )
+        except Exception as exc:
+            logging.debug("Monthly risk review skipped: %s", exc)
+
+    def _reply_once(
+        self, repository: Repository, signal: Any, key: str, text: str
+    ) -> None:
+        """Threaded reply under a signal card, sent at most once per key."""
+        if repository.get_kv(key):
+            return
+        try:
+            message_id = int(repository.get_signal_message_id(signal.signal_hash))
+        except (KeyError, TypeError, ValueError):
+            return
+        repository.set_kv(key, str(int(time.time())))
+        client = self.telegram_client_factory()
+        try:
+            deliver(
+                client, repository, text,
+                chat_id=getattr(signal, "telegram_chat_id", None),
+                reply_to_message_id=message_id, kind="reply", signal_hash=signal.signal_hash,
+            )
+        except (TelegramAPIError, ValueError) as exc:
+            logging.error("Trade notice not delivered (queued): %s", exc)
+
+    def _notify_open_trades(self, repository: Repository, symbol: str, current_candle: Candle) -> None:
+        """Warn holders of this market's open trades before high-impact news
+        for its currencies, and tell them the weekend plan when it applies."""
+        try:
+            open_signals = [
+                s for s in repository.get_open_signals()
+                if str(s.symbol).upper() == symbol.upper() and str(s.status).upper() in {"ACTIVE", "PARTIAL_TP1"}
+            ]
+        except Exception as exc:
+            logging.debug("Open-trade notices skipped: %s", exc)
+            return
+        if not open_signals:
+            return
+        from src.alerting.timefmt import eat_time
+        from src.analysis.risk_governor import KV_NEWS_EVENTS, event_currency
+
+        now = int(time.time())
+        warn_seconds = int(app_settings.NEWS_WARN_MINUTES) * 60
+        events: list[dict[str, Any]] = []
+        if warn_seconds > 0:
+            try:
+                raw = repository.get_kv(KV_NEWS_EVENTS)
+                parsed = json.loads(raw) if isinstance(raw, str) and raw else []
+                currencies = set(get_instrument(symbol).news_currencies)
+                events = [
+                    e for e in parsed if isinstance(e, dict)
+                    and event_currency(e) in currencies
+                    and 0 < int(e.get("timestamp", 0)) - now <= warn_seconds
+                ]
+            except (TypeError, ValueError):
+                events = []
+        nd = get_instrument(symbol).price_decimals
+        for signal in open_signals:
+            for event in events:
+                event_ts = int(event["timestamp"])
+                minutes = max(1, (event_ts - now) // 60)
+                self._reply_once(
+                    repository, signal, f"news_warned:{signal.signal_hash}:{event_ts}",
+                    f"\u26a0\ufe0f <b>Big news in {minutes} min</b> ({eat_time(event_ts)}): "
+                    f"{html.escape(str(event.get('label') or 'high-impact news'))} "
+                    f"({event_currency(event)}).\nThis trade is still open. Prices can jump: "
+                    f"consider closing it or moving the stop to entry (<code>{float(signal.entry_price):.{nd}f}</code>).",
+                )
+            if (
+                str(app_settings.WEEKEND_ACTION).lower() == "breakeven"
+                and str(signal.status).upper() == "ACTIVE"
+                and SignalLifecycleManager._held_into_weekend(signal, current_candle)
+            ):
+                self._reply_once(
+                    repository, signal, f"weekend_be:{signal.signal_hash}",
+                    "\U0001f6e1\ufe0f <b>Weekend plan</b>: move your stop to entry "
+                    f"(<code>{float(signal.entry_price):.{nd}f}</code>). The trade stays open "
+                    "over the weekend with no risk left at the normal price.",
+                )
+
     def _maybe_send_daily_status(self, repository: Repository) -> None:
         """The owner's daily check: how many runs happened, which price feeds
         were used and how late, signals sent, and any warning signs."""
@@ -1733,6 +1884,7 @@ class PulseOrchestrator:
             repository.set_kv("last_processed_timestamp", latest_timestamp)
         current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
         errors_encountered += self._monitor_open_signals(repository, valid_candles)
+        self._notify_open_trades(repository, symbol, current_candle)
         self._update_shadow_outcomes(repository, symbol, valid_candles)
         self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
 
@@ -1794,6 +1946,14 @@ class PulseOrchestrator:
             new_candle_count=len(valid_candles),
         )
         if potential_setup is not None:
+            if quiet_hour(symbol, int(current_candle.timestamp)):
+                self._log_blocked_setup(
+                    repository, symbol, potential_setup, current_candle,
+                    "Quiet hour: history tests show this hour loses for this market",
+                    levels=self._hypothetical_levels(potential_setup, recent_candles, symbol),
+                )
+                return signals_generated, errors_encountered
+
             permission_engine = PermissionEngine()
             macro_context = self._build_macro_permission_context(repository)
             is_permitted, permission_reason = permission_engine.is_trade_permitted(
@@ -2116,6 +2276,8 @@ class PulseOrchestrator:
             self._maybe_refresh_news_calendar(repository)
             self._maybe_send_weekly_report(repository)
             self._maybe_update_strategy_quarantine(repository)
+            self._maybe_check_live_vs_history(repository)
+            self._maybe_send_monthly_risk_review(repository)
             self._maybe_send_daily_status(repository)
         except Exception:
             errors_encountered += 1

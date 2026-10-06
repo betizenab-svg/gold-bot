@@ -86,3 +86,80 @@ def build_daily_check(repository: Any, now: Optional[int] = None) -> str:
 
 def run_detail(feed: dict[str, Any]) -> str:
     return json.dumps(feed, separators=(",", ":"))
+
+
+def month_bounds(year: int, month: int) -> tuple[int, int]:
+    from datetime import datetime, timezone
+
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    end = datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=timezone.utc)
+    return int(start.timestamp()), int(end.timestamp())
+
+
+def build_monthly_risk_review(repository: Any, year: int, month: int) -> Optional[str]:
+    """Worst day, worst losing streak and biggest loss against the plan (1R)."""
+    from datetime import datetime, timezone
+
+    from config import settings
+    from src.analysis.evidence import load_evidence
+    from src.analysis.luck_test import longest_losing_streak, max_drawdown
+    from src.analysis.outcomes import row_r
+
+    start, end = month_bounds(year, month)
+    rows = repository.query(
+        "SELECT symbol, strategy, status, realized_r, COALESCE(closed_at, timestamp) FROM signals "
+        "WHERE status LIKE 'CLOSED%' AND COALESCE(trial, 0) = 0 "
+        "AND COALESCE(closed_at, timestamp) >= ? AND COALESCE(closed_at, timestamp) < ? "
+        "ORDER BY COALESCE(closed_at, timestamp), id;",
+        (start, end),
+    )
+    trades = []
+    for symbol, strategy, status, realized, closed in rows:
+        value = row_r(status, realized)
+        if value is not None:
+            trades.append((str(symbol), str(strategy or "UNKNOWN"), float(value), int(closed)))
+    label = datetime(year, month, 1, tzinfo=timezone.utc).strftime("%B %Y")
+    if not trades:
+        return f"\U0001f4cb <b>Risk review, {label}</b>\nNo finished trades this month."
+
+    results = [t[2] for t in trades]
+    by_day: dict[str, float] = {}
+    for _symbol, _strategy, value, closed in trades:
+        day = datetime.fromtimestamp(closed, tz=timezone.utc).strftime("%Y-%m-%d")
+        by_day[day] = by_day.get(day, 0.0) + value
+    worst_day, worst_day_r = min(by_day.items(), key=lambda item: item[1])
+    limit_days = sum(1 for v in by_day.values() if v <= -abs(float(settings.RISK_DAILY_MAX_LOSS_R)))
+    worst = min(trades, key=lambda t: t[2])
+    streak = longest_losing_streak(results)
+    dip = max_drawdown(results)
+
+    luck = (load_evidence().get("luck") or {}).get("ALL") or {}
+    lines = [
+        f"\U0001f4cb <b>Risk review, {label}</b>",
+        f"Finished trades: <b>{len(trades)}</b> | result: <b>{sum(results):+.2f}R</b>",
+        f"Worst day: {worst_day} ({worst_day_r:+.2f}R)"
+        + (f" | daily loss limit reached on {limit_days} day(s)" if limit_days else ""),
+        f"Longest losing streak: {streak}"
+        + (
+            f" (history: up to {luck['bad_luck_losing_streak']} with bad luck)"
+            if luck.get("bad_luck_losing_streak") is not None
+            else ""
+        ),
+        f"Deepest dip: {dip:.2f}R"
+        + (
+            f" (history: up to {luck['bad_luck_max_drawdown_r']}R with bad luck)"
+            if luck.get("bad_luck_max_drawdown_r") is not None
+            else ""
+        ),
+    ]
+    overshoot = -1.0 - worst[2]
+    if overshoot > 0.05:
+        lines.append(
+            f"\u26a0\ufe0f Biggest loss: {worst[2]:+.2f}R on {html.escape(worst[0])} ({html.escape(worst[1])}), "
+            f"{overshoot:.2f}R worse than the planned 1R (price jumped past the stop)."
+        )
+    else:
+        lines.append(f"Biggest loss: {worst[2]:+.2f}R, within the planned 1R.")
+    if luck.get("bad_luck_losing_streak") is not None and streak > int(luck["bad_luck_losing_streak"]):
+        lines.append("\u26a0\ufe0f The losing streak is longer than history allows for bad luck: review before continuing.")
+    return "\n".join(lines)

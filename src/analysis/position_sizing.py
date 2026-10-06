@@ -7,6 +7,14 @@ class LotSizeCalculator:
     """Dynamic position sizing using a fixed-risk model (per-instrument pips)."""
 
     ACCOUNT_BALANCES = [50, 100, 200, 500, 700, 1000, 2000, 5000, 10000, 50000]
+    QUICK_BALANCES = (100, 500, 1000)
+    MIN_LOT = 0.01
+    # Flag a balance when the smallest lot risks this many times the plan.
+    OVER_RISK_FACTOR = 1.5
+    MIN_LOT_NOTE = (
+        "⚠ = even the smallest lot (0.01) risks more than planned on this balance: "
+        "skip the trade or use a cent account."
+    )
     RISK_PERCENT = 0.02
     BASELINE_BALANCE = 100
     PIP_MULTIPLIER = 10.0
@@ -36,6 +44,32 @@ class LotSizeCalculator:
         risk_amount = float(balance) * float(risk_pct)
         lot_size = risk_amount / (pip_distance * pip_value)
         return round(max(lot_size, 0.01), 2)
+
+    def actual_risk_pct(self, balance: float, pips: float, lot: float, symbol: str = "XAUUSD") -> float:
+        """Share of the balance really at risk with this lot."""
+        pip_value = get_instrument(symbol).pip_value_per_lot
+        return 100.0 * float(lot) * float(pips) * pip_value / float(balance)
+
+    def quick_lots(
+        self, entry_price: float, sl_price: float, risk_pct: float, symbol: str = "XAUUSD"
+    ) -> list[dict]:
+        """Lots for $100, $500 and $1,000 accounts, with the real risk."""
+        pips = self.calculate_pips(entry_price, sl_price, symbol)
+        if pips <= 0:
+            return []
+        rows = []
+        for balance in self.QUICK_BALANCES:
+            lot = self.calculate_lot_size(balance, pips, risk_pct, symbol)
+            actual = self.actual_risk_pct(balance, pips, lot, symbol)
+            rows.append(
+                {
+                    "balance": balance,
+                    "lot": lot,
+                    "risk_pct": round(actual, 1),
+                    "too_big": actual > float(risk_pct) * 100.0 * self.OVER_RISK_FACTOR,
+                }
+            )
+        return rows
 
     def generate_table(
         self,
@@ -67,12 +101,17 @@ class LotSizeCalculator:
             "-------   --------",
         ]
         pre_lines_from_baseline: list[str] = []
+        flagged = False
 
         for balance in self.ACCOUNT_BALANCES:
             lot_size = self.calculate_lot_size(
                 balance=balance, pips=pips, risk_pct=risk_pct, symbol=symbol
             )
             row = f"${balance:<7} {lot_size:.2f}"
+            actual = self.actual_risk_pct(balance, pips, lot_size, symbol)
+            if actual > float(risk_pct) * 100.0 * self.OVER_RISK_FACTOR:
+                row += f" ⚠ {actual:.1f}%"
+                flagged = True
             if balance < self.BASELINE_BALANCE:
                 pre_lines_before_baseline.append(row)
             else:
@@ -81,10 +120,11 @@ class LotSizeCalculator:
         before_block = "<pre>" + "\n".join(pre_lines_before_baseline) + "</pre>"
         baseline_block = "<pre>" + "\n".join(pre_lines_from_baseline) + "</pre>"
         risk_label = f"{risk_pct * 100:g}%"
+        note = f"\n<i>{self.MIN_LOT_NOTE}</i>" if flagged else ""
         return (
             f"{self.LEGACY_BASELINE_TEXT}\n"
             f"<i>{risk_label} risk model for {instrument.symbol} | {instrument.lot_note}</i>\n"
             f"{before_block}\n"
             f"{self.BASELINE_NOTE}\n"
-            f"{baseline_block}"
+            f"{baseline_block}{note}"
         )

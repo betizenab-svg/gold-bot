@@ -21,6 +21,7 @@ CLOSED_STATUSES = (
     "CLOSED_SL",
     "CLOSED_TIME",
     "CLOSED_STRUCT",
+    "CLOSED_WEEKEND",
 )
 
 # Only for rows written before realized_r existed and without enough detail.
@@ -30,6 +31,7 @@ STATUS_R_FALLBACK = {
     "CLOSED_SL": -1.0,
     "CLOSED_TIME": 0.0,
     "CLOSED_STRUCT": 1.0,
+    "CLOSED_WEEKEND": 0.0,
 }
 
 EARLY_BE_MARKER = "then returned to entry"
@@ -53,28 +55,38 @@ def realized_r_for_event(
     sl: float,
     tp2: float,
     exit_price: Optional[float] = None,
+    tp1: Optional[float] = None,
 ) -> Optional[float]:
-    """Exact R for a closing lifecycle event; None for events that do not close a trade."""
+    """Exact R for a closing lifecycle event; None for events that do not close a trade.
+
+    `tp1` gives the half banked at TP1 from the real level (spread cushions and
+    tested target settings move it); without it the classic 1.5R is assumed."""
     risk = _risk(entry, sl)
     if risk <= 0:
         return None
+    banked = BANKED_AT_TP1
+    if tp1 is not None:
+        try:
+            banked = TP1_SHARE * _move_r(direction, entry, float(tp1), risk)
+        except (TypeError, ValueError):
+            banked = BANKED_AT_TP1
     event = str(event_type).upper()
     if event == "SL_HIT":
         return -1.0
     if event == "EARLY_BE":
         return 0.0
     if event == "BE_HIT":
-        return BANKED_AT_TP1
+        return round(banked, 4)
     if event == "TP2_SMASH":
-        return round(BANKED_AT_TP1 + TP1_SHARE * _move_r(direction, entry, tp2, risk), 4)
-    if event == "TIME_STOP":
+        return round(banked + TP1_SHARE * _move_r(direction, entry, tp2, risk), 4)
+    if event in {"TIME_STOP", "WEEKEND_CLOSE"}:
         if exit_price is None:
             return 0.0
         return round(_move_r(direction, entry, exit_price, risk), 4)
-    if event == "STRUCTURE_EXIT":
+    if event in {"STRUCTURE_EXIT", "WEEKEND_RUNNER_CLOSE"}:
         if exit_price is None:
-            return BANKED_AT_TP1
-        return round(BANKED_AT_TP1 + TP1_SHARE * _move_r(direction, entry, exit_price, risk), 4)
+            return round(banked, 4)
+        return round(banked + TP1_SHARE * _move_r(direction, entry, exit_price, risk), 4)
     return None
 
 

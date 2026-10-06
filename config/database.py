@@ -13,4 +13,7 @@ def get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("PRAGMA busy_timeout=3000;")
+    # History runs rebuild everything from checkpoints, so they skip disk flushes.
+    if os.getenv("SQLITE_SYNCHRONOUS", "").upper() in {"OFF", "NORMAL"}:
+        conn.execute(f"PRAGMA synchronous={os.environ['SQLITE_SYNCHRONOUS'].upper()};")
     return conn

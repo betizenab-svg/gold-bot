@@ -45,9 +45,8 @@ class Instrument:
     usd_exposure: int = 0  # LONG = -1 short dollar, +1 long dollar, 0 = not a dollar bet
     code_prefix: str = ""  # short signal code, e.g. G -> #G142
     trial: bool = False  # True = signals go to the owner's chat only
-    history_source: str = ""  # "DUKASCOPY" | "BINANCE" for multi-year tests
+    history_source: str = ""  # "HISTDATA" | "BINANCE": free multi-year history for tests
     history_symbol: str = ""  # name at the history source
-    history_price_scale: float = 0.0  # Dukascopy integer price divisor
 
 
 INSTRUMENTS: dict[str, Instrument] = {
@@ -78,9 +77,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         news_currencies=("USD",),
         usd_exposure=-1,
         code_prefix="G",
-        history_source="DUKASCOPY",
+        history_source="HISTDATA",
         history_symbol="XAUUSD",
-        history_price_scale=1000.0,
     ),
     "BTCUSD": Instrument(
         symbol="BTCUSD",
@@ -139,9 +137,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         news_currencies=("USD", "EUR"),
         usd_exposure=-1,
         code_prefix="E",
-        history_source="DUKASCOPY",
+        history_source="HISTDATA",
         history_symbol="EURUSD",
-        history_price_scale=100000.0,
     ),
     "GBPUSD": Instrument(
         symbol="GBPUSD",
@@ -170,9 +167,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         news_currencies=("USD", "GBP"),
         usd_exposure=-1,
         code_prefix="P",
-        history_source="DUKASCOPY",
+        history_source="HISTDATA",
         history_symbol="GBPUSD",
-        history_price_scale=100000.0,
     ),
 }
 

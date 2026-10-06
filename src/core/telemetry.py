@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover - Windows
 
 
 class MemoryProfiler:
-    def __init__(self, warning_threshold_mb: float = 100.0) -> None:
+    def __init__(self, warning_threshold_mb: float = 400.0) -> None:
         self.warning_threshold_mb = warning_threshold_mb
         self._started_at: Optional[float] = None
 

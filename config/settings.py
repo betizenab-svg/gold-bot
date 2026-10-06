@@ -205,6 +205,32 @@ CB_NET_PURCHASES_QUARTER = (os.getenv("CB_NET_PURCHASES_QUARTER") or "").strip()
 RISK_PER_TRADE_PCT = float(os.getenv("RISK_PER_TRADE_PCT") or "1.0")
 CONVICTION_SIZING_ENABLED = _env_bool("CONVICTION_SIZING_ENABLED", False)
 
+# --- Trade handling (tested by the history proof) ---
+# Targets in R: half the position is banked at TP1, the rest runs to TP2.
+TP1_R = float(os.getenv("TP1_R") or "1.5")
+TP2_R = float(os.getenv("TP2_R") or "3.0")
+# Entry method: "limit" waits for the pullback to the zone; "market" enters at
+# the signal candle's close (no missed entries, but a wider stop).
+ENTRY_MODE = (os.getenv("ENTRY_MODE") or "limit").strip().lower()
+# Widen the levels a broker's spread can trigger early (short stops and
+# targets, long limit entries) so subscribers are not stopped by the spread.
+SPREAD_CUSHION_ENABLED = _env_bool("SPREAD_CUSHION_ENABLED", True)
+# No new signals for the rest of the week (from Monday 00:00 UTC) after this loss.
+RISK_WEEKLY_MAX_LOSS_R = float(os.getenv("RISK_WEEKLY_MAX_LOSS_R") or "6.0")
+# Gold, EUR and GBP move together against the US dollar: at most this many
+# open at once that bet the same way on the dollar.
+RISK_MAX_SAME_USD_BET = int(os.getenv("RISK_MAX_SAME_USD_BET") or "2")
+# Reply to open trades this many minutes before high-impact news for their market.
+NEWS_WARN_MINUTES = int(os.getenv("NEWS_WARN_MINUTES") or "30")
+# Friday plan for markets that close at the weekend, in the last
+# WEEKEND_EXIT_MINUTES before the close: "close" every open trade and pending
+# order, "breakeven" (close losing trades; winners keep running with the stop
+# at entry), or "off".
+WEEKEND_ACTION = (os.getenv("WEEKEND_ACTION") or "close").strip().lower()
+WEEKEND_EXIT_MINUTES = int(os.getenv("WEEKEND_EXIT_MINUTES") or "30")
+# Monthly risk review in the owner's chat (first run of each month).
+MONTHLY_RISK_REVIEW_ENABLED = _env_bool("MONTHLY_RISK_REVIEW_ENABLED", True)
+
 # --- Evidence ---
 # Follow every blocked/rejected idea to see what it would have done.
 SHADOW_TRACKING_ENABLED = _env_bool("SHADOW_TRACKING_ENABLED", True)

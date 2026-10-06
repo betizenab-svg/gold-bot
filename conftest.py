@@ -37,3 +37,10 @@ os.environ.setdefault("DASHBOARD_PASSWORD", "test-password")
 os.environ.setdefault("TWELVEDATA_API_KEY", "")
 os.environ.setdefault("TELEGRAM_ADMIN_CHAT_ID", "")
 os.environ.setdefault("HEALTHCHECK_PING_URL", "")
+# Tests must not depend on the committed history evidence (quiet hours etc.).
+os.environ.setdefault("EVIDENCE_ENABLED", "0")
+# Legacy suites pin exact chart-level prices and weekday timings; the spread
+# cushion and the Friday weekend plan have their own dedicated tests.
+os.environ.setdefault("SPREAD_CUSHION_ENABLED", "0")
+os.environ.setdefault("WEEKEND_ACTION", "off")
+os.environ.setdefault("MONTHLY_RISK_REVIEW_ENABLED", "0")

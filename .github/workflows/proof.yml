@@ -1,0 +1,172 @@
+name: History proof
+
+# Once a month (and whenever the proof engine itself changes): replay the real
+# strategy code over the last three years of free history, after trading
+# costs, and refresh config/evidence.json (switched-off losers, quiet hours,
+# baselines for the live-vs-history check). Suggested setting changes are sent
+# to the owner and never applied automatically.
+
+on:
+  schedule:
+    - cron: "0 3 8 * *" # 8th of each month, 03:00 UTC (last month's free file is out by then)
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "scripts/history/**"
+      - ".github/workflows/proof.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: history-proof
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      start: ${{ steps.window.outputs.start }}
+      end: ${{ steps.window.outputs.end }}
+      symbols: ${{ steps.window.outputs.symbols }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Pick the last 36 complete months and the markets to test
+        id: window
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from datetime import date
+          from config.instruments import INSTRUMENTS
+          today = date.today()
+          last = today.year * 12 + today.month - 2
+          first = last - 35
+          print(f"start={first // 12:04d}-{first % 12 + 1:02d}")
+          print(f"end={last // 12:04d}-{last % 12 + 1:02d}")
+          print("symbols=" + json.dumps([s for s, i in INSTRUMENTS.items() if i.history_source]))
+          PY
+      - name: Weekly gold positioning history (free CFTC data)
+        continue-on-error: true
+        run: python scripts/history/cot.py
+      - name: Build the job list
+        id: matrix
+        env:
+          SYMBOLS: ${{ steps.window.outputs.symbols }}
+        run: |
+          list=$(python -c "import json, os; print(','.join(json.loads(os.environ['SYMBOLS'])))")
+          echo "matrix=$(python scripts/history/run_all.py --symbols "$list" \
+            --from "${{ steps.window.outputs.start }}" --to "${{ steps.window.outputs.end }}" --matrix)" >> "$GITHUB_OUTPUT"
+
+  fetch:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: ${{ fromJSON(needs.prepare.outputs.symbols) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Restore downloaded history
+        uses: actions/cache/restore@v6
+        with:
+          path: data/history/${{ matrix.symbol }}
+          key: history-${{ matrix.symbol }}-${{ github.run_id }}
+          restore-keys: history-${{ matrix.symbol }}-
+      - name: Download missing months (free sources)
+        continue-on-error: true
+        run: >
+          python scripts/history/fetch.py --symbols "${{ matrix.symbol }}"
+          --from "${{ needs.prepare.outputs.start }}" --to "${{ needs.prepare.outputs.end }}"
+      - name: Keep the history for next time
+        uses: actions/cache/save@v6
+        with:
+          path: data/history/${{ matrix.symbol }}
+          key: history-${{ matrix.symbol }}-${{ github.run_id }}
+
+  prove:
+    needs: [prepare, fetch]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Restore downloaded history
+        uses: actions/cache/restore@v6
+        with:
+          path: data/history/${{ matrix.symbol }}
+          key: history-${{ matrix.symbol }}-${{ github.run_id }}
+          restore-keys: history-${{ matrix.symbol }}-
+      - name: Gold positioning history
+        if: contains(matrix.args, '--cot')
+        run: python scripts/history/cot.py
+      - name: Replay the live strategy code over history
+        run: >
+          python scripts/history/proof.py --symbol "${{ matrix.symbol }}"
+          --from "${{ matrix.from }}" --to "${{ matrix.to }}"
+          --variant "${{ matrix.variant }}" ${{ matrix.args }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: proof-${{ matrix.variant }}-${{ matrix.symbol }}
+          path: data/proof/${{ matrix.variant }}/${{ matrix.symbol }}/trades.json
+          retention-days: 30
+
+  report:
+    needs: [prepare, prove]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: proof-*
+          path: data/proof
+      - name: Scorecards and evidence
+        run: |
+          python scripts/history/report.py --write-evidence
+          mkdir -p docs
+          cp data/proof/report.md docs/proof-report.md
+      - name: Publish the evidence the live bot reads
+        run: |
+          git config user.name "gold-bot"
+          git config user.email "gold-bot@users.noreply.github.com"
+          git add config/evidence.json docs/proof-report.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "evidence: monthly history proof [skip ci]"
+          git push || (git pull --rebase && git push)
+      - name: Send the summary to the owner
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: |
+          [ -n "$TOKEN" ] && [ -n "$CHAT" ] || exit 0
+          text=$(head -c 3800 data/proof/report.md)
+          curl -fsS -m 20 "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=${text}" -o /dev/null

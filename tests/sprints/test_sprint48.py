@@ -40,12 +40,21 @@ def _fake_feed_response() -> MagicMock:
 
 def test_calendar_fetch_filters_high_impact_usd() -> None:
     with patch("src.ingestion.news_calendar.requests.get", return_value=_fake_feed_response()):
-        events = NewsCalendarClient().fetch_high_impact_events()
+        events = NewsCalendarClient().fetch_high_impact_events(currencies={"USD"})
 
     assert len(events) == 2
     assert events[0]["label"] == "Non-Farm Employment Change"
     assert events[0]["timestamp"] == 1_700_055_000  # 2023-11-15 13:30 UTC
     assert all(isinstance(e["timestamp"], int) for e in events)
+
+
+def test_calendar_keeps_news_for_every_traded_currency() -> None:
+    # Milestone 4: euro news now pauses (and warns) EURUSD only.
+    with patch("src.ingestion.news_calendar.requests.get", return_value=_fake_feed_response()):
+        events = NewsCalendarClient().fetch_high_impact_events()
+
+    assert [e["currency"] for e in events] == ["EUR", "USD", "USD"]
+    assert events[0]["label"] == "German CPI"
 
 
 def test_refresh_preserves_manual_events() -> None:

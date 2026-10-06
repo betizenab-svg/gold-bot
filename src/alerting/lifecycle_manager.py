@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 
+from config import settings as app_settings
 from config.instruments import get_instrument, state_key
 from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
 from src.alerting.messenger import deliver, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
+from src.analysis.market_hours import WEEK_CLOSE_MINUTE_FRIDAY, minutes_to_weekly_close
 from src.analysis.outcomes import realized_r_for_event
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
@@ -29,16 +31,24 @@ class SignalLifecycleManager:
         "EXPIRED": "CANCELLED",
         "TIME_STOP": "CLOSED_TIME",
         "STRUCTURE_EXIT": "CLOSED_STRUCT",
+        "WEEKEND_CANCEL": "CANCELLED",
+        "WEEKEND_CLOSE": "CLOSED_WEEKEND",
+        "WEEKEND_RUNNER_CLOSE": "CLOSED_WEEKEND",
     }
 
     # Realized R for terminal events (half off at TP1=1.5R, half at TP2=3R).
+    # Market exits are replaced by the exact value at the exit price.
     EVENT_R_MAP = {
         "SL_HIT": -1.0,
         "BE_HIT": 0.75,
         "EARLY_BE": 0.0,
         "TP2_SMASH": 2.25,
         "TIME_STOP": 0.0,
+        "WEEKEND_CLOSE": 0.0,
+        "WEEKEND_RUNNER_CLOSE": 0.75,
     }
+
+    MARKET_EXIT_EVENTS = {"TIME_STOP", "STRUCTURE_EXIT", "WEEKEND_CLOSE", "WEEKEND_RUNNER_CLOSE"}
 
     # Once a trade has run this far in R, the stop moves to entry
     # (Trendline/Brooks: breakeven after the move equals the risk).
@@ -148,6 +158,13 @@ class SignalLifecycleManager:
         if direction not in {"LONG", "SHORT"}:
             return None
 
+        weekend_event = self._weekend_event(signal, status, direction, entry_price, current_candle)
+        if weekend_event is not None:
+            return weekend_event
+
+        # Charts show the bid; buys and the exits of sells fill at the ask.
+        ask = self._spread(signal)
+
         if status == "PENDING":
             if self._is_pending_expired(signal, current_candle):
                 return "EXPIRED"
@@ -155,9 +172,9 @@ class SignalLifecycleManager:
             if direction == "LONG":
                 # STOP = breakout buy above market; LIMIT = pullback buy below market.
                 triggered = (
-                    candle_high >= entry_price
+                    candle_high + ask >= entry_price
                     if order_type == "STOP"
-                    else candle_low <= entry_price
+                    else candle_low + ask <= entry_price
                 )
                 if triggered and candle_low <= sl_price:
                     # Filled and stopped within the same candle: pessimistic fill.
@@ -168,7 +185,7 @@ class SignalLifecycleManager:
                     if order_type == "STOP"
                     else candle_high >= entry_price
                 )
-                if triggered and candle_high >= sl_price:
+                if triggered and candle_high + ask >= sl_price:
                     return "SL_HIT"
             return "ACTIVATED" if triggered else None
 
@@ -185,7 +202,7 @@ class SignalLifecycleManager:
             if status == "PARTIAL_TP1" and candle_low <= entry_price:
                 return "BE_HIT"
             if status == "ACTIVE":
-                be_armed = self._breakeven_armed(signal)
+                be_armed = self._breakeven_armed(signal, current_candle)
                 if be_armed and candle_low <= entry_price:
                     return "EARLY_BE"
                 if not be_armed and candle_low <= sl_price:
@@ -196,23 +213,86 @@ class SignalLifecycleManager:
                 return "TP1_SMASH"
             return None
 
-        if status == "PARTIAL_TP1" and candle_high >= entry_price:
+        if status == "PARTIAL_TP1" and candle_high + ask >= entry_price:
             return "BE_HIT"
         if status == "ACTIVE":
-            be_armed = self._breakeven_armed(signal)
-            if be_armed and candle_high >= entry_price:
+            be_armed = self._breakeven_armed(signal, current_candle)
+            if be_armed and candle_high + ask >= entry_price:
                 return "EARLY_BE"
-            if not be_armed and candle_high >= sl_price:
+            if not be_armed and candle_high + ask >= sl_price:
                 return "SL_HIT"
-        if candle_low <= tp2_price:
+        if candle_low + ask <= tp2_price:
             return "TP2_SMASH"
-        if status == "ACTIVE" and candle_low <= tp1_price:
+        if status == "ACTIVE" and candle_low + ask <= tp1_price:
             return "TP1_SMASH"
         return None
 
-    def _breakeven_armed(self, signal: Any) -> bool:
-        """True once the trade has already run >= 1R in favor (tracked MFE):
-        the stop is then treated as sitting at entry."""
+    @staticmethod
+    def _spread(signal: Any) -> float:
+        if not app_settings.SPREAD_CUSHION_ENABLED:
+            return 0.0
+        return float(SignalLifecycleManager._signal_instrument(signal).typical_spread)
+
+    def _weekend_event(
+        self,
+        signal: Any,
+        status: str,
+        direction: str,
+        entry_price: float,
+        current_candle: Candle,
+    ) -> Optional[str]:
+        """Friday plan before the weekend gap (markets that close at the weekend)."""
+        action = str(app_settings.WEEKEND_ACTION).lower()
+        if action not in {"close", "breakeven"}:
+            return None
+        if status not in {"PENDING", "ACTIVE", "PARTIAL_TP1"}:
+            return None
+        instrument = self._signal_instrument(signal)
+        remaining = minutes_to_weekly_close(instrument.symbol, int(current_candle.timestamp))
+        if remaining is None or remaining > int(app_settings.WEEKEND_EXIT_MINUTES):
+            return None
+        if status == "PENDING":
+            return "WEEKEND_CANCEL"
+        if status == "PARTIAL_TP1":
+            # Half is banked and the stop is already at entry; "close" banks the rest.
+            return "WEEKEND_RUNNER_CLOSE" if action == "close" else None
+        if action == "close":
+            return "WEEKEND_CLOSE"
+        move = float(current_candle.close) - float(entry_price)
+        if direction == "SHORT":
+            move = -move - self._spread(signal)
+        return "WEEKEND_CLOSE" if move <= 0 else None
+
+    @staticmethod
+    def _held_into_weekend(signal: Any, current_candle: Candle) -> bool:
+        """True once an open trade has passed Friday's weekend-plan moment."""
+        try:
+            created = int(SignalLifecycleManager._get_value(signal, "timestamp", "created_at"))
+        except (TypeError, ValueError):
+            return False
+        now = int(current_candle.timestamp)
+        moment = datetime.fromtimestamp(now, tz=timezone.utc)
+        friday = (moment - timedelta(days=(moment.weekday() - 4) % 7)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        plan_start = int(friday.timestamp()) + (
+            WEEK_CLOSE_MINUTE_FRIDAY - int(app_settings.WEEKEND_EXIT_MINUTES)
+        ) * 60
+        if plan_start > now:
+            plan_start -= 7 * 86400
+        return created < plan_start <= now
+
+    def _breakeven_armed(self, signal: Any, current_candle: Optional[Candle] = None) -> bool:
+        """True once the trade has already run >= BE_ARM_R in favor (tracked
+        MFE), or was held into the weekend under the "breakeven" plan: the
+        stop is then treated as sitting at entry."""
+        if (
+            current_candle is not None
+            and str(app_settings.WEEKEND_ACTION).lower() == "breakeven"
+            and not self._signal_instrument(signal).weekend_trading
+            and self._held_into_weekend(signal, current_candle)
+        ):
+            return True
         try:
             mfe = float(self._get_value(signal, "mfe_r", default=0.0) or 0.0)
         except (TypeError, ValueError):
@@ -513,13 +593,19 @@ class SignalLifecycleManager:
     @staticmethod
     def _event_realized_r(signal: Any, event_type: str, current_candle: Candle) -> Optional[float]:
         try:
+            direction = str(SignalLifecycleManager._get_value(signal, "signal_type", "type", default=""))
+            exit_price = float(current_candle.close)
+            if direction.upper() == "SHORT" and event_type.upper() in SignalLifecycleManager.MARKET_EXIT_EVENTS:
+                exit_price += SignalLifecycleManager._spread(signal)  # sells are closed at the ask
+            raw_tp1 = SignalLifecycleManager._get_optional_value(signal, "tp1_price", "tp1")
             return realized_r_for_event(
                 event_type,
-                str(SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")),
+                direction,
                 float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry")),
                 float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl")),
                 float(SignalLifecycleManager._get_required_value(signal, "tp2_price", "tp2")),
-                exit_price=float(current_candle.close),
+                exit_price=exit_price,
+                tp1=float(raw_tp1) if raw_tp1 is not None else None,
             )
         except (TypeError, ValueError, AttributeError):
             return None
@@ -594,6 +680,21 @@ class SignalLifecycleManager:
             return "Trade never reached TP1 within the holding window; closed as stagnant."
         if normalized == "STRUCTURE_EXIT":
             return "Market structure flipped against the runner; closed to protect banked TP1 gains."
+        if normalized == "WEEKEND_CANCEL":
+            price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
+            return (
+                f"The market closes for the weekend soon; the pending order at {price:.{nd}f} "
+                "is withdrawn so nothing can open over the weekend."
+            )
+        if normalized in {"WEEKEND_CLOSE", "WEEKEND_RUNNER_CLOSE"}:
+            if current_candle is not None:
+                result = SignalLifecycleManager._event_realized_r(signal, event_type, current_candle)
+                if result is not None:
+                    return (
+                        f"Weekend plan: closed at {float(current_candle.close):.{nd}f} ({result:+.2f}R in total) "
+                        "before the market shuts, so a Monday price jump cannot hit this trade."
+                    )
+            return "Weekend plan: closed before the market shuts for the weekend."
         raise ValueError(f"Unsupported lifecycle event type: {event_type}")
 
     @staticmethod
