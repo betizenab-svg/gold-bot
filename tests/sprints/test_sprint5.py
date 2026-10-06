@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, timezone
-from typing import List
 from unittest.mock import Mock, patch
 
 os.environ.setdefault("TWELVEDATA_API_KEY", "test_key")

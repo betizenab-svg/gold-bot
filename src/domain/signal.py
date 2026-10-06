@@ -23,6 +23,11 @@ class Signal:
     order_type: str = "LIMIT"
     strategy: str | None = None
     mfe_r: float = 0.0
+    id: int | None = None
+    price_source: str | None = None
+    trial: bool = False
+    code_version: str | None = None
+    risk_pct: float | None = None
 
     def __post_init__(self) -> None:
         timestamp = self.timestamp

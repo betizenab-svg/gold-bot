@@ -273,8 +273,12 @@ class Repository:
                 created_at,
                 status,
                 order_type,
-                strategy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                strategy,
+                price_source,
+                trial,
+                code_version,
+                risk_pct
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 signal.signal_hash,
@@ -299,8 +303,18 @@ class Repository:
                 signal.status,
                 getattr(signal, "order_type", "LIMIT"),
                 getattr(signal, "strategy", None),
+                getattr(signal, "price_source", None),
+                1 if getattr(signal, "trial", False) else 0,
+                getattr(signal, "code_version", None),
+                getattr(signal, "risk_pct", None),
             ),
         )
+
+    def get_signal_id(self, signal_hash: str) -> Optional[int]:
+        row = self._fetchone(
+            "SELECT id FROM signals WHERE signal_hash = ? LIMIT 1;", (signal_hash,)
+        )
+        return int(row[0]) if row and row[0] is not None else None
 
     def get_open_signals(self) -> List[Signal]:
         rows = self._fetchall(
@@ -322,7 +336,10 @@ class Repository:
                 status,
                 COALESCE(order_type, 'LIMIT') AS order_type,
                 strategy,
-                COALESCE(mfe_r, 0.0) AS mfe_r
+                COALESCE(mfe_r, 0.0) AS mfe_r,
+                id,
+                price_source,
+                COALESCE(trial, 0) AS trial
             FROM signals
             WHERE status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
             ORDER BY created_at ASC, id ASC;
@@ -351,6 +368,9 @@ class Repository:
                     order_type=str(row[14] or "LIMIT"),
                     strategy=str(row[15]) if row[15] is not None else None,
                     mfe_r=float(row[16] or 0.0),
+                    id=int(row[17]) if row[17] is not None else None,
+                    price_source=str(row[18]) if row[18] is not None else None,
+                    trial=bool(row[19]),
                 )
             )
         return signals
@@ -409,14 +429,24 @@ class Repository:
         signal_hash: str,
         closure_reason: str,
         status: str,
+        realized_r: Optional[float] = None,
+        closed_at: Optional[int] = None,
     ) -> None:
         self._execute(
             """
             UPDATE signals
-            SET closure_reason = ?, status = ?
+            SET closure_reason = ?, status = ?,
+                realized_r = COALESCE(?, realized_r),
+                closed_at = COALESCE(?, closed_at)
             WHERE signal_hash = ?;
             """,
-            (closure_reason, status, signal_hash),
+            (
+                closure_reason,
+                status,
+                None if realized_r is None else round(float(realized_r), 4),
+                None if closed_at is None else int(closed_at),
+                signal_hash,
+            ),
         )
 
     def save_zone(self, zone: Dict[str, Any]) -> None:
@@ -599,6 +629,48 @@ class Repository:
         )
         return [str(row[0]) for row in rows if row and row[0] is not None]
 
+    def get_strategy_realized_r(self, strategy: str, limit: int = 30) -> List[float]:
+        """Exact R of the strategy's latest closed public trades, newest first."""
+        from src.analysis.outcomes import row_r
+
+        rows = self._fetchall(
+            """
+            SELECT status, realized_r
+            FROM signals
+            WHERE strategy = ? AND status LIKE 'CLOSED%' AND COALESCE(trial, 0) = 0
+            ORDER BY id DESC
+            LIMIT ?;
+            """,
+            (str(strategy), int(limit)),
+        )
+        values: List[float] = []
+        for status, realized in rows:
+            value = row_r(status, realized)
+            if value is not None:
+                values.append(float(value))
+        return values
+
+    def get_closed_results_since(self, cutoff_timestamp: int) -> List[tuple]:
+        """(strategy, symbol, r) for every closed public trade since the cutoff."""
+        from src.analysis.outcomes import row_r
+
+        rows = self._fetchall(
+            """
+            SELECT COALESCE(strategy, 'UNKNOWN'), symbol, status, realized_r
+            FROM signals
+            WHERE status LIKE 'CLOSED%' AND COALESCE(trial, 0) = 0
+              AND COALESCE(closed_at, timestamp, created_at, 0) >= ?
+            ORDER BY COALESCE(closed_at, timestamp, created_at, 0) ASC, id ASC;
+            """,
+            (int(cutoff_timestamp),),
+        )
+        output: List[tuple] = []
+        for strategy, symbol, status, realized in rows:
+            value = row_r(status, realized)
+            if value is not None:
+                output.append((str(strategy), str(symbol or "XAUUSD"), float(value)))
+        return output
+
     def get_closed_outcomes_since(self, cutoff_timestamp: int) -> List[tuple]:
         """(strategy, status) for every closed trade since the cutoff."""
         rows = self._fetchall(
@@ -627,20 +699,209 @@ class Repository:
         classification: str,
         vetoes: str,
         timestamp: int,
+        levels: Optional[tuple[float, float, float, float]] = None,
     ) -> None:
-        """Detection-funnel telemetry: every scored setup, published or not."""
+        """Detection-funnel telemetry: every scored setup, published or not.
+        With levels, the idea is also followed to see what it would have done."""
+        entry = sl = tp1 = tp2 = None
+        shadow_status = None
+        if levels is not None:
+            entry, sl, tp1, tp2 = (float(value) for value in levels)
+            shadow_status = "PENDING"
         self._execute(
             """
             INSERT INTO setup_log
                 (symbol, strategy, direction, order_type, score,
-                 classification, vetoes, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                 classification, vetoes, timestamp,
+                 entry_price, sl_price, tp1_price, tp2_price, shadow_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 str(symbol), str(strategy), str(direction), str(order_type),
                 int(score), str(classification), str(vetoes), int(timestamp),
+                entry, sl, tp1, tp2, shadow_status,
             ),
         )
+
+    def get_open_shadow_setups(self, symbol: str) -> List[dict]:
+        rows = self._fetchall(
+            """
+            SELECT id, symbol, strategy, direction, order_type, timestamp,
+                   entry_price, sl_price, tp1_price, tp2_price,
+                   shadow_status, COALESCE(shadow_mfe_r, 0.0)
+            FROM setup_log
+            WHERE symbol = ? AND shadow_status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1')
+            ORDER BY id ASC;
+            """,
+            (str(symbol),),
+        )
+        return [
+            {
+                "id": int(row[0]),
+                "symbol": row[1],
+                "strategy": row[2],
+                "signal_type": row[3],
+                "order_type": row[4] or "LIMIT",
+                "timestamp": int(row[5] or 0),
+                "entry_price": float(row[6]),
+                "sl_price": float(row[7]),
+                "tp1_price": float(row[8]),
+                "tp2_price": float(row[9]),
+                "status": row[10],
+                "mfe_r": float(row[11] or 0.0),
+            }
+            for row in rows
+            if row[6] is not None and row[7] is not None
+        ]
+
+    def update_shadow_setup(
+        self,
+        row_id: int,
+        status: str,
+        mfe_r: float,
+        realized_r: Optional[float] = None,
+        closed_at: Optional[int] = None,
+    ) -> None:
+        self._execute(
+            """
+            UPDATE setup_log
+            SET shadow_status = ?, shadow_mfe_r = ?, shadow_r = ?, shadow_closed_at = ?
+            WHERE id = ?;
+            """,
+            (
+                str(status),
+                round(float(mfe_r), 4),
+                None if realized_r is None else round(float(realized_r), 4),
+                closed_at,
+                int(row_id),
+            ),
+        )
+
+    # --- Telegram outbox: nothing is lost when Telegram is down -------------
+    def outbox_add(
+        self,
+        chat_id: str,
+        text: str,
+        kind: str = "message",
+        reply_to_message_id: Optional[int] = None,
+        signal_hash: Optional[str] = None,
+        status: str = "PENDING",
+    ) -> int:
+        connection = self._open_connection()
+        with connection:
+            with closing(connection.cursor()) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO outbox (chat_id, kind, text, reply_to_message_id,
+                                        signal_hash, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        str(chat_id), str(kind), str(text),
+                        reply_to_message_id, signal_hash, str(status), int(time.time()),
+                    ),
+                )
+                return int(cursor.lastrowid or 0)
+
+    def outbox_mark(
+        self,
+        row_id: int,
+        status: str,
+        message_id: Optional[int] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        self._execute(
+            """
+            UPDATE outbox
+            SET status = ?,
+                attempts = attempts + CASE WHEN ? IN ('SENT', 'PENDING', 'FAILED') THEN 1 ELSE 0 END,
+                message_id = COALESCE(?, message_id),
+                last_error = COALESCE(?, last_error),
+                sent_at = CASE WHEN ? = 'SENT' THEN ? ELSE sent_at END
+            WHERE id = ?;
+            """,
+            (
+                str(status), str(status), message_id,
+                None if error is None else str(error)[:500],
+                str(status), int(time.time()), int(row_id),
+            ),
+        )
+
+    def outbox_rows(self, statuses: Iterable[str], limit: int = 50) -> List[dict]:
+        wanted = [str(status) for status in statuses]
+        if not wanted:
+            return []
+        placeholders = ",".join("?" for _ in wanted)
+        rows = self._fetchall(
+            f"""
+            SELECT id, chat_id, kind, text, reply_to_message_id, signal_hash,
+                   status, attempts, created_at
+            FROM outbox WHERE status IN ({placeholders})
+            ORDER BY id ASC LIMIT ?;
+            """,
+            (*wanted, int(limit)),
+        )
+        return [
+            {
+                "id": int(row[0]), "chat_id": row[1], "kind": row[2], "text": row[3],
+                "reply_to_message_id": row[4], "signal_hash": row[5],
+                "status": row[6], "attempts": int(row[7] or 0), "created_at": int(row[8] or 0),
+            }
+            for row in rows
+        ]
+
+    def prune_outbox(self, older_than_seconds: int = 14 * 86400) -> None:
+        self._execute(
+            "DELETE FROM outbox WHERE status IN ('SENT', 'FAILED', 'UNCERTAIN') AND created_at < ?;",
+            (int(time.time()) - int(older_than_seconds),),
+        )
+
+    # --- Feed health and run history --------------------------------------
+    def record_feed_health(
+        self, symbol: str, source: str, lag_seconds: Optional[int], ok: bool, timestamp: int
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO feed_health (symbol, source, lag_seconds, ok, timestamp)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (str(symbol), str(source), lag_seconds, 1 if ok else 0, int(timestamp)),
+        )
+
+    def record_pulse_run(
+        self, timestamp: int, duration_ms: int, signals: int, errors: int, detail: str
+    ) -> None:
+        self._execute(
+            """
+            INSERT INTO pulse_runs (timestamp, duration_ms, signals, errors, detail)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (int(timestamp), int(duration_ms), int(signals), int(errors), str(detail)),
+        )
+
+    def prune_health_tables(self, retention_days: int = 30) -> None:
+        cutoff = int(time.time()) - int(retention_days) * 86400
+        self._execute("DELETE FROM feed_health WHERE timestamp < ?;", (cutoff,))
+        self._execute("DELETE FROM pulse_runs WHERE timestamp < ?;", (cutoff,))
+
+    def query(self, sql: str, params: Iterable[Any] = ()) -> List[tuple[Any, ...]]:
+        """Read-only helper for reports."""
+        return self._fetchall(sql, params)
+
+    def purge_symbol_price_history(self, symbol: str) -> None:
+        """Drop a market's stored candles, zones and still-open shadow ideas
+        (used when its price feed changes and old levels no longer apply)."""
+        name = str(symbol).upper()
+        self._execute("DELETE FROM market_data WHERE symbol = ?;", (name,))
+        self._execute("DELETE FROM zones WHERE symbol = ?;", (name,))
+        self._execute(
+            "UPDATE setup_log SET shadow_status = 'VOID' "
+            "WHERE symbol = ? AND shadow_status IN ('PENDING', 'ACTIVE', 'PARTIAL_TP1');",
+            (name,),
+        )
+
+    def delete_kv(self, key: str) -> None:
+        self._execute("DELETE FROM kv_store WHERE key = ?;", (key,))
 
     def get_recent_setups(self, limit: int = 20) -> List[dict]:
         rows = self._fetchall(

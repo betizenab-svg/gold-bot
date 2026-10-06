@@ -11,4 +11,4 @@ SRC_PATH = os.path.join(PROJECT_ROOT, "src")
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
-from src.dashboard.app import app as application
+from src.dashboard.app import app as application  # noqa: E402,F401  (WSGI entry point)

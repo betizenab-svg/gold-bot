@@ -173,3 +173,47 @@ ACTIVE_MAX_HOLD_HOURS = int(os.getenv("ACTIVE_MAX_HOLD_HOURS", "24"))
 # 0.75 is replay-confirmed (EUR +17%, BTC +20% vs 1.0 over 45d, 2026-08-26).
 # `or`: the replay workflow passes an empty string when no override is given.
 BE_ARM_R = float(os.getenv("BE_ARM_R") or "0.75")
+
+# --- Owner channel and operations ---
+# Private chat for warnings, errors and trial signals. Unset = log only, never
+# the public channel.
+TELEGRAM_ADMIN_CHAT_ID = (os.getenv("TELEGRAM_ADMIN_CHAT_ID") or "").strip()
+# GitHub repository variable BOT_PAUSED=1 stops new signals (open trades are
+# still followed and updated).
+BOT_PAUSED = _env_bool("BOT_PAUSED", False)
+CODE_VERSION = (os.getenv("GITHUB_SHA") or os.getenv("CODE_VERSION") or "local")[:7]
+
+# --- Price feeds ---
+# Markets with a spot feed (gold: TwelveData XAU/USD) use it first and fall
+# back to Yahoo only when it fails.
+SPOT_FEED_ENABLED = _env_bool("SPOT_FEED_ENABLED", True)
+# How long a measured futures-vs-spot gap may be used to correct backup prices.
+PRICE_BASIS_MAX_AGE_HOURS = int(os.getenv("PRICE_BASIS_MAX_AGE_HOURS") or "24")
+
+# --- Big-picture (macro) gates ---
+# "penalty": lower the score; "block": refuse the trade (old behaviour);
+# "off": ignore. Penalty until history tests prove a gate earns a hard veto.
+MACRO_GATES_MODE = (os.getenv("MACRO_GATES_MODE") or "penalty").strip().lower()
+MACRO_GATE_PENALTY = int(os.getenv("MACRO_GATE_PENALTY") or "10")
+# Real central-bank buying (World Gold Council, tonnes per quarter), entered by
+# hand with its quarter, e.g. 2026-Q2. No value = the gate stays off.
+CB_NET_PURCHASES_TONNES = (os.getenv("CB_NET_PURCHASES_TONNES") or "").strip()
+CB_NET_PURCHASES_QUARTER = (os.getenv("CB_NET_PURCHASES_QUARTER") or "").strip()
+
+# --- Sizing ---
+# One risk size for every signal until history proves top scores win more.
+RISK_PER_TRADE_PCT = float(os.getenv("RISK_PER_TRADE_PCT") or "1.0")
+CONVICTION_SIZING_ENABLED = _env_bool("CONVICTION_SIZING_ENABLED", False)
+
+# --- Evidence ---
+# Follow every blocked/rejected idea to see what it would have done.
+SHADOW_TRACKING_ENABLED = _env_bool("SHADOW_TRACKING_ENABLED", True)
+SHADOW_MAX_AGE_DAYS = int(os.getenv("SHADOW_MAX_AGE_DAYS") or "3")
+
+# --- Watching the bot itself ---
+# Per-run and per-feed health rows (switched off for history replays).
+OPS_TELEMETRY_ENABLED = _env_bool("OPS_TELEMETRY_ENABLED", True)
+# Warn the owner when a market's newest candle is this late while it is open.
+FEED_LAG_ALERT_MINUTES = int(os.getenv("FEED_LAG_ALERT_MINUTES") or "45")
+# The owner's daily check arrives at the first run after this UTC hour (04 = 07:00 Addis Ababa).
+DAILY_STATUS_HOUR_UTC = int(os.getenv("DAILY_STATUS_HOUR_UTC") or "4")

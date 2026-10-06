@@ -100,8 +100,52 @@ class SchemaInitializer:
             );
             """,
             """
+            CREATE TABLE IF NOT EXISTS outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'message',
+                text TEXT,
+                reply_to_message_id INTEGER,
+                signal_hash TEXT,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT,
+                created_at INTEGER,
+                sent_at INTEGER,
+                message_id INTEGER
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS feed_health (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT,
+                source TEXT,
+                lag_seconds INTEGER,
+                ok INTEGER,
+                timestamp INTEGER
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS pulse_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp INTEGER,
+                duration_ms INTEGER,
+                signals INTEGER,
+                errors INTEGER,
+                detail TEXT
+            );
+            """,
+            """
             CREATE INDEX IF NOT EXISTS market_data_timestamp
             ON market_data (timestamp);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS outbox_status
+            ON outbox (status);
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS feed_health_symbol_ts
+            ON feed_health (symbol, timestamp);
             """,
             """
             CREATE INDEX IF NOT EXISTS signals_status
@@ -134,10 +178,51 @@ class SchemaInitializer:
         self._ensure_column(cursor, "signals", "strategy", "TEXT")
         self._ensure_column(cursor, "signals", "mfe_r", "REAL")
         self._ensure_column(cursor, "signals", "mae_r", "REAL")
+        added_realized = self._ensure_column(cursor, "signals", "realized_r", "REAL")
+        self._ensure_column(cursor, "signals", "closed_at", "INTEGER")
+        self._ensure_column(cursor, "signals", "price_source", "TEXT")
+        self._ensure_column(cursor, "signals", "trial", "INTEGER DEFAULT 0")
+        self._ensure_column(cursor, "signals", "code_version", "TEXT")
+        self._ensure_column(cursor, "signals", "risk_pct", "REAL")
+        for column, column_type in (
+            ("entry_price", "REAL"),
+            ("sl_price", "REAL"),
+            ("tp1_price", "REAL"),
+            ("tp2_price", "REAL"),
+            ("shadow_status", "TEXT"),
+            ("shadow_mfe_r", "REAL"),
+            ("shadow_r", "REAL"),
+            ("shadow_closed_at", "INTEGER"),
+        ):
+            self._ensure_column(cursor, "setup_log", column, column_type)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS setup_log_shadow ON setup_log (symbol, shadow_status);"
+        )
         # Self-heal: purge malformed rows (test seeds / legacy junk) that
         # pollute dashboards and stats. Real signals always carry a symbol.
         cursor.execute("DELETE FROM signals WHERE symbol IS NULL;")
+        if added_realized:
+            self._backfill_realized_r(cursor)
         self.connection.commit()
+
+    @staticmethod
+    def _backfill_realized_r(cursor: sqlite3.Cursor) -> None:
+        from src.analysis.outcomes import derive_realized_r
+
+        rows = cursor.execute(
+            """
+            SELECT id, status, closure_reason, COALESCE(signal_type, type),
+                   COALESCE(entry_price, entry), COALESCE(sl_price, sl),
+                   COALESCE(tp2_price, tp2)
+            FROM signals WHERE status LIKE 'CLOSED%';
+            """
+        ).fetchall()
+        for row_id, status, reason, direction, entry, sl, tp2 in rows:
+            value = derive_realized_r(status, reason, direction, entry, sl, tp2)
+            if value is not None:
+                cursor.execute(
+                    "UPDATE signals SET realized_r = ? WHERE id = ?;", (value, row_id)
+                )
 
     def _ensure_column(
         self,
@@ -145,12 +230,13 @@ class SchemaInitializer:
         table_name: str,
         column_name: str,
         column_type: str,
-    ) -> None:
+    ) -> bool:
         rows = cursor.execute(f"PRAGMA table_info({table_name});").fetchall()
         existing_columns = {row[1] for row in rows}
         if column_name in existing_columns:
-            return
+            return False
 
         cursor.execute(
             f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type};"
         )
+        return True

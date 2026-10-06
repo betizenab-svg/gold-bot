@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+import re
+from datetime import datetime, timezone
 from typing import Optional
 
+from config import settings
 from config.settings import (
     LONG_BIAS_MULTIPLIER_ACTIVE,
     LONG_BIAS_MULTIPLIER_INACTIVE,
@@ -10,52 +13,59 @@ from config.settings import (
 )
 from src.persistence.repository import Repository
 
-DEFAULT_NET_PURCHASES = 400.0
+KV_VALUE = "macro_cb_net_purchases"
+KV_SOURCE = "macro_cb_net_purchases_source"
+# A quarterly figure stays usable until two newer quarters could have replaced it.
+MAX_QUARTERS_OLD = 2
+
+
+def _quarter_index(label: str) -> Optional[int]:
+    match = re.fullmatch(r"\s*(\d{4})\s*-?\s*Q([1-4])\s*", str(label or ""), re.IGNORECASE)
+    if not match:
+        return None
+    return int(match.group(1)) * 4 + int(match.group(2)) - 1
+
+
+def _current_quarter_index(now: Optional[datetime] = None) -> int:
+    moment = now or datetime.now(timezone.utc)
+    return moment.year * 4 + (moment.month - 1) // 3
 
 
 class SovereignProxy:
-    """Evaluates central bank accumulation to produce a Long Bias Multiplier.
+    """Central-bank gold buying (tonnes per quarter, World Gold Council).
 
-    When quarterly net purchases exceed the threshold, bullish technical
-    signals should be scaled up by the active multiplier.
+    There is no free automatic feed, so the figure is entered by hand
+    (CB_NET_PURCHASES_TONNES + CB_NET_PURCHASES_QUARTER). Without a real,
+    recent figure the check stays off; a made-up default is never used.
     """
 
-    def get_net_purchases(self, repository: Repository) -> float:
-        """Retrieve macro_cb_net_purchases from kv_store.
-
-        If the key does not exist, initialises it with the default value
-        of 400.0 tonnes and returns that default.
-        """
-        raw = repository.get_kv("macro_cb_net_purchases")
-        if raw is None:
-            logging.info(
-                "macro_cb_net_purchases not found; defaulting to %.1f",
-                DEFAULT_NET_PURCHASES,
-            )
-            repository.set_kv("macro_cb_net_purchases", str(DEFAULT_NET_PURCHASES))
-            return DEFAULT_NET_PURCHASES
-
+    def manual_figure(self, now: Optional[datetime] = None) -> Optional[tuple[float, str]]:
+        raw_value = settings.CB_NET_PURCHASES_TONNES
+        quarter = settings.CB_NET_PURCHASES_QUARTER
+        quarter_index = _quarter_index(quarter)
+        if not raw_value or quarter_index is None:
+            return None
         try:
-            return float(raw)
-        except (ValueError, TypeError):
-            logging.warning(
-                "Invalid macro_cb_net_purchases value '%s'; defaulting to %.1f",
-                raw,
-                DEFAULT_NET_PURCHASES,
-            )
-            repository.set_kv("macro_cb_net_purchases", str(DEFAULT_NET_PURCHASES))
-            return DEFAULT_NET_PURCHASES
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            logging.warning("CB_NET_PURCHASES_TONNES is not a number: %r", raw_value)
+            return None
+        if _current_quarter_index(now) - quarter_index > MAX_QUARTERS_OLD:
+            logging.info("Central-bank figure for %s is too old; check stays off", quarter)
+            return None
+        return value, quarter.strip().upper()
 
-    def calculate_multiplier(self, net_purchases: float) -> float:
-        """Return the Long Bias Multiplier based on the accumulation threshold.
+    def get_net_purchases(self, repository: Repository) -> Optional[float]:
+        figure = self.manual_figure()
+        if figure is not None:
+            value, quarter = figure
+            repository.set_kv(KV_VALUE, str(value))
+            repository.set_kv(KV_SOURCE, f"manual:{quarter}")
+            return value
+        return None
 
-        Args:
-            net_purchases: Central bank net purchases in tonnes per quarter.
-
-        Returns:
-            LONG_BIAS_MULTIPLIER_ACTIVE  (1.25) if net_purchases > threshold,
-            LONG_BIAS_MULTIPLIER_INACTIVE (1.0)  otherwise.
-        """
-        if net_purchases > SOVEREIGN_ACCUMULATION_THRESHOLD:
+    def calculate_multiplier(self, net_purchases: Optional[float]) -> float:
+        """1.25 when real quarterly buying is above the threshold, else 1.0."""
+        if net_purchases is not None and net_purchases > SOVEREIGN_ACCUMULATION_THRESHOLD:
             return float(LONG_BIAS_MULTIPLIER_ACTIVE)
         return float(LONG_BIAS_MULTIPLIER_INACTIVE)

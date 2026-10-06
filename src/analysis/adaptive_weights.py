@@ -30,19 +30,27 @@ class AdaptiveWeightEngine:
         if not strategy:
             return neutral
 
+        r_values: list[float] = []
         try:
-            outcomes = repository.get_strategy_outcomes(str(strategy), self.LOOKBACK)
+            exact = repository.get_strategy_realized_r(str(strategy), self.LOOKBACK)
         except Exception:
-            return neutral
+            exact = None
+        if isinstance(exact, list) and all(isinstance(v, (int, float)) for v in exact):
+            r_values = [float(v) for v in exact]
+        else:
+            try:
+                outcomes = repository.get_strategy_outcomes(str(strategy), self.LOOKBACK)
+            except Exception:
+                return neutral
 
-        if not isinstance(outcomes, list):
-            return neutral
+            if not isinstance(outcomes, list):
+                return neutral
 
-        r_values = [
-            self.OUTCOME_R[str(status).upper()]
-            for status in outcomes
-            if str(status).upper() in self.OUTCOME_R
-        ]
+            r_values = [
+                self.OUTCOME_R[str(status).upper()]
+                for status in outcomes
+                if str(status).upper() in self.OUTCOME_R
+            ]
         samples = len(r_values)
         if samples < self.MIN_SAMPLES:
             return neutral

@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any, Optional
 
+from config import settings
 from config.instruments import get_instrument
 from config.settings import (
     NEWS_BLACKOUT_AFTER_MIN,
@@ -70,6 +71,9 @@ class RiskGovernor:
         direction: Optional[str] = None,
     ) -> tuple[bool, str]:
         now_ts = int(now_ts)
+
+        if settings.BOT_PAUSED:
+            return False, "Risk governor: paused by the owner (BOT_PAUSED switch)"
 
         try:
             paused = repository.get_kv("trading_paused")

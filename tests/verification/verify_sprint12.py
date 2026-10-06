@@ -1,10 +1,8 @@
 """Test script for Sprint 12: Commitment of Traders (COT) Index Implementation."""
 import sqlite3
-import time
 from unittest.mock import patch, MagicMock
 
 from src.analysis.cot_index import CotAnalyzer
-from src.ingestion.cot_client import CotClient
 from src.persistence.schema import SchemaInitializer
 from src.persistence.repository import Repository
 from src.core.orchestrator import PulseOrchestrator

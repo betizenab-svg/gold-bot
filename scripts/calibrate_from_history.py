@@ -20,46 +20,48 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from config.settings import DB_PATH  # noqa: E402
+from src.analysis.outcomes import STATUS_R_FALLBACK, row_r  # noqa: E402
 
-# Realized R per terminal status (TP1=1.5R half off, TP2=3R, BE runner flat).
-OUTCOME_R = {
-    "CLOSED_TP2": 2.25,
-    "CLOSED_BE": 0.75,
-    "CLOSED_SL": -1.0,
-    "CLOSED_TIME": 0.0,
-    "CLOSED_STRUCT": 1.0,
-}
+# Legacy per-status values; exact per-trade results live in signals.realized_r.
+OUTCOME_R = dict(STATUS_R_FALLBACK)
 
 MIN_SAMPLE_FOR_ADVICE = 10
+
+
+def _closed_rows(connection: sqlite3.Connection) -> list[tuple]:
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(signals);")}
+    realized = "realized_r" if "realized_r" in columns else "NULL"
+    trial_filter = "AND COALESCE(trial, 0) = 0" if "trial" in columns else ""
+    return connection.execute(
+        f"""
+        SELECT COALESCE(strategy, 'UNKNOWN'), status,
+               COALESCE(mfe_r, 0.0), COALESCE(mae_r, 0.0),
+               COALESCE(symbol, 'XAUUSD'), {realized}
+        FROM signals
+        WHERE status IN ('CLOSED_TP2', 'CLOSED_BE', 'CLOSED_SL',
+                         'CLOSED_TIME', 'CLOSED_STRUCT') {trial_filter};
+        """
+    ).fetchall()
 
 
 def analyze(db_path: str) -> dict[str, Any]:
     connection = sqlite3.connect(db_path)
     try:
-        rows = connection.execute(
-            """
-            SELECT COALESCE(strategy, 'UNKNOWN'), status,
-                   COALESCE(mfe_r, 0.0), COALESCE(mae_r, 0.0),
-                   COALESCE(symbol, 'XAUUSD')
-            FROM signals
-            WHERE status IN ('CLOSED_TP2', 'CLOSED_BE', 'CLOSED_SL',
-                             'CLOSED_TIME', 'CLOSED_STRUCT');
-            """
-        ).fetchall()
+        rows = _closed_rows(connection)
     finally:
         connection.close()
 
     strategies: dict[str, dict[str, Any]] = {}
     symbols: dict[str, dict[str, Any]] = {}
-    for strategy, status, mfe_r, mae_r, symbol in rows:
+    for strategy, status, mfe_r, mae_r, symbol, realized in rows:
         status = str(status).upper()
-        r_for_symbol = OUTCOME_R.get(status)
-        if r_for_symbol is not None:
+        r_value = row_r(status, realized)
+        if r_value is not None:
             symbol_stats = symbols.setdefault(
                 str(symbol), {"trades": 0, "net_r": 0.0, "wins": 0}
             )
             symbol_stats["trades"] += 1
-            symbol_stats["net_r"] = round(symbol_stats["net_r"] + r_for_symbol, 2)
+            symbol_stats["net_r"] = round(symbol_stats["net_r"] + r_value, 2)
             if status == "CLOSED_TP2":
                 symbol_stats["wins"] += 1
         stats = strategies.setdefault(
@@ -73,8 +75,6 @@ def analyze(db_path: str) -> dict[str, Any]:
                 "winner_mae": [],
             },
         )
-        status = str(status).upper()
-        r_value = OUTCOME_R.get(status)
         if r_value is None:
             continue
         stats["trades"] += 1

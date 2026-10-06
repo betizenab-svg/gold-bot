@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 import yfinance as yf
 
+from config.instruments import INSTRUMENTS
 from config.settings import TIMEFRAME_SECONDS, YAHOO_SYMBOL_MAP
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
@@ -74,7 +75,10 @@ class YahooFinanceClient:
         return mapping[timeframe]
 
     def _normalize_symbol(self, symbol: str) -> str:
-        return YAHOO_SYMBOL_MAP.get(symbol, symbol)
+        if symbol in YAHOO_SYMBOL_MAP:
+            return YAHOO_SYMBOL_MAP[symbol]
+        instrument = INSTRUMENTS.get(str(symbol).upper())
+        return instrument.yahoo_ticker if instrument is not None else symbol
 
     def _normalize_columns(self, frame: pd.DataFrame) -> pd.DataFrame:
         normalized = frame.copy()

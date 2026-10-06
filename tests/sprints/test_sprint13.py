@@ -7,13 +7,11 @@ workspace = Path(__file__).resolve().parent
 if str(workspace) not in sys.path:
     sys.path.insert(0, str(workspace))
 
-from config.settings import SURPRISE_FACTOR_THRESHOLD
 from src.analysis.consensus import SurpriseFactorEngine
 from src.core.orchestrator import PulseOrchestrator
 from src.ingestion.calendar_client import EconomicCalendarClient
 from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
-from config.database import get_connection
 
 def main() -> int:
     try:

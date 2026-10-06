@@ -7,7 +7,7 @@ Orchestrator: Force macro update, assert macro_dxy_correlation and macro_crisis_
 
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pandas as pd

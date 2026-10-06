@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from math import ceil
-from typing import Dict, List, Optional
+from typing import List, Optional
 import logging
 
 import requests
 
+from config.instruments import INSTRUMENTS
 from config.settings import SYMBOL_MAP, TWELVEDATA_API_KEY, TWELVEDATA_BASE_URL
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
@@ -19,6 +20,9 @@ class DataIngestionError(RuntimeError):
 
 
 class TwelveDataClient:
+    # One call costs one credit whatever the size; 2000 M5 bars ~ 7 days.
+    MAX_OUTPUTSIZE = 2000
+
     def __init__(self, repository: Repository, circuit_breaker: Optional[CircuitBreaker] = None) -> None:
         self.repository = repository
         self.circuit_breaker = circuit_breaker or CircuitBreaker(repository)
@@ -29,14 +33,18 @@ class TwelveDataClient:
             raise DataIngestionError("TWELVEDATA_API_KEY is not configured")
 
     def _get_last_timestamp(self, symbol: str, timeframe: str) -> int:
-        key = f"last_fetch_{symbol}_{timeframe}"
-        value = self.repository.get_kv(key)
-        if value is None:
-            return int(datetime.now(timezone.utc).timestamp() - 24 * 3600)
-        try:
-            return int(value)
-        except ValueError:
-            return int(datetime.now(timezone.utc).timestamp() - 24 * 3600)
+        keys = [f"last_fetch_{symbol}_{timeframe}", f"last_processed_{symbol}"]
+        if symbol == "XAUUSD":
+            keys.append("last_processed_timestamp")
+        for key in keys:
+            value = self.repository.get_kv(key)
+            if value is None:
+                continue
+            try:
+                return int(value)
+            except ValueError:
+                continue
+        return int(datetime.now(timezone.utc).timestamp() - 24 * 3600)
 
     def _map_timeframe(self, timeframe: str) -> str:
         mapping = {
@@ -67,6 +75,9 @@ class TwelveDataClient:
         return mapping[timeframe]
 
     def _normalize_symbol(self, symbol: str) -> str:
+        instrument = INSTRUMENTS.get(str(symbol).upper())
+        if instrument is not None and instrument.spot_symbol:
+            return instrument.spot_symbol
         return SYMBOL_MAP.get(symbol, symbol)
 
     def _parse_timestamp(self, value: str) -> int:
@@ -81,7 +92,7 @@ class TwelveDataClient:
         delta = max(now_ts - last_timestamp, 0)
         seconds_per_bar = self._timeframe_seconds(timeframe)
         bars = max(1, ceil(delta / seconds_per_bar) + 1)
-        return min(bars, 500)
+        return min(bars, self.MAX_OUTPUTSIZE)
 
     def fetch_latest_candles(self, symbol: str, timeframe: str) -> List[Candle]:
         if self.circuit_breaker.is_open("TWELVEDATA"):
@@ -98,10 +109,11 @@ class TwelveDataClient:
             "interval": interval,
             "apikey": self.api_key,
             "outputsize": outputsize,
+            "timezone": "UTC",
         }
 
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=15)
         except requests.exceptions.RequestException as exc:
             self.circuit_breaker.record_failure("TWELVEDATA", "REQUEST_EXCEPTION", str(exc))
             raise DataIngestionError("TwelveData request failed") from exc
@@ -116,15 +128,26 @@ class TwelveDataClient:
             self.circuit_breaker.record_failure("TWELVEDATA", "INVALID_JSON", str(exc))
             raise DataIngestionError("TwelveData returned invalid JSON") from exc
 
-        values = payload.get("values")
+        if isinstance(payload, dict) and str(payload.get("status", "")).lower() == "error":
+            code = str(payload.get("code", "ERROR"))
+            message = str(payload.get("message", ""))[:300]
+            self.circuit_breaker.record_failure("TWELVEDATA", code, message)
+            raise DataIngestionError(f"TwelveData error {code}: {message}")
+
+        values = payload.get("values") if isinstance(payload, dict) else None
         if not isinstance(values, list):
-            self.circuit_breaker.record_failure("TWELVEDATA", "MALFORMED_RESPONSE", str(payload))
+            self.circuit_breaker.record_failure("TWELVEDATA", "MALFORMED_RESPONSE", str(payload)[:300])
             raise DataIngestionError("TwelveData response missing values")
 
+        now_epoch = int(datetime.now(timezone.utc).timestamp())
+        step_seconds = self._timeframe_seconds(timeframe)
         candles: List[Candle] = []
         for item in values:
             timestamp = self._parse_timestamp(item.get("datetime", ""))
             if timestamp <= last_timestamp:
+                continue
+            # The newest bar is still forming; storing it would freeze wrong OHLC.
+            if timestamp + step_seconds > now_epoch:
                 continue
             candles.append(
                 Candle(
@@ -135,9 +158,10 @@ class TwelveDataClient:
                     high=float(item.get("high", 0)),
                     low=float(item.get("low", 0)),
                     close=float(item.get("close", 0)),
-                    volume=int(float(item.get("volume", 0))),
+                    volume=int(float(item.get("volume", 0) or 0)),
                 )
             )
+        candles.sort(key=lambda candle: candle.timestamp)
 
         validator = DataValidator()
         valid_candles = validator.filter_candles(candles)

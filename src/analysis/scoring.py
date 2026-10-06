@@ -10,7 +10,8 @@ class ScoringEngine:
         direction = trade_direction.upper()
         bias = macro_bias.upper()
 
-        if bias == "NEUTRAL":
+        # The bias engine writes BIAS_NEUTRAL; both spellings mean neutral.
+        if bias in {"NEUTRAL", "BIAS_NEUTRAL"}:
             return 10
 
         if (direction == "LONG" and bias == "BIAS_LONG") or (

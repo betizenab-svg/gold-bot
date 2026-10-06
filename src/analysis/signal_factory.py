@@ -8,12 +8,26 @@ from config.instruments import get_instrument
 from config.settings import (
     ACTIVE_MAX_HOLD_HOURS,
     ATR_SL_MULTIPLIER,
+    CONVICTION_SIZING_ENABLED,
+    RISK_PER_TRADE_PCT,
     SIGNAL_EXPIRY_MINUTES,
     SL_MIN_ATR_MULT,
     SL_MIN_USD,
 )
 from src.analysis.position_sizing import LotSizeCalculator
 from src.domain.signal import Signal
+
+
+def risk_fraction_for_score(score: int) -> float:
+    """Risk per trade as a fraction of the account.
+
+    Live results gave no evidence that top-score signals win more, so every
+    signal uses the same size unless CONVICTION_SIZING_ENABLED is switched on.
+    """
+    base = float(RISK_PER_TRADE_PCT) / 100.0
+    if CONVICTION_SIZING_ENABLED and int(score) >= 85:
+        return base * 2.0
+    return base
 
 
 class SignalFactory:
@@ -156,7 +170,9 @@ class SignalFactory:
         risk_bits = []
         if plan.get("daily_r") is not None:
             risk_bits.append(f"day so far {plan['daily_r']}")
-        risk_bits.append("risk fixed 2% per lot table below")
+        risk_bits.append(
+            f"risk {risk_fraction_for_score(score) * 100:g}% of the account (lot table below)"
+        )
         lines.append("Risk state: " + " | ".join(risk_bits))
 
         lines.append(
@@ -251,8 +267,9 @@ class SignalFactory:
                 rendered_notes = "\n".join(f"- {note}" for note in confluence_notes)
                 base_reasoning = f"{base_reasoning}\n{rendered_notes}"
 
+        risk_fraction = risk_fraction_for_score(int(score))
         lot_size_table = LotSizeCalculator().generate_table(
-            entry, sl, risk_pct=0.02 if int(score) >= 85 else 0.01, symbol=symbol
+            entry, sl, risk_pct=risk_fraction, symbol=symbol
         )
         reasoning = f"{base_reasoning}{self.LOT_SIZE_TABLE_MARKER}{lot_size_table}"
 
@@ -289,4 +306,5 @@ class SignalFactory:
             signal_hash=signal_hash,
             order_type=order_type,
             strategy=str(strategy_key) if strategy_key is not None else None,
+            risk_pct=round(risk_fraction * 100.0, 3),
         )

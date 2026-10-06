@@ -1,7 +1,6 @@
 import json
-from pathlib import Path
 
-from config.database import DB_PATH, get_connection
+from config.database import get_connection
 from src.persistence.schema import SchemaInitializer
 
 

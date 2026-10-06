@@ -50,7 +50,9 @@ def test_validator_fx_volume_and_crypto_weekend() -> None:
     validator = DataValidator()
     # Yahoo FX feeds report volume=0 — must be accepted for FX only.
     assert validator.validate_candle(_candle("EURUSD", KILLZONE_TS, volume=0.0)) is True
-    assert validator.validate_candle(_candle("XAUUSD", KILLZONE_TS, volume=0.0)) is False
+    # Spot gold has no traded volume either; BTC must still report volume.
+    assert validator.validate_candle(_candle("XAUUSD", KILLZONE_TS, volume=0.0)) is True
+    assert validator.validate_candle(_candle("BTCUSD", KILLZONE_TS, volume=0.0)) is False
     # Crypto trades Saturday; gold does not.
     assert validator.validate_candle(_candle("BTCUSD", SATURDAY_TS)) is True
     assert validator.validate_candle(_candle("XAUUSD", SATURDAY_TS)) is False
@@ -114,10 +116,11 @@ def test_gold_macro_gates_do_not_block_other_markets() -> None:
     engine = PermissionEngine()
     setup = {"trade_direction": "LONG"}
     macro = {"macro_cot_state": "OVERCROWDED_LONG"}
-    permitted_gold, _ = engine.is_trade_permitted(setup, macro, symbol="XAUUSD")
-    permitted_btc, _ = engine.is_trade_permitted(setup, macro, symbol="BTCUSD")
+    permitted_gold, _ = engine.is_trade_permitted(setup, macro, symbol="XAUUSD", mode="block")
+    permitted_btc, _ = engine.is_trade_permitted(setup, macro, symbol="BTCUSD", mode="block")
     assert permitted_gold is False
     assert permitted_btc is True
+    assert engine.score_penalties(setup, macro, symbol="BTCUSD", mode="penalty") == []
 
 
 def test_trading_age_counts_weekend_for_crypto() -> None:
@@ -209,14 +212,12 @@ def test_fx_sweep_detection_without_volume() -> None:
         symbol="XAUUSD", timeframe="M5", timestamp=KILLZONE_TS,
         open=2400.0, high=2401.0, low=2390.0, close=2400.0, volume=0.0,
     )
-    # Gold still requires a volume spike (volume=0 -> no sweep).
-    assert (
-        LiquiditySweepDetector().detect_sweep(
-            current_candle=gold_bar, avg_volume=0.0,
-            last_swing_high=2450.0, last_swing_low=2395.0,
-        )
-        is None
+    # Spot gold is judged on price alone, like FX.
+    gold_sweep = LiquiditySweepDetector().detect_sweep(
+        current_candle=gold_bar, avg_volume=0.0,
+        last_swing_high=2450.0, last_swing_low=2395.0,
     )
+    assert gold_sweep is not None and gold_sweep["type"] == "LIQUIDITY_SWEEP_LONG"
 
 
 def test_multi_symbol_pulse_namespaces_state(tmp_path: Path, monkeypatch) -> None:

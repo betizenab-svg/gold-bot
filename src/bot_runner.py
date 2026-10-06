@@ -40,16 +40,38 @@ def _resolve_log_level() -> int:
     return getattr(logging, raw, logging.INFO)
 
 
+class GitHubAnnotationHandler(logging.Handler):
+    """Warnings and errors also appear as notes on the GitHub run page."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = self.format(record).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+            level = "error" if record.levelno >= logging.ERROR else "warning"
+            sys.stdout.write(f"::{level}::{message}\n")
+        except Exception:
+            self.handleError(record)
+
+
 def setup_logging() -> None:
     log_path = Path(LOG_FILE_PATH)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     level = _resolve_log_level()
+    handlers: list[logging.Handler] = [logging.FileHandler(log_path, encoding="utf-8")]
+    if os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("LOG_TO_STDOUT") == "1":
+        handlers.append(logging.StreamHandler(sys.stdout))
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            annotations = GitHubAnnotationHandler(level=logging.WARNING)
+            annotations.setFormatter(logging.Formatter("%(name)s: %(message)s"))
+            handlers.append(annotations)
     logging.basicConfig(
         level=level,
         format="[%(levelname)s] %(asctime)sZ %(name)s %(funcName)s:%(lineno)d | %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
-        handlers=[logging.FileHandler(log_path, encoding="utf-8")],
+        handlers=handlers,
     )
+    logging.Formatter.converter = time.gmtime
+    # The bot reports its own data errors; the library's duplicates are noise.
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     logging.getLogger(__name__).info("Logging initialized at level=%s", logging.getLevelName(level))
 
 

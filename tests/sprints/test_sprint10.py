@@ -7,8 +7,8 @@ Test 3: Orchestrator persistence — macro_long_bias_multiplier written as 1.25
 
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, call
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
 import pandas as pd
 
@@ -17,7 +17,7 @@ from src.analysis.sovereign import SovereignProxy
 from src.ingestion.macro_client import FredMacroClient
 from src.persistence.schema import SchemaInitializer
 from src.persistence.repository import Repository
-from src.core.orchestrator import PulseOrchestrator, MACRO_CACHE_TTL_SECONDS
+from src.core.orchestrator import PulseOrchestrator
 
 
 def _make_repo() -> Repository:
@@ -45,15 +45,16 @@ def test_multiplier_math():
 
 
 def test_default_state():
-    """Missing macro_cb_net_purchases returns default 400.0."""
+    """No real hand-entered figure: unknown (None), never a made-up default."""
     mock_repo = MagicMock(spec=Repository)
     mock_repo.get_kv.return_value = None
 
     proxy = SovereignProxy()
     result = proxy.get_net_purchases(mock_repo)
 
-    assert result == 400.0, f"Expected default 400.0, got {result}"
-    print(f"  get_net_purchases(None key) = {result} PASSED")
+    assert result is None, f"Expected None (unknown), got {result}"
+    assert proxy.calculate_multiplier(result) == 1.0
+    mock_repo.set_kv.assert_not_called()
 
 
 def test_orchestrator_persistence():
@@ -95,15 +96,12 @@ def test_orchestrator_persistence():
         macro_client=mock_macro,
     )
 
-    # macro_cb_net_purchases is missing → defaults to 400.0 → multiplier = 1.25
+    # No real central-bank figure entered -> the long-bias multiplier stays off.
     orchestrator._run_macro_regime_check(repo)
 
     multiplier_str = repo.get_kv("macro_long_bias_multiplier")
     assert multiplier_str is not None, "macro_long_bias_multiplier must be persisted"
-    assert float(multiplier_str) == 1.25, (
-        f"Expected 1.25 (default 400.0 > 350 threshold), got {multiplier_str}"
-    )
-    print(f"  set_kv('macro_long_bias_multiplier', '1.25') PASSED")
+    assert float(multiplier_str) == 1.0, f"Expected 1.0 without real data, got {multiplier_str}"
 
 
 def main() -> int:

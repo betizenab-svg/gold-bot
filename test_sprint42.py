@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from flask import Flask
 
 from passenger_wsgi import application
@@ -26,7 +28,7 @@ def main() -> int:
 
     success_response = client.post(
         "/login",
-        data={"username": "Machete", "password": "@Machete1231"},
+        data={"username": os.environ["DASHBOARD_USERNAME"], "password": os.environ["DASHBOARD_PASSWORD"]},
         follow_redirects=False,
     )
     assert_condition(success_response.status_code == 302, "Expected successful login redirect")
@@ -39,7 +41,7 @@ def main() -> int:
     with client:
         client.post(
             "/login",
-            data={"username": "Machete", "password": "@Machete1231"},
+            data={"username": os.environ["DASHBOARD_USERNAME"], "password": os.environ["DASHBOARD_PASSWORD"]},
             follow_redirects=False,
         )
         authenticated_home = client.get("/", follow_redirects=False)
@@ -51,7 +53,7 @@ def main() -> int:
     failed_client = application.test_client()
     failed_response = failed_client.post(
         "/login",
-        data={"username": "Machete", "password": "wrong-password"},
+        data={"username": os.environ["DASHBOARD_USERNAME"], "password": "wrong-password"},
         follow_redirects=False,
     )
     assert_condition(

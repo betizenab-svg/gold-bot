@@ -1,5 +1,3 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
 from src.analysis.signal_factory import SignalFactory
@@ -105,7 +103,6 @@ def test_hash_deduplication() -> None:
 
 def test_orchestrator_blocks_duplicate_signal() -> None:
     candles = _build_recent_candles()
-    current_candle = candles[-1]
     zone = {
         "id": 1,
         "symbol": "XAUUSD",

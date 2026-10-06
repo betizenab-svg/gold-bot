@@ -7,7 +7,9 @@ from typing import Any, Optional, Sequence
 from config.instruments import get_instrument, state_key
 from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING, SIGNAL_EXPIRY_MINUTES
 from src.alerting.formatter import SignalFormatter
+from src.alerting.messenger import deliver, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
+from src.analysis.outcomes import realized_r_for_event
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
 from src.domain.candle import Candle
@@ -63,8 +65,40 @@ class SignalLifecycleManager:
     ) -> tuple[int, int]:
         target_chat_id = self._get_required_value(signal_obj, "telegram_chat_id", default=chat_id)
         self._set_client_chat_id(str(target_chat_id))
+        signal_hash = self._get_optional_value(signal_obj, "signal_hash")
         initial_message = self.formatter.format_initial_signal(signal_obj)
-        message_id = self.telegram_client.send_message(initial_message)
+
+        entry_price = self._get_optional_value(signal_obj, "entry_price", "entry")
+        sl_price = self._get_optional_value(signal_obj, "sl_price", "sl")
+        raw_symbol = self._get_optional_value(signal_obj, "symbol")
+        table_symbol = raw_symbol if isinstance(raw_symbol, str) and raw_symbol else "XAUUSD"
+        if entry_price is not None and sl_price is not None:
+            lot_size_table = self.lot_size_calculator.generate_table(
+                float(entry_price),
+                float(sl_price),
+                symbol=table_symbol,
+            )
+        else:
+            lot_size_table = self.lot_size_calculator.calculate_table(sl_distance_pips)
+        reasoning_message = self.formatter.format_trade_reasoning(signal_obj, lot_size_table)
+
+        try:
+            message_id = deliver(
+                self.telegram_client,
+                self.repository,
+                initial_message,
+                chat_id=str(target_chat_id),
+                kind="signal",
+                signal_hash=str(signal_hash) if signal_hash is not None else None,
+            )
+        except (TelegramAPIError, ValueError):
+            if uses_outbox(self.repository) and signal_hash is not None:
+                # Queued behind the signal card; threads under it once that is delivered.
+                self.repository.outbox_add(
+                    str(target_chat_id), reasoning_message, kind="reply",
+                    signal_hash=str(signal_hash), status="PENDING",
+                )
+            raise
 
         # Chart is best-effort decoration: never let it break the alert flow.
         if chart_png:
@@ -76,7 +110,6 @@ class SignalLifecycleManager:
             except Exception as exc:
                 logging.info("Signal chart delivery skipped: %s", exc)
 
-        signal_hash = self._get_optional_value(signal_obj, "signal_hash")
         if self.repository is not None and signal_hash is not None:
             if hasattr(self.repository, "update_signal_message_id"):
                 self.repository.update_signal_message_id(
@@ -90,19 +123,13 @@ class SignalLifecycleManager:
                     telegram_chat_id=str(target_chat_id),
                 )
 
-        entry_price = self._get_optional_value(signal_obj, "entry_price", "entry")
-        sl_price = self._get_optional_value(signal_obj, "sl_price", "sl")
-        if entry_price is not None and sl_price is not None:
-            lot_size_table = self.lot_size_calculator.generate_table(
-                float(entry_price),
-                float(sl_price),
-            )
-        else:
-            lot_size_table = self.lot_size_calculator.calculate_table(sl_distance_pips)
-        reasoning_message = self.formatter.format_trade_reasoning(signal_obj, lot_size_table)
-        reasoning_message_id = self.telegram_client.send_message(
+        reasoning_message_id = deliver(
+            self.telegram_client,
+            self.repository,
             reasoning_message,
             reply_to_message_id=int(message_id),
+            kind="reply",
+            signal_hash=str(signal_hash) if signal_hash is not None else None,
         )
         return int(message_id), int(reasoning_message_id)
 
@@ -280,11 +307,20 @@ class SignalLifecycleManager:
 
             signal_hash = str(self._get_required_value(signal, "signal_hash"))
             new_status = self.EVENT_STATUS_MAP[event_type]
-            reason = self._build_lifecycle_reason(signal, event_type)
+            reason = self._build_lifecycle_reason(signal, event_type, current_candle)
             is_closure = new_status.startswith("CLOSED") or new_status == "CANCELLED"
             if is_closure and hasattr(active_repository, "update_signal_closure"):
-                # Persist WHY it closed, not just that it closed (journal/CSV).
+                # Persist WHY it closed and the exact result, not just that it closed.
+                realized = self._event_realized_r(signal, event_type, current_candle)
                 try:
+                    active_repository.update_signal_closure(
+                        signal_hash,
+                        reason,
+                        new_status,
+                        realized_r=realized,
+                        closed_at=int(current_candle.timestamp),
+                    )
+                except TypeError:
                     active_repository.update_signal_closure(signal_hash, reason, new_status)
                 except Exception as exc:
                     logging.debug("Closure reason persist failed: %s", exc)
@@ -293,42 +329,68 @@ class SignalLifecycleManager:
                 active_repository.update_signal_status(signal_hash, new_status)
             self._record_risk_outcome(active_repository, event_type, current_candle, signal)
 
-            try:
-                message_id = int(active_repository.get_signal_message_id(signal_hash))
-            except KeyError:
-                logging.info(
-                    "No stored Telegram message id for signal %s; lifecycle reply skipped",
-                    signal_hash,
-                )
-                continue
-
             chat_id = self._get_optional_value(signal, "telegram_chat_id")
             if chat_id is not None:
                 self._set_client_chat_id(str(chat_id), telegram_client=active_telegram_client)
+
+            try:
+                message_id = int(active_repository.get_signal_message_id(signal_hash))
+            except KeyError:
+                if uses_outbox(active_repository) and chat_id is not None:
+                    # The signal card itself is still queued: thread these under it later.
+                    for text in active_formatter.format_lifecycle_update(event_type, reason):
+                        active_repository.outbox_add(
+                            str(chat_id), text, kind="reply",
+                            signal_hash=signal_hash, status="PENDING",
+                        )
+                    logging.info("Lifecycle update for %s queued behind its signal card", signal_hash)
+                else:
+                    logging.info(
+                        "No stored Telegram message id for signal %s; lifecycle reply skipped",
+                        signal_hash,
+                    )
+                continue
 
             alert_message, explanation_message = active_formatter.format_lifecycle_update(
                 event_type,
                 reason,
             )
+
             try:
-                active_telegram_client.send_message(
-                    alert_message,
-                    reply_to_message_id=message_id,
-                )
-                active_telegram_client.send_message(
-                    explanation_message,
-                    reply_to_message_id=message_id,
+                deliver(
+                    active_telegram_client, active_repository, alert_message,
+                    reply_to_message_id=message_id, kind="reply", signal_hash=signal_hash,
                 )
             except (TelegramAPIError, ValueError) as exc:
+                if uses_outbox(active_repository):
+                    active_repository.outbox_add(
+                        str(getattr(active_telegram_client, "chat_id", "") or chat_id or ""),
+                        explanation_message, kind="reply",
+                        reply_to_message_id=message_id, signal_hash=signal_hash,
+                        status="PENDING",
+                    )
                 # The new status is already saved; a lost message must not stop
                 # the remaining trades and candles from being checked.
                 undelivered += 1
                 logging.error(
-                    "Lifecycle update not delivered: signal=%s event=%s error=%s",
+                    "Lifecycle update not delivered (queued for retry): signal=%s event=%s error=%s",
                     signal_hash,
                     event_type,
                     exc,
                 )
+            else:
+                try:
+                    deliver(
+                        active_telegram_client, active_repository, explanation_message,
+                        reply_to_message_id=message_id, kind="reply", signal_hash=signal_hash,
+                    )
+                except (TelegramAPIError, ValueError) as exc:
+                    undelivered += 1
+                    logging.error(
+                        "Lifecycle explanation not delivered (queued for retry): signal=%s error=%s",
+                        signal_hash,
+                        exc,
+                    )
             logging.info(
                 "Processed signal lifecycle event: signal=%s event=%s status=%s",
                 signal_hash,
@@ -449,6 +511,20 @@ class SignalLifecycleManager:
         return None
 
     @staticmethod
+    def _event_realized_r(signal: Any, event_type: str, current_candle: Candle) -> Optional[float]:
+        try:
+            return realized_r_for_event(
+                event_type,
+                str(SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")),
+                float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry")),
+                float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl")),
+                float(SignalLifecycleManager._get_required_value(signal, "tp2_price", "tp2")),
+                exit_price=float(current_candle.close),
+            )
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    @staticmethod
     def _record_risk_outcome(
         repository: Any,
         event_type: str,
@@ -464,31 +540,23 @@ class SignalLifecycleManager:
                 governor.record_win(repository)
 
             r_delta = SignalLifecycleManager.EVENT_R_MAP.get(event_type)
-            if event_type == "STRUCTURE_EXIT" and signal is not None:
-                # Banked TP1 half (0.75R) plus the runner half marked at close.
-                try:
-                    entry = float(
-                        SignalLifecycleManager._get_required_value(signal, "entry_price", "entry")
-                    )
-                    sl = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
-                    direction = str(
-                        SignalLifecycleManager._get_value(signal, "signal_type", "type", default="")
-                    ).upper()
-                    risk = abs(entry - sl)
-                    if risk > 0:
-                        move = float(current_candle.close) - entry
-                        if direction == "SHORT":
-                            move = -move
-                        r_delta = 0.75 + 0.5 * (move / risk)
-                except (TypeError, ValueError, AttributeError):
-                    r_delta = 0.75
+            if signal is not None and (
+                r_delta is not None or event_type == "STRUCTURE_EXIT"
+            ):
+                exact = SignalLifecycleManager._event_realized_r(
+                    signal, event_type, current_candle
+                )
+                if exact is not None:
+                    r_delta = exact
             if r_delta is not None:
                 governor.record_result_r(repository, r_delta, event_ts)
         except Exception as exc:
             logging.debug("Risk outcome recording skipped: %s", exc)
 
     @staticmethod
-    def _build_lifecycle_reason(signal: Any, event_type: str) -> str:
+    def _build_lifecycle_reason(
+        signal: Any, event_type: str, current_candle: Optional[Candle] = None
+    ) -> str:
         normalized = event_type.upper()
         nd = SignalLifecycleManager._signal_instrument(signal).price_decimals
         if normalized == "ACTIVATED":
@@ -509,13 +577,20 @@ class SignalLifecycleManager:
         if normalized == "EARLY_BE":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return (
-                f"Trade ran +1R then returned to entry at {price:.{nd}f}; "
+                f"Trade ran +{SignalLifecycleManager.BE_ARM_R:g}R then returned to entry at {price:.{nd}f}; "
                 "protected at breakeven instead of taking the full stop."
             )
         if normalized == "EXPIRED":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return f"Pending entry at {price:.{nd}f} was never triggered; signal cancelled."
         if normalized == "TIME_STOP":
+            if current_candle is not None:
+                result = SignalLifecycleManager._event_realized_r(signal, event_type, current_candle)
+                if result is not None:
+                    return (
+                        "Trade never reached TP1 within the holding window; closed at "
+                        f"{float(current_candle.close):.{nd}f} ({result:+.2f}R)."
+                    )
             return "Trade never reached TP1 within the holding window; closed as stagnant."
         if normalized == "STRUCTURE_EXIT":
             return "Market structure flipped against the runner; closed to protect banked TP1 gains."

@@ -8,7 +8,7 @@ Scenario D: Expired 24h cache triggers macro fetch and kv_store update
 
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pandas as pd
@@ -19,7 +19,7 @@ from src.analysis.regime import RegimeDetector
 from src.ingestion.macro_client import FredMacroClient
 from src.persistence.schema import SchemaInitializer
 from src.persistence.repository import Repository
-from src.core.orchestrator import PulseOrchestrator, MACRO_CACHE_TTL_SECONDS
+from src.core.orchestrator import PulseOrchestrator
 
 
 def _make_repo() -> Repository:

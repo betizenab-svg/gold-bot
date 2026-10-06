@@ -2,6 +2,7 @@
 clocks, DST sessions, deterministic hashes, heartbeat, control-room detail."""
 from __future__ import annotations
 
+import os
 import sqlite3
 from unittest.mock import MagicMock
 
@@ -132,9 +133,10 @@ class _KvRepo:
         self.kv[key] = str(value)
 
 
-def test_heartbeat_and_error_alert() -> None:
+def test_heartbeat_and_error_alert(monkeypatch) -> None:
     from src.core.orchestrator import PulseOrchestrator
 
+    monkeypatch.setenv("TELEGRAM_ADMIN_CHAT_ID", "owner-1")
     telegram = MagicMock()
     telegram.chat_id = "chat-1"
     orchestrator = PulseOrchestrator(telegram_client_factory=lambda: telegram)
@@ -148,6 +150,7 @@ def test_heartbeat_and_error_alert() -> None:
         orchestrator._record_pulse_health(repo, errors_encountered=1)
     telegram.send_message.assert_called_once()
     assert "health alert" in telegram.send_message.call_args.args[0]
+    assert telegram.chat_id == "owner-1"
 
     # Cooldown: a sixth failing pulse does not re-alert.
     orchestrator._record_pulse_health(repo, errors_encountered=1)
@@ -185,7 +188,7 @@ def dashboard_client(tmp_path, monkeypatch):
     client = flask_app.test_client()
     client.post(
         "/login",
-        data={"username": "Machete", "password": "@Machete1231"},
+        data={"username": os.environ["DASHBOARD_USERNAME"], "password": os.environ["DASHBOARD_PASSWORD"]},
         follow_redirects=True,
     )
     return client

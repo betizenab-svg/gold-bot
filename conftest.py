@@ -30,3 +30,10 @@ os.environ.setdefault("BE_ARM_R", "1.0")
 # Legacy suites exercise the single-symbol pipeline; multi-symbol paths have
 # their own dedicated tests that override this.
 os.environ.setdefault("SYMBOLS", "XAUUSD")
+# Test-only dashboard login (production reads its own from .env).
+os.environ.setdefault("DASHBOARD_USERNAME", "test-admin")
+os.environ.setdefault("DASHBOARD_PASSWORD", "test-password")
+# Never reach real spot-price, admin-chat or watchdog services from tests.
+os.environ.setdefault("TWELVEDATA_API_KEY", "")
+os.environ.setdefault("TELEGRAM_ADMIN_CHAT_ID", "")
+os.environ.setdefault("HEALTHCHECK_PING_URL", "")

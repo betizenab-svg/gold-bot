@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
@@ -101,8 +102,14 @@ def test_detect_sweep_identifies_liquidity_sweep_short() -> None:
 
 
 def test_detect_sweep_rejects_volume_at_or_below_threshold() -> None:
-    equal_volume_candle = _make_candle(1_700_001_120, 100.0, 101.0, 94.0, 96.0, 120.0)
-    below_volume_candle = _make_candle(1_700_001_180, 100.0, 111.0, 99.0, 109.0, 119.0)
+    # Volume confirmation applies to markets with real traded volume (BTC);
+    # spot gold has none and is judged on price alone.
+    equal_volume_candle = replace(
+        _make_candle(1_700_001_120, 100.0, 101.0, 94.0, 96.0, 120.0), symbol="BTCUSD"
+    )
+    below_volume_candle = replace(
+        _make_candle(1_700_001_180, 100.0, 111.0, 99.0, 109.0, 119.0), symbol="BTCUSD"
+    )
     detector = LiquiditySweepDetector()
 
     assert detector.detect_sweep(equal_volume_candle, 100.0, 110.0, 95.0) is None

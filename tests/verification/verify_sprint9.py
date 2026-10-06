@@ -10,12 +10,10 @@ Tests:
 """
 
 import math
-import os
 import sqlite3
-import sys
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from unittest.mock import MagicMock, patch
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -13,16 +14,17 @@ from flask_login import LoginManager, current_user, login_required, login_user, 
 
 from config.instruments import active_symbols, get_instrument, state_key
 from config.settings import BASE_DIR, DB_PATH
-from src.dashboard.auth import AdminUser, DEFAULT_USERNAME, load_user, verify_credentials
+from src.analysis.outcomes import STATUS_R_FALLBACK, row_r
+from src.dashboard.auth import AdminUser, load_user, login_configured, verify_credentials
 
-# Realized R by closing status (kept in sync with the calibration script).
-_STATUS_R = {
-    "CLOSED_TP2": 2.25,
-    "CLOSED_BE": 0.75,
-    "CLOSED_SL": -1.0,
-    "CLOSED_TIME": 0.0,
-    "CLOSED_STRUCT": 1.0,
-}
+# Legacy per-status values, used only for rows without a stored exact result.
+_STATUS_R = dict(STATUS_R_FALLBACK)
+
+_CLOSED_PUBLIC = "status LIKE 'CLOSED%' AND COALESCE(trial, 0) = 0"
+
+
+def _r(row: dict[str, Any]) -> float:
+    return float(row_r(row.get("status"), row.get("realized_r")) or 0.0)
 
 
 def _to_int(value: Any, default: int = 0) -> int:
@@ -197,10 +199,8 @@ def create_app() -> Flask:
         static_url_path="/static",
     )
 
-    flask_app.config["SECRET_KEY"] = os.getenv(
-        "DASHBOARD_SECRET_KEY",
-        "replace-this-secret-in-production",
-    )
+    # A random key per start is safe: it only means logging in again after a restart.
+    flask_app.config["SECRET_KEY"] = os.getenv("DASHBOARD_SECRET_KEY") or secrets.token_hex(32)
 
     login_manager = LoginManager()
     setattr(login_manager, "login_view", "login")
@@ -215,17 +215,18 @@ def create_app() -> Flask:
         if current_user.is_authenticated:
             return redirect(url_for("index"))
 
+        login_disabled = not login_configured()
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             if verify_credentials(username, password):
-                login_user(AdminUser(DEFAULT_USERNAME), remember=False)
+                login_user(AdminUser(username), remember=False)
                 return redirect(_safe_next_url())
 
             flash("Invalid credentials. Access denied.", "error")
-            return render_template("login.html"), 401
+            return render_template("login.html", login_disabled=login_disabled), 401
 
-        return render_template("login.html")
+        return render_template("login.html", login_disabled=login_disabled)
 
     @flask_app.route("/logout")
     @login_required
@@ -250,7 +251,7 @@ def create_app() -> Flask:
             _query_value(
                 """
                 SELECT COUNT(*) FROM signals
-                WHERE status IN ('CLOSED_TP2', 'CLOSED_SL', 'CANCELLED');
+                WHERE status LIKE 'CLOSED%' OR status = 'CANCELLED';
                 """,
                 default=0,
             )
@@ -284,14 +285,12 @@ def create_app() -> Flask:
         )
 
         # Net realized R across all closed trades (the one number that matters).
-        status_counts = _query_rows(
-            "SELECT status, COUNT(*) AS n FROM signals GROUP BY status;"
-        )
-        net_r = 0.0
-        for row in status_counts:
-            net_r += _STATUS_R.get(str(row.get("status", "")).upper(), 0.0) * _to_int(
-                row.get("n")
+        net_r = sum(
+            _r(row)
+            for row in _query_rows(
+                f"SELECT status, realized_r FROM signals WHERE {_CLOSED_PUBLIC};"
             )
+        )
 
         # Open positions with instrument-correct price formatting.
         open_rows = _query_rows(
@@ -388,12 +387,11 @@ def create_app() -> Flask:
                 default=0,
             )
         )
-        status_counts = _query_rows(
-            "SELECT status, COUNT(*) AS n FROM signals GROUP BY status;"
-        )
         net_r = sum(
-            _STATUS_R.get(str(row.get("status", "")).upper(), 0.0) * _to_int(row.get("n"))
-            for row in status_counts
+            _r(row)
+            for row in _query_rows(
+                f"SELECT status, realized_r FROM signals WHERE {_CLOSED_PUBLIC};"
+            )
         )
         return {
             "heartbeat_age_min": (
@@ -477,7 +475,7 @@ def create_app() -> Flask:
                    COALESCE(tp2_price, tp2) AS tp2_price,
                    score, status, timestamp,
                    COALESCE(mfe_r,0) AS mfe_r, COALESCE(mae_r,0) AS mae_r,
-                   COALESCE(closure_reason,'') AS closure_reason
+                   COALESCE(closure_reason,'') AS closure_reason, realized_r
             FROM signals ORDER BY id ASC;
             """
         )
@@ -499,7 +497,7 @@ def create_app() -> Flask:
                     row.get("tp1_price"), row.get("tp2_price"),
                     row.get("score"), row.get("status"),
                     _format_unix_ts(row.get("timestamp")),
-                    _STATUS_R.get(str(row.get("status", "")).upper(), ""),
+                    _r(row) if str(row.get("status", "")).upper().startswith("CLOSED") else "",
                     row.get("mfe_r"), row.get("mae_r"), row.get("closure_reason"),
                 ]
             )
@@ -678,12 +676,12 @@ def create_app() -> Flask:
         # Equity curve: cumulative realized R over closed signals, in order.
         closed = _query_rows(
             f"""
-            SELECT id, timestamp, status, symbol,
+            SELECT id, timestamp, status, symbol, realized_r,
                    COALESCE(strategy,'UNKNOWN') AS strategy
             FROM signals
-            WHERE status IN ('CLOSED_TP2','CLOSED_BE','CLOSED_SL','CLOSED_TIME','CLOSED_STRUCT')
+            WHERE {_CLOSED_PUBLIC}
             {where_symbol}
-            ORDER BY id ASC;
+            ORDER BY COALESCE(closed_at, timestamp) ASC, id ASC;
             """,
             params,
         )
@@ -691,7 +689,7 @@ def create_app() -> Flask:
         curve_labels: list[str] = []
         curve_values: list[float] = []
         for row in closed:
-            cumulative += _STATUS_R.get(str(row.get("status", "")).upper(), 0.0)
+            cumulative += _r(row)
             curve_labels.append(_format_unix_ts(row.get("timestamp"))[:10])
             curve_values.append(round(cumulative, 2))
 
@@ -703,9 +701,9 @@ def create_app() -> Flask:
         totals = {
             "closed": len(closed),
             "net_r": round(cumulative, 2),
-            "wins": sum(1 for r in closed if str(r.get("status")) == "CLOSED_TP2"),
-            "losses": sum(1 for r in closed if str(r.get("status")) == "CLOSED_SL"),
-            "breakeven": sum(1 for r in closed if str(r.get("status")) == "CLOSED_BE"),
+            "wins": sum(1 for r in closed if _r(r) > 0.8),
+            "losses": sum(1 for r in closed if _r(r) < 0),
+            "breakeven": sum(1 for r in closed if 0 <= _r(r) <= 0.8),
         }
 
         excursions = _query_rows(
@@ -728,7 +726,7 @@ def create_app() -> Flask:
         session_n: dict[str, int] = {}
         for row in closed:
             label = current_session_label(_to_int(row.get("timestamp")))
-            r_value = _STATUS_R.get(str(row.get("status", "")).upper(), 0.0)
+            r_value = _r(row)
             session_r[label] = session_r.get(label, 0.0) + r_value
             session_n[label] = session_n.get(label, 0) + 1
         session_split = [
@@ -743,10 +741,9 @@ def create_app() -> Flask:
             stats = symbol_stats.setdefault(
                 sym, {"symbol": sym, "net_r": 0.0, "n": 0, "wins": 0}
             )
-            status = str(row.get("status", "")).upper()
-            stats["net_r"] += _STATUS_R.get(status, 0.0)
+            stats["net_r"] += _r(row)
             stats["n"] += 1
-            if status == "CLOSED_TP2":
+            if _r(row) > 0:
                 stats["wins"] += 1
         symbol_split = sorted(
             (
@@ -774,9 +771,7 @@ def create_app() -> Flask:
                 continue
             ny_dt = datetime.fromtimestamp(ts, tz=_tz.utc).astimezone(ny_tz)
             key = (ny_dt.weekday(), ny_dt.hour)
-            heat[key] = heat.get(key, 0.0) + _STATUS_R.get(
-                str(row.get("status", "")).upper(), 0.0
-            )
+            heat[key] = heat.get(key, 0.0) + _r(row)
         heat_max = max((abs(v) for v in heat.values()), default=1.0) or 1.0
         weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         heatmap = []
@@ -794,18 +789,25 @@ def create_app() -> Flask:
                 )
             heatmap.append({"day": day_name, "cells": cells})
 
-        # R-multiple distribution (outcome histogram).
+        # R-multiple distribution (outcome histogram) from exact results.
+        histogram_order = [
+            ("stop", "-1R stop", "neg"),
+            ("flat", "about 0R (breakeven / time)", "flat"),
+            ("partial", "+0.75R (TP1 banked)", "flat"),
+            ("win", "+1R or more", "pos"),
+        ]
         outcome_counts: dict[str, int] = {}
         for row in closed:
-            status = str(row.get("status", "")).upper()
-            outcome_counts[status] = outcome_counts.get(status, 0) + 1
-        histogram_order = [
-            ("CLOSED_SL", "-1R stop", "neg"),
-            ("CLOSED_TIME", "0R time", "flat"),
-            ("CLOSED_BE", "+0.75R breakeven", "flat"),
-            ("CLOSED_STRUCT", "+1R structure", "pos"),
-            ("CLOSED_TP2", "+2.25R full win", "pos"),
-        ]
+            value = _r(row)
+            if value <= -0.5:
+                bucket = "stop"
+            elif value < 0.5:
+                bucket = "flat"
+            elif value < 1.0:
+                bucket = "partial"
+            else:
+                bucket = "win"
+            outcome_counts[bucket] = outcome_counts.get(bucket, 0) + 1
         hist_max = max(outcome_counts.values(), default=1) or 1
         histogram = [
             {
@@ -829,13 +831,7 @@ def create_app() -> Flask:
             sym = str(row.get("symbol") or "XAUUSD")
             series = symbol_curve_map.setdefault(sym, [])
             previous = series[-1] if series else 0.0
-            series.append(
-                round(
-                    previous
-                    + _STATUS_R.get(str(row.get("status", "")).upper(), 0.0),
-                    2,
-                )
-            )
+            series.append(round(previous + _r(row), 2))
         symbol_curves = [
             {
                 "symbol": sym,

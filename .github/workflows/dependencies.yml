@@ -1,0 +1,71 @@
+name: Library updates
+
+# Once a week, while markets are closed: try the newest versions of the
+# libraries in a scratch environment, run every test, and only if all pass
+# move the pinned versions forward. If anything fails the bot keeps its old,
+# working versions and the owner gets a Telegram note.
+
+on:
+  schedule:
+    - cron: "17 4 * * 0" # Sunday 04:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: library-updates
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Try the newest library versions
+        id: try
+        run: |
+          python -m venv /tmp/try
+          names=$(grep -E '^[A-Za-z]' requirements.txt | sed 's/==.*//')
+          /tmp/try/bin/pip install -q --upgrade $names
+          /tmp/try/bin/pip install -q -r requirements-dev.txt
+          /tmp/try/bin/python scripts/update_pins.py requirements.txt > /tmp/new_requirements.txt
+          if cmp -s requirements.txt /tmp/new_requirements.txt; then
+            echo "Everything is already up to date."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            diff requirements.txt /tmp/new_requirements.txt || true
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run every test with the new versions
+        if: steps.try.outputs.changed == 'true'
+        run: /tmp/try/bin/python -m pytest -q -p no:cacheprovider
+
+      - name: Move the pinned versions forward
+        if: steps.try.outputs.changed == 'true'
+        run: |
+          cp /tmp/new_requirements.txt requirements.txt
+          git config user.name "gold-bot"
+          git config user.email "gold-bot@users.noreply.github.com"
+          git commit -am "deps: newer library versions passed every test [skip ci]"
+          git push || (git pull --rebase && git push)
+
+      - name: Tell the owner if an update broke something
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$TOKEN" ] && [ -n "$CHAT" ] || exit 0
+          curl -fsS -m 15 "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" \
+            --data-urlencode "text=Weekly library update check failed. The bot stays on its old, working versions. Details: ${RUN_URL}" \
+            -o /dev/null

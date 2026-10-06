@@ -59,6 +59,12 @@
         </div>
         {% endif %} {% endwith %}
 
+        {% if login_disabled %}
+        <div class="mt-5 rounded-xl border border-amber-400/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
+          Login is switched off: add DASHBOARD_USERNAME and DASHBOARD_PASSWORD to the .env file, then restart the dashboard.
+        </div>
+        {% endif %}
+
         <form method="post" class="mt-6 space-y-4">
           <div>
             <label

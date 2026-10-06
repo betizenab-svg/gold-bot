@@ -53,6 +53,7 @@ def test_cot_overcrowded_gate() -> None:
             "macro_consensus_state": "NEUTRAL",
             "macro_long_bias_multiplier": 1.0,
         },
+        mode="block",
     )
 
     assert permitted is False
@@ -68,6 +69,7 @@ def test_sovereign_floor_gate() -> None:
             "macro_consensus_state": "NEUTRAL",
             "macro_long_bias_multiplier": 1.25,
         },
+        mode="block",
     )
 
     assert permitted is False
@@ -146,7 +148,8 @@ def test_orchestrator_integration_blocked_setup() -> None:
         }
     )
 
-    with patch.object(SignalFactory, "build_signal", autospec=True) as build_signal_mock:
+    with patch.object(SignalFactory, "build_signal", autospec=True) as build_signal_mock, \
+            patch("config.settings.MACRO_GATES_MODE", "block"):
         with patch.object(TelegramClient, "send_message", autospec=True) as send_message_mock:
             orchestrator.run()
             build_signal_mock.assert_not_called()

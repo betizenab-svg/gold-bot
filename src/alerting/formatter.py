@@ -27,9 +27,16 @@ class SignalFormatter:
         tp1_price = self._get_numeric(signal_obj, "tp1_price", "tp1", decimals=nd)
         tp2_price = self._get_numeric(signal_obj, "tp2_price", "tp2", decimals=nd)
         generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        backup_line = ""
+        if str(self._get_value(signal_obj, "price_source", default="") or "").upper() == "BACKUP":
+            backup_line = (
+                "\u26a0\ufe0f <b>Backup prices:</b> the main price feed was down. "
+                "Check these levels against your broker's chart before entering.\n"
+            )
 
         return (
             "\U0001f6a8 <b>Signal Alert</b>\n"
+            f"{backup_line}"
             f"\U0001f7e1 <b>Status:</b> market execution/pending order\n"
             f"\U0001f4cc <b>Symbol:</b> {symbol}\n"
             f"\U0001f4c8 <b>Direction:</b> {direction}\n"
@@ -103,13 +110,13 @@ class SignalFormatter:
             alert_message = "⚖️ <b>Breakeven Exit</b>\nRunner closed at entry after TP1 was banked."
             explanation_title = "Reason"
         elif normalized_type == "EARLY_BE":
-            alert_message = "🛡️ <b>Breakeven Protect</b>\nRan +1R, stop moved to entry, closed flat instead of stopped."
+            alert_message = "🛡️ <b>Breakeven Protect</b>\nTrade moved in profit, stop went to entry, closed flat (0R) instead of stopped."
             explanation_title = "Reason"
         elif normalized_type == "EXPIRED":
             alert_message = "⌛ <b>Signal Expired</b>\nEntry was never triggered; order cancelled."
             explanation_title = "Reason"
         elif normalized_type == "TIME_STOP":
-            alert_message = "⏱️ <b>Time Stop</b>\nTrade stalled without reaching TP1; closed flat."
+            alert_message = "⏱️ <b>Time Stop</b>\nTrade stalled without reaching TP1; closed at market."
             explanation_title = "Reason"
         elif normalized_type == "STRUCTURE_EXIT":
             alert_message = "🔀 <b>Structure Exit</b>\nTrend flipped; runner closed with TP1 already banked."

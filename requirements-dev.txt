@@ -1,0 +1,3 @@
+# Only for checks (GitHub test runs and your own computer); the bot does not need these.
+pytest==9.1.1
+ruff==0.16.10

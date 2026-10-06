@@ -1,6 +1,6 @@
 """Test script for Sprint 13: Consensus Variance (Surprise Factor)."""
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pandas as pd
 

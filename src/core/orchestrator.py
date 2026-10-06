@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+from dataclasses import replace as dataclass_replace
 # Trigger linter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, Optional, cast
@@ -16,8 +17,10 @@ import pandas as pd
 from config.database import get_connection
 from src.core.logger import StructuredLogger
 from src.core.telemetry import MemoryProfiler
-from src.alerting.lifecycle_manager import LifecycleManager
+from src.alerting.lifecycle_manager import LifecycleManager, SignalLifecycleManager
+from src.alerting.messenger import OutboxFlusher, deliver, notify_admin, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
+from src.analysis.outcomes import realized_r_for_event
 from src.analysis.crisis import CrisisDetector
 from src.analysis.regime import RegimeDetector
 from src.analysis.sovereign import SovereignProxy
@@ -34,7 +37,12 @@ from src.analysis.order_block import OrderBlockScanner
 from src.analysis.signal_factory import SignalFactory
 from src.analysis.scoring import ScoringEngine
 from src.analysis.structure import MarketStructureEngine
-from src.ingestion.factory import get_market_data_client
+from src.ingestion.factory import (
+    SOURCE_SPOT,
+    feed_kind_key,
+    get_market_router,
+    spot_feed_configured,
+)
 from src.ingestion.macro_client import FredMacroClient, MacroDataError
 from src.ingestion.cot_client import CotClient
 from src.ingestion.calendar_client import EconomicCalendarClient
@@ -49,16 +57,23 @@ from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
     AUTO_QUARANTINE_ENABLED,
     CHART_ALERTS_ENABLED,
+    CODE_VERSION,
     DAILY_STATUS_ENABLED,
+    DAILY_STATUS_HOUR_UTC,
     DISABLED_STRATEGIES,
     DXY_TICKER,
-    DXY_CORRELATION_WINDOW,
+    FEED_LAG_ALERT_MINUTES,
     MARKET_DATA_RETENTION_DAYS,
     NEWS_AUTOFETCH_ENABLED,
     NEWS_CALENDAR_REFRESH_HOURS,
+    OPS_TELEMETRY_ENABLED,
+    SHADOW_MAX_AGE_DAYS,
+    SHADOW_TRACKING_ENABLED,
     SIGNAL_TIMEFRAME,
     TIMEFRAME_SECONDS,
     FSR_LOOKBACK_PERIOD,
+    TWELVEDATA_API_KEY,
+    TWELVEDATA_BASE_URL,
     WEEKLY_REPORT_ENABLED,
     WEEKLY_REPORT_INTERVAL_DAYS,
     WEEKLY_REPORT_MIN_TRADES,
@@ -79,7 +94,7 @@ MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
 MACRO_HISTORY_DAYS = 90
 DXY_HISTORY_DAYS = 30
 
-# Realized R by closing status (mirrors scripts/calibrate_from_history.py).
+# Legacy per-status values for rows written before exact results were stored.
 STATUS_R = {
     "CLOSED_TP2": 2.25,
     "CLOSED_BE": 0.75,
@@ -87,6 +102,19 @@ STATUS_R = {
     "CLOSED_TIME": 0.0,
     "CLOSED_STRUCT": 1.0,
 }
+
+# Per-market state that refers to price levels; cleared when a market changes feed.
+PRICE_STATE_KEYS = (
+    "swing_history",
+    "smc_latest_fractals",
+    "last_swing_high",
+    "last_swing_low",
+    "latest_liquidity_sweep",
+    "current_structure_state",
+    "last_setup_attempt",
+    "latest_setup_score",
+    "latest_setup_classification",
+)
 
 
 class PulseOrchestrator:
@@ -104,7 +132,7 @@ class PulseOrchestrator:
         structured_logger: Optional[StructuredLogger] = None,
     ) -> None:
         self.repository_factory = repository_factory or self._default_repository_factory
-        self.client_factory = client_factory or get_market_data_client
+        self.client_factory = client_factory or get_market_router
         self.memory_profiler = memory_profiler or MemoryProfiler()
         self.structured_logger = structured_logger
         self.macro_client = macro_client or FredMacroClient()
@@ -117,6 +145,8 @@ class PulseOrchestrator:
         )
         # Strategies quarantined automatically from live results (kv-backed).
         self._extra_disabled: set[str] = set()
+        # Per-market price source and lateness seen during the current run.
+        self._run_feed: dict[str, dict[str, Any]] = {}
 
     def _default_repository_factory(self) -> Repository:
         connection = get_connection()
@@ -175,7 +205,12 @@ class PulseOrchestrator:
         return MockClient()
 
     def _fetch_gold_daily_closes(self, repository: Repository) -> pd.Series:
-        """Aggregate stored XAUUSD candles from market_data into daily closes."""
+        """Daily gold closes for the macro engines: the spot feed's own daily
+        bars when it is configured (one call a day), else stored candles."""
+        if spot_feed_configured("XAUUSD"):
+            spot_daily = self._spot_daily_closes("XAU/USD")
+            if not spot_daily.empty:
+                return spot_daily
         cutoff = datetime.now(timezone.utc) - timedelta(days=MACRO_HISTORY_DAYS)
         cutoff_ts = int(cutoff.timestamp())
 
@@ -192,6 +227,39 @@ class PulseOrchestrator:
         daily.index = pd.DatetimeIndex(daily.index)
 
         return cast(pd.Series, daily)
+
+    @staticmethod
+    def _spot_daily_closes(spot_symbol: str) -> pd.Series:
+        import requests
+
+        try:
+            response = requests.get(
+                f"{TWELVEDATA_BASE_URL.rstrip('/')}/time_series",
+                params={
+                    "symbol": spot_symbol,
+                    "interval": "1day",
+                    "outputsize": MACRO_HISTORY_DAYS,
+                    "timezone": "UTC",
+                    "apikey": TWELVEDATA_API_KEY,
+                },
+                timeout=15,
+            )
+            values = response.json().get("values")
+        except Exception as exc:
+            logging.info("Spot daily closes unavailable: %s", exc)
+            return pd.Series(dtype=float)
+        if not isinstance(values, list) or not values:
+            return pd.Series(dtype=float)
+        dates: list[Any] = []
+        closes: list[float] = []
+        for item in values:
+            try:
+                dates.append(pd.Timestamp(str(item["datetime"])[:10]))
+                closes.append(float(item["close"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+        series = pd.Series(closes, index=pd.DatetimeIndex(dates), dtype=float).sort_index()
+        return cast(pd.Series, series[~series.index.duplicated(keep="last")])
 
     def _fetch_dxy_daily_closes(self) -> pd.Series:
         """Fetch DXY daily closing prices from Yahoo Finance."""
@@ -786,16 +854,9 @@ class PulseOrchestrator:
             zone["status"],
         )
 
-    def _persist_actionable_signal(
-        self,
-        repository: Repository,
-        potential_setup: dict[str, Any],
-        recent_candles: List[Candle],
-        current_candle: Candle,
-        total_score: int,
-    ) -> tuple[bool, int]:
+    @staticmethod
+    def _signal_context(potential_setup: dict[str, Any]) -> dict[str, Any]:
         zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
-        trade_direction = str(potential_setup["trade_direction"])
         signal_context: dict[str, Any] = dict(zone)
         for key in (
             "entry_price",
@@ -812,6 +873,40 @@ class PulseOrchestrator:
                 signal_context[key] = potential_setup[key]
         if "id" not in signal_context and "zone_id" in potential_setup:
             signal_context["id"] = potential_setup["zone_id"]
+        return signal_context
+
+    def _hypothetical_levels(
+        self,
+        potential_setup: dict[str, Any],
+        recent_candles: List[Candle],
+        symbol: str,
+    ) -> Optional[tuple[float, float, float, float]]:
+        """Entry/stop/targets the idea would have had, so its outcome can be followed."""
+        if not SHADOW_TRACKING_ENABLED or not isinstance(recent_candles, list) or not recent_candles:
+            return None
+        try:
+            atr_value = ATREngine().calculate_atr(recent_candles[-15:], period=14)
+            return SignalFactory().calculate_parameters(
+                str(potential_setup.get("trade_direction", "")),
+                self._signal_context(potential_setup),
+                atr_value,
+                symbol,
+            )
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            return None
+
+    def _persist_actionable_signal(
+        self,
+        repository: Repository,
+        potential_setup: dict[str, Any],
+        recent_candles: List[Candle],
+        current_candle: Candle,
+        total_score: int,
+        price_source: Optional[str] = None,
+    ) -> tuple[bool, int]:
+        zone = cast(Optional[dict[str, Any]], potential_setup.get("zone")) or {}
+        trade_direction = str(potential_setup["trade_direction"])
+        signal_context = self._signal_context(potential_setup)
 
         signal_factory = SignalFactory()
         atr_value = ATREngine().calculate_atr(recent_candles[-15:], period=14)
@@ -823,6 +918,12 @@ class PulseOrchestrator:
             score=total_score,
             timestamp=int(current_candle.timestamp),
         )
+        try:
+            signal = dataclass_replace(
+                signal, price_source=price_source, code_version=CODE_VERSION
+            )
+        except TypeError:
+            pass
 
         if repository.is_signal_duplicate(signal.signal_hash):
             logging.info("Skipped duplicate signal: %s", signal.signal_hash)
@@ -880,6 +981,17 @@ class PulseOrchestrator:
         """Run the macro regime detection, gated behind a 24-hour cache."""
         now = int(time.time())
 
+        # The old made-up central-bank figure must stop acting right away,
+        # not at the next daily refresh.
+        try:
+            if (
+                repository.get_kv("macro_cb_net_purchases_source") is None
+                and repository.get_kv("macro_long_bias_multiplier") == "1.25"
+            ):
+                repository.set_kv("macro_long_bias_multiplier", "1.0")
+        except Exception as exc:
+            logging.debug("Central-bank flag reset skipped: %s", exc)
+
         last_update_raw = repository.get_kv("last_macro_update_timestamp")
         if last_update_raw is not None:
             try:
@@ -912,13 +1024,13 @@ class PulseOrchestrator:
             "Macro regime updated: %s (correlation=%.4f)", regime, correlation
         )
 
-        # --- Sovereign Demand Proxy ---
+        # --- Sovereign Demand Proxy (real hand-entered figure only) ---
         net_purchases = self.sovereign_proxy.get_net_purchases(repository)
         multiplier = self.sovereign_proxy.calculate_multiplier(net_purchases)
         repository.set_kv("macro_long_bias_multiplier", str(multiplier))
         logging.info(
-            "Sovereign proxy: net_purchases=%.1f, long_bias_multiplier=%.2f",
-            net_purchases,
+            "Sovereign proxy: net_purchases=%s, long_bias_multiplier=%.2f",
+            "unknown" if net_purchases is None else f"{float(net_purchases):.1f}",
             multiplier,
         )
 
@@ -1077,6 +1189,10 @@ class PulseOrchestrator:
             logging.info("Pruned market_data older than %d days", MARKET_DATA_RETENTION_DAYS)
         except Exception as exc:
             logging.debug("Market data prune skipped: %s", exc)
+        try:
+            repository.prune_health_tables(30)
+        except Exception as exc:
+            logging.debug("Health history prune skipped: %s", exc)
 
     # Second attempt at the same level within this bar window scores a bonus
     # (Brooks: "the second signal is more reliable").
@@ -1198,11 +1314,12 @@ class PulseOrchestrator:
                 return
 
             message = build_weekly_report(analysis)
-            telegram_client = self.telegram_client_factory()
-            if getattr(telegram_client, "chat_id", None):
-                telegram_client.send_message(message)
-                repository.set_kv("weekly_report_last_sent", str(now))
-                logging.info("Weekly performance report sent (%d trades)", total_trades)
+            # Tuning advice is for the owner; subscribers get the results card.
+            notify_admin(
+                message, repository=repository, telegram_client=self.telegram_client_factory()
+            )
+            repository.set_kv("weekly_report_last_sent", str(now))
+            logging.info("Weekly performance report sent (%d trades)", total_trades)
         except Exception as exc:
             logging.warning("Weekly report skipped (will retry): %s", exc)
 
@@ -1237,14 +1354,14 @@ class PulseOrchestrator:
             if now - last_alert < 6 * 3600:
                 return
 
-            telegram_client = self.telegram_client_factory()
-            if getattr(telegram_client, "chat_id", None):
-                telegram_client.send_message(
-                    "🩺 <b>Bot health alert</b>\n"
-                    f"{streak} consecutive pulses hit errors. "
-                    "Check the Actions log / data feed. Signals may be delayed."
-                )
-                repository.set_kv("last_error_alert_ts", str(now))
+            notify_admin(
+                "🩺 <b>Bot health alert</b>\n"
+                f"{streak} consecutive pulses hit errors. "
+                "Check the Actions log / data feed. Signals may be delayed.",
+                repository=repository,
+                telegram_client=self.telegram_client_factory(),
+            )
+            repository.set_kv("last_error_alert_ts", str(now))
         except Exception as exc:
             logging.debug("Pulse health recording skipped: %s", exc)
 
@@ -1255,6 +1372,7 @@ class PulseOrchestrator:
         setup: dict[str, Any],
         current_candle: Candle,
         reason: str,
+        levels: Optional[tuple[float, float, float, float]] = None,
     ) -> None:
         """Funnel visibility for pre-scoring blocks (macro gates, governor):
         a benched market must look benched, not broken."""
@@ -1268,6 +1386,7 @@ class PulseOrchestrator:
                 classification="BLOCKED",
                 vetoes=str(reason),
                 timestamp=int(current_candle.timestamp),
+                levels=levels,
             )
         except Exception as exc:
             logging.debug("Blocked-setup funnel logging skipped: %s", exc)
@@ -1298,14 +1417,11 @@ class PulseOrchestrator:
         except Exception:
             return
         try:
-            outcomes = repository.get_closed_outcomes_since(now - 45 * 86400)
+            outcomes = repository.get_closed_results_since(now - 45 * 86400)
             if not isinstance(outcomes, list):
                 return
             stats: dict[str, list[float]] = {}
-            for strategy, status in outcomes:
-                r_value = STATUS_R.get(str(status))
-                if r_value is None:
-                    continue
+            for strategy, _symbol, r_value in outcomes:
                 stats.setdefault(str(strategy).upper(), []).append(float(r_value))
 
             existing = set(self._extra_disabled)
@@ -1325,80 +1441,236 @@ class PulseOrchestrator:
                     f"\u2022 {name}: {exp:+.2f}R/trade over {n} live trades"
                     for name, exp, n in newly
                 )
-                telegram_client = self.telegram_client_factory()
-                if getattr(telegram_client, "chat_id", None):
-                    telegram_client.send_message(
-                        "\U0001f9ea <b>Strategy auto-quarantine</b>\n"
-                        f"{lines}\n"
-                        "<i>Suspended based on live results; clear "
-                        "auto_quarantined_strategies in the DB to re-enable.</i>"
-                    )
+                notify_admin(
+                    "\U0001f9ea <b>Strategy auto-quarantine</b>\n"
+                    f"{lines}\n"
+                    "<i>Suspended based on live results; clear "
+                    "auto_quarantined_strategies in the DB to re-enable.</i>",
+                    repository=repository,
+                    telegram_client=self.telegram_client_factory(),
+                )
                 logging.info("Auto-quarantined strategies: %s", [n for n, _, _ in newly])
             repository.set_kv("strategy_quarantine_last_date", today)
         except Exception as exc:
             logging.debug("Strategy quarantine check skipped: %s", exc)
 
     def _maybe_send_daily_status(self, repository: Repository) -> None:
-        """One quiet-confidence message per day: proof of life plus what the
-        engine looked at, so silence is never mistaken for death."""
+        """The owner's daily check: how many runs happened, which price feeds
+        were used and how late, signals sent, and any warning signs."""
         if not DAILY_STATUS_ENABLED:
             return
         now = int(time.time())
         today = time.strftime("%Y-%m-%d", time.gmtime(now))
+        if time.gmtime(now).tm_hour < DAILY_STATUS_HOUR_UTC:
+            return
         try:
             if repository.get_kv("daily_status_last_date") == today:
                 return
         except Exception:
             return
         try:
-            day_ago = now - 86400
-            candles_24h = repository.count_candles_since(day_ago)
-            signals_24h = repository.count_signals_since(day_ago)
-            open_now = len(repository.get_open_signals())
+            from src.alerting.owner_reports import build_daily_check
 
-            symbol_lines = []
-            for sym in active_symbols():
-                classification = repository.get_kv(
-                    state_key("latest_setup_classification", sym)
-                )
-                score = repository.get_kv(state_key("latest_setup_score", sym))
-                label = str(classification) if classification else "no setup yet"
-                score_text = f" ({score})" if score else ""
-                symbol_lines.append(f"{get_instrument(sym).display_name}: {label}{score_text}")
+            message = build_daily_check(repository, now)
 
             # Regime-drift watch: negative rolling 14-day expectancy is flagged
             # before it can quietly bleed the account.
-            drift_line = ""
             try:
-                recent = repository.get_closed_outcomes_since(now - 14 * 86400)
-                r_values = [
-                    STATUS_R[str(status)]
-                    for _, status in recent
-                    if str(status) in STATUS_R
-                ]
+                recent = repository.get_closed_results_since(now - 14 * 86400)
+                r_values = [float(r) for _, _, r in recent]
                 if len(r_values) >= 6 and sum(r_values) <= -3.0:
-                    drift_line = (
-                        f"\n\u26a0\ufe0f 14-day results: {sum(r_values):+.1f}R over "
-                        f"{len(r_values)} trades \u2014 regime may have shifted; review /performance."
+                    message += (
+                        f"\n\n\u26a0\ufe0f 14-day results: {sum(r_values):+.1f}R over "
+                        f"{len(r_values)} trades \u2014 conditions may have changed; review the dashboard."
                     )
-            except Exception:
-                drift_line = ""
+            except Exception as exc:
+                logging.debug("Drift line skipped: %s", exc)
 
-            message = (
-                "\u2705 <b>Daily Status</b>\n"
-                f"Candles analyzed (24h): <b>{candles_24h}</b>\n"
-                f"Signals published (24h): <b>{signals_24h}</b> | Open now: <b>{open_now}</b>\n"
-                f"Last setups \u2014 {' | '.join(symbol_lines)}\n"
-                "<i>No signal means no setup passed every gate \u2014 that is the "
-                "discipline working, not a malfunction.</i>"
-                f"{drift_line}"
+            notify_admin(
+                message, repository=repository, telegram_client=self.telegram_client_factory()
             )
-            telegram_client = self.telegram_client_factory()
-            if getattr(telegram_client, "chat_id", None):
-                telegram_client.send_message(message)
-                repository.set_kv("daily_status_last_date", today)
+            repository.set_kv("daily_status_last_date", today)
         except Exception as exc:
             logging.debug("Daily status skipped: %s", exc)
+
+    @staticmethod
+    def _price_source(client: Any, symbol: str) -> Optional[str]:
+        sources = getattr(client, "last_source", None)
+        if isinstance(sources, dict):
+            value = sources.get(symbol)
+            return str(value) if value else None
+        return None
+
+    def _adopt_spot_feed(
+        self,
+        repository: Repository,
+        client: Any,
+        symbol: str,
+        timeframe: str,
+    ) -> List[Candle]:
+        """First successful spot fetch: history, zones and swing state drawn on
+        the old futures prices are dropped and refilled from the spot feed.
+        Open signals priced on the old feed are withdrawn."""
+        now = int(time.time())
+        repository.purge_symbol_price_history(symbol)
+        for base in PRICE_STATE_KEYS:
+            repository.delete_kv(state_key(base, symbol))
+        refill_from = str(now - 7 * 86400)
+        repository.set_kv(f"last_processed_{symbol}", refill_from)
+        if symbol == "XAUUSD":
+            repository.set_kv("last_processed_timestamp", refill_from)
+
+        withdrawn = 0
+        reason = (
+            "Withdrawn: this market now uses broker-style spot prices; this "
+            "signal's levels came from the old futures feed. Close or cancel it."
+        )
+        for signal in repository.get_open_signals():
+            if str(getattr(signal, "symbol", "")).upper() != symbol.upper():
+                continue
+            repository.update_signal_closure(signal.signal_hash, reason, "CANCELLED")
+            withdrawn += 1
+            message_id = getattr(signal, "telegram_message_id", None)
+            chat_id = getattr(signal, "telegram_chat_id", None)
+            if message_id and chat_id:
+                try:
+                    deliver(
+                        self.telegram_client_factory(), repository,
+                        "\u26a0\ufe0f <b>Signal withdrawn</b>\n" + reason,
+                        chat_id=str(chat_id), reply_to_message_id=int(message_id),
+                        kind="reply", signal_hash=signal.signal_hash,
+                    )
+                except (TelegramAPIError, ValueError) as exc:
+                    logging.error("Withdrawal notice not delivered: %s", exc)
+
+        repository.set_kv(feed_kind_key(symbol), SOURCE_SPOT)
+        candles = client.fetch_latest_candles(symbol, timeframe)
+        notify_admin(
+            f"\U0001f504 <b>{get_instrument(symbol).display_name} now uses spot prices</b>\n"
+            f"Old futures history and zones were cleared; {len(candles)} spot candles loaded."
+            + (f" {withdrawn} open signal(s) withdrawn." if withdrawn else ""),
+            repository=repository,
+            telegram_client=self.telegram_client_factory(),
+        )
+        logging.warning("%s switched to the spot feed (%d candles loaded)", symbol, len(candles))
+        return candles
+
+    def _update_shadow_outcomes(
+        self,
+        repository: Repository,
+        symbol: str,
+        new_candles: List[Candle],
+    ) -> None:
+        """Follow every blocked/rejected idea with the live trade rules to see
+        what it would have done (the evidence for judging each filter)."""
+        if not SHADOW_TRACKING_ENABLED or not new_candles:
+            return
+        try:
+            rows = repository.get_open_shadow_setups(symbol)
+        except Exception:
+            return
+        if not isinstance(rows, list) or not rows:
+            return
+
+        judge = SignalLifecycleManager(telegram_client=cast(Any, None))
+        max_age = int(SHADOW_MAX_AGE_DAYS) * 86400
+        changed: dict[int, dict[str, Any]] = {}
+        for candle in sorted(new_candles, key=lambda item: item.timestamp):
+            for row in rows:
+                if row.get("closed") or int(candle.timestamp) <= int(row["timestamp"]):
+                    continue
+                event = judge.evaluate_signal(row, candle)
+                if event is None and row["status"] == "PARTIAL_TP1":
+                    event = SignalLifecycleManager._structure_exit_event(repository, row)
+                if event is None and int(candle.timestamp) - int(row["timestamp"]) > max_age:
+                    event = "STRUCTURE_EXIT" if row["status"] == "PARTIAL_TP1" else (
+                        "TIME_STOP" if row["status"] == "ACTIVE" else "EXPIRED"
+                    )
+                if event is None:
+                    if row["status"] in {"ACTIVE", "PARTIAL_TP1"}:
+                        risk = abs(float(row["entry_price"]) - float(row["sl_price"]))
+                        if risk > 0:
+                            favorable = (
+                                float(candle.high) - float(row["entry_price"])
+                                if str(row["signal_type"]).upper() == "LONG"
+                                else float(row["entry_price"]) - float(candle.low)
+                            )
+                            row["mfe_r"] = max(float(row.get("mfe_r") or 0.0), favorable / risk)
+                            changed[int(row["id"])] = row
+                    continue
+
+                new_status = SignalLifecycleManager.EVENT_STATUS_MAP[event]
+                row["status"] = new_status
+                if new_status.startswith("CLOSED") or new_status == "CANCELLED":
+                    row["closed"] = True
+                    row["realized_r"] = (
+                        None
+                        if new_status == "CANCELLED"
+                        else realized_r_for_event(
+                            event,
+                            str(row["signal_type"]),
+                            float(row["entry_price"]),
+                            float(row["sl_price"]),
+                            float(row["tp2_price"]),
+                            exit_price=float(candle.close),
+                        )
+                    )
+                    row["closed_at"] = int(candle.timestamp)
+                changed[int(row["id"])] = row
+
+        for row_id, row in changed.items():
+            try:
+                repository.update_shadow_setup(
+                    row_id,
+                    str(row["status"]),
+                    float(row.get("mfe_r") or 0.0),
+                    realized_r=row.get("realized_r"),
+                    closed_at=row.get("closed_at"),
+                )
+            except Exception as exc:
+                logging.debug("Shadow outcome update skipped: %s", exc)
+
+    def _record_feed_health(
+        self,
+        repository: Repository,
+        symbol: str,
+        timeframe: str,
+        source: Optional[str],
+        newest_ts: Optional[int],
+    ) -> None:
+        """How late the newest candle is; the owner hears when a feed falls behind."""
+        from src.analysis.market_hours import market_open
+
+        now = int(time.time())
+        step = int(TIMEFRAME_SECONDS.get(timeframe, 300))
+        lag = None if not newest_ts else max(0, now - (int(newest_ts) + step))
+        label = source or "MOCK"
+        self._run_feed[symbol] = {
+            "source": label,
+            "lag_min": None if lag is None else round(lag / 60.0, 1),
+        }
+        if not OPS_TELEMETRY_ENABLED:
+            return
+        try:
+            repository.record_feed_health(symbol, label, lag, lag is not None, now)
+        except Exception as exc:
+            logging.debug("Feed health record skipped: %s", exc)
+            return
+        if lag is None or lag < FEED_LAG_ALERT_MINUTES * 60 or not market_open(symbol, now):
+            return
+        alert_key = f"feed_lag_alert_at:{symbol}"
+        try:
+            if now - int(repository.get_kv(alert_key) or 0) < 2 * 3600:
+                return
+        except (TypeError, ValueError):
+            pass
+        repository.set_kv(alert_key, str(now))
+        notify_admin(
+            f"⏰ <b>{get_instrument(symbol).display_name} prices are {lag // 60} minutes late</b>\n"
+            f"Source: {label}. Signals for this market wait until fresh prices arrive.",
+            repository=repository,
+            telegram_client=self.telegram_client_factory(),
+        )
 
     def _pulse_symbol(
         self,
@@ -1420,6 +1692,14 @@ class PulseOrchestrator:
             logging.error("Ingestion failed for %s: %s", symbol, exc)
             return signals_generated, errors_encountered + 1
 
+        price_source = self._price_source(client, symbol)
+        if price_source == SOURCE_SPOT and repository.get_kv(feed_kind_key(symbol)) != SOURCE_SPOT:
+            try:
+                candles = self._adopt_spot_feed(repository, client, symbol, timeframe)
+            except (YahooDataIngestionError, TwelveDataIngestionError) as exc:
+                logging.error("Spot history load failed for %s: %s", symbol, exc)
+                return signals_generated, errors_encountered + 1
+
         self.memory_profiler.log_snapshot(f"Post-ingestion {symbol}")
 
         total_count = len(candles)
@@ -1431,6 +1711,15 @@ class PulseOrchestrator:
         )
         if filtered:
             logging.info("Filtered out %s invalid %s candles", filtered, symbol)
+
+        if valid_candles:
+            newest_ts: Optional[int] = max(candle.timestamp for candle in valid_candles)
+        else:
+            try:
+                newest_ts = int(repository.get_kv(f"last_processed_{symbol}") or 0) or None
+            except (TypeError, ValueError):
+                newest_ts = None
+        self._record_feed_health(repository, symbol, timeframe, price_source, newest_ts)
 
         if not valid_candles:
             logging.info("No valid candles for %s; skipping symbol", symbol)
@@ -1444,6 +1733,7 @@ class PulseOrchestrator:
             repository.set_kv("last_processed_timestamp", latest_timestamp)
         current_candle = max(valid_candles, key=lambda candle: candle.timestamp)
         errors_encountered += self._monitor_open_signals(repository, valid_candles)
+        self._update_shadow_outcomes(repository, symbol, valid_candles)
         self._evaluate_zone_lifecycle(repository, symbol, valid_candles)
 
         detector = FractalDetector()
@@ -1519,7 +1809,8 @@ class PulseOrchestrator:
                     permission_reason,
                 )
                 self._log_blocked_setup(
-                    repository, symbol, potential_setup, current_candle, permission_reason
+                    repository, symbol, potential_setup, current_candle, permission_reason,
+                    levels=self._hypothetical_levels(potential_setup, recent_candles, symbol),
                 )
                 return signals_generated, errors_encountered
 
@@ -1533,7 +1824,8 @@ class PulseOrchestrator:
             if not trading_allowed:
                 logging.info("Setup blocked: %s", governor_reason)
                 self._log_blocked_setup(
-                    repository, symbol, potential_setup, current_candle, governor_reason
+                    repository, symbol, potential_setup, current_candle, governor_reason,
+                    levels=self._hypothetical_levels(potential_setup, recent_candles, symbol),
                 )
                 return signals_generated, errors_encountered
 
@@ -1644,6 +1936,21 @@ class PulseOrchestrator:
                 )
                 classification = scoring_engine.classify_score(total_score)
 
+            penalties = permission_engine.score_penalties(
+                cast(dict[str, Any], potential_setup), macro_context, symbol=symbol
+            )
+            if penalties:
+                total_score = max(0, int(total_score) - sum(points for points, _ in penalties))
+                penalty_notes = [note for _, note in penalties]
+                potential_setup["confluence_notes"] = (
+                    list(potential_setup.get("confluence_notes", [])) + penalty_notes
+                )
+                if classification != "REJECTED":
+                    classification = ScoringEngine().classify_score(total_score)
+                vetoes_text = "; ".join(
+                    part for part in [vetoes_text, *(f"penalty: {n}" for n in penalty_notes)] if part
+                )
+
             self._record_setup_attempt(
                 repository, trade_direction, entry_hint, current_candle
             )
@@ -1701,6 +2008,11 @@ class PulseOrchestrator:
                     classification=str(classification),
                     vetoes=vetoes_text,
                     timestamp=int(current_candle.timestamp),
+                    levels=(
+                        None
+                        if classification == "ACTIONABLE"
+                        else self._hypothetical_levels(potential_setup, recent_candles, symbol)
+                    ),
                 )
             except Exception as exc:
                 logging.debug("Setup funnel logging skipped: %s", exc)
@@ -1719,6 +2031,7 @@ class PulseOrchestrator:
                         recent_candles,
                         current_candle,
                         total_score,
+                        price_source=price_source,
                     )
                     if signal_saved:
                         signals_generated += 1
@@ -1733,6 +2046,19 @@ class PulseOrchestrator:
         del valid_candles
         return signals_generated, errors_encountered
 
+    def _flush_outbox(self, repository: Repository) -> None:
+        if not uses_outbox(repository):
+            return
+        try:
+            flusher = OutboxFlusher(repository, client_factory=self.telegram_client_factory)
+            flusher.recover_interrupted()
+            delivered = flusher.flush()
+            if delivered:
+                logging.info("Delivered %d queued Telegram message(s)", delivered)
+            repository.prune_outbox()
+        except Exception as exc:
+            logging.warning("Outbox flush skipped: %s", exc)
+
     def run(self, force_signal: bool = False) -> None:
         logging.info("---- Pulse started ----")
         structured_logger = self.structured_logger or StructuredLogger()
@@ -1743,8 +2069,10 @@ class PulseOrchestrator:
         repository: Optional[Repository] = None
         signals_generated = 0
         errors_encountered = 0
+        self._run_feed = {}
         try:
             repository = self.repository_factory()
+            self._flush_outbox(repository)
             # --- Macro Regime Check (24-hour gated) ---
             try:
                 self._run_macro_regime_check(repository)
@@ -1818,6 +2146,17 @@ class PulseOrchestrator:
 
             self.memory_profiler.log_snapshot("Pulse end")
             logging.info("Pulse finished in %.2fs", execution_time_ms / 1000.0)
+            if repository is not None and OPS_TELEMETRY_ENABLED and hasattr(repository, "record_pulse_run"):
+                try:
+                    repository.record_pulse_run(
+                        int(time.time()),
+                        int(execution_time_ms),
+                        int(signals_generated),
+                        int(errors_encountered),
+                        json.dumps(self._run_feed, separators=(",", ":")),
+                    )
+                except Exception as exc:
+                    logging.debug("Run record skipped: %s", exc)
             self._record_pulse_health(repository, errors_encountered)
             if repository is not None and hasattr(repository, "close"):
                 repository.close()

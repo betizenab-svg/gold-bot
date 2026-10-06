@@ -1,6 +1,6 @@
 """Test script for Sprint 14: Fundamental Shift Rate (FSR) Engine."""
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pandas as pd
 
@@ -64,7 +64,7 @@ def test_orchestrator_integration():
     state = repo.get_kv("macro_fsr_state")
 
     assert fsr_val_str is not None, "macro_fsr_value should be saved"
-    fsr_val = float(fsr_val_str)
+    float(fsr_val_str)
     
     assert state is not None, "macro_fsr_state should be saved"
     assert state in (

@@ -2,8 +2,8 @@
 London continuation, kill switch, trade-plan reasoning, dashboard pages."""
 from __future__ import annotations
 
+import os
 import sqlite3
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -286,7 +286,7 @@ def dashboard_client(tmp_path, monkeypatch):
     client = flask_app.test_client()
     client.post(
         "/login",
-        data={"username": "Machete", "password": "@Machete1231"},
+        data={"username": os.environ["DASHBOARD_USERNAME"], "password": os.environ["DASHBOARD_PASSWORD"]},
         follow_redirects=True,
     )
     return client, db_path

@@ -37,6 +37,17 @@ class Instrument:
     signal_timeframe: str = ""  # override; empty = global SIGNAL_TIMEFRAME
     signals_enabled: bool = True  # False = watch-only (data + zones, no signals)
     correlation_group: str = ""  # same group + same direction = doubled bet
+    spot_source: str = ""  # "TWELVEDATA" = broker-style spot feed first, Yahoo as backup
+    spot_symbol: str = ""  # symbol name at the spot source, e.g. XAU/USD
+    typical_spread: float = 0.0  # normal broker spread in price units
+    slippage: float = 0.0  # extra price lost per fill in history tests
+    news_currencies: tuple[str, ...] = ("USD",)  # whose high-impact news matters
+    usd_exposure: int = 0  # LONG = -1 short dollar, +1 long dollar, 0 = not a dollar bet
+    code_prefix: str = ""  # short signal code, e.g. G -> #G142
+    trial: bool = False  # True = signals go to the owner's chat only
+    history_source: str = ""  # "DUKASCOPY" | "BINANCE" for multi-year tests
+    history_symbol: str = ""  # name at the history source
+    history_price_scale: float = 0.0  # Dukascopy integer price divisor
 
 
 INSTRUMENTS: dict[str, Instrument] = {
@@ -58,7 +69,18 @@ INSTRUMENTS: dict[str, Instrument] = {
         pivot_roll="ny17",
         pivot_tolerance_floor=1.0,
         london_min_net=0.5,
-        requires_volume=True,
+        # Spot XAU/USD has no traded volume; sweeps are judged on price alone.
+        requires_volume=False,
+        spot_source="TWELVEDATA",
+        spot_symbol="XAU/USD",
+        typical_spread=0.30,
+        slippage=0.10,
+        news_currencies=("USD",),
+        usd_exposure=-1,
+        code_prefix="G",
+        history_source="DUKASCOPY",
+        history_symbol="XAUUSD",
+        history_price_scale=1000.0,
     ),
     "BTCUSD": Instrument(
         symbol="BTCUSD",
@@ -83,6 +105,12 @@ INSTRUMENTS: dict[str, Instrument] = {
         zone_proximity=300.0,
         # M5 replay: -16.5R/45d, 0% full wins — BTC chop needs slower bars.
         signal_timeframe="M15",
+        typical_spread=20.0,
+        slippage=5.0,
+        news_currencies=("USD",),
+        code_prefix="B",
+        history_source="BINANCE",
+        history_symbol="BTCUSDT",
     ),
     "EURUSD": Instrument(
         symbol="EURUSD",
@@ -106,6 +134,14 @@ INSTRUMENTS: dict[str, Instrument] = {
         entry_buffer=0.0002,
         zone_proximity=0.0015,
         correlation_group="EUR_GBP_BLOC",
+        typical_spread=0.00008,
+        slippage=0.00002,
+        news_currencies=("USD", "EUR"),
+        usd_exposure=-1,
+        code_prefix="E",
+        history_source="DUKASCOPY",
+        history_symbol="EURUSD",
+        history_price_scale=100000.0,
     ),
     "GBPUSD": Instrument(
         symbol="GBPUSD",
@@ -129,6 +165,14 @@ INSTRUMENTS: dict[str, Instrument] = {
         entry_buffer=0.0002,
         zone_proximity=0.0018,
         correlation_group="EUR_GBP_BLOC",
+        typical_spread=0.00012,
+        slippage=0.00003,
+        news_currencies=("USD", "GBP"),
+        usd_exposure=-1,
+        code_prefix="P",
+        history_source="DUKASCOPY",
+        history_symbol="GBPUSD",
+        history_price_scale=100000.0,
     ),
 }
 

@@ -112,9 +112,10 @@ Sprint 42 adds a secure Flask dashboard for cPanel hosting via Passenger WSGI wh
 - Session authentication via Flask-Login.
 - All dashboard routes require authentication.
 - Unauthenticated requests redirect to `/login`.
-- Default admin credentials:
-  - Username: `Machete`
-  - Password: `@Machete1231`
+- The login comes from your private `.env` file (never from the code):
+  - `DASHBOARD_USERNAME=your-name`
+  - `DASHBOARD_PASSWORD=a-long-password-you-use-nowhere-else`
+  - Without both lines, login is switched off.
 
 ### Dashboard Routes
 
@@ -273,10 +274,7 @@ python scripts/health_check.py
 5. Point the app to the same project virtual environment used by the bot.
 6. Restart the Python application from cPanel.
 7. Open the dashboard URL in browser.
-8. Sign in using default credentials:
-
-- Username: Machete
-- Password: @Machete1231
+8. Sign in with the DASHBOARD_USERNAME / DASHBOARD_PASSWORD you put in `.env`.
 
 9. Confirm route protection by opening / without login in a fresh browser session.
 10. Confirm dashboard pages load:

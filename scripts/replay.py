@@ -45,6 +45,9 @@ os.environ["NEWS_AUTOFETCH_ENABLED"] = "0"
 os.environ["WEEKLY_REPORT_ENABLED"] = "0"
 os.environ["DAILY_STATUS_ENABLED"] = "0"
 os.environ["AUTO_QUARANTINE_ENABLED"] = "0"
+os.environ["OPS_TELEMETRY_ENABLED"] = "0"
+os.environ["SPOT_FEED_ENABLED"] = "0"
+os.environ["TELEGRAM_ADMIN_CHAT_ID"] = ""
 os.environ["TELEGRAM_BOT_TOKEN"] = ""
 os.environ["TELEGRAM_CHAT_ID"] = ""
 os.environ["TELEGRAM_API_BASE_URL"] = "http://127.0.0.1:9"
@@ -216,7 +219,8 @@ def run_replay(candles: list[Candle], warmup: int = 600) -> dict:
 
 
 def summarize(db_path: str) -> dict:
-    from scripts.calibrate_from_history import OUTCOME_R, analyze
+    from scripts.calibrate_from_history import analyze
+    from src.analysis.outcomes import row_r
 
     report = analyze(db_path)
 
@@ -226,12 +230,15 @@ def summarize(db_path: str) -> dict:
         SELECT status, COUNT(*) FROM signals GROUP BY status;
         """
     ).fetchall()
+    closed = connection.execute(
+        "SELECT status, realized_r FROM signals WHERE status LIKE 'CLOSED%';"
+    ).fetchall()
     connection.close()
 
     counts = {str(status): int(count) for status, count in rows}
     closed_r = 0.0
-    for status, count in counts.items():
-        closed_r += OUTCOME_R.get(status, 0.0) * count
+    for status, realized in closed:
+        closed_r += row_r(status, realized) or 0.0
 
     wins = counts.get("CLOSED_TP2", 0)
     losses = counts.get("CLOSED_SL", 0)

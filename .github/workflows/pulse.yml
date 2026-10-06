@@ -5,8 +5,8 @@ name: Gold Bot Pulse
 # skips most runs and is only a backup.
 #
 # The bot's database travels between runs in the Actions cache (a new entry per
-# run, old ones expire automatically). A copy is committed to the repository at
-# most every 6 hours, so the git history stays small.
+# run; older entries are deleted, the newest 20 are kept). A copy is committed
+# to the repository at most every 6 hours, so the git history stays small.
 
 on:
   workflow_dispatch: {}
@@ -20,37 +20,32 @@ concurrency:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 jobs:
   pulse:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out the latest code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # A run that waited in the queue must not start from older code/state.
           ref: ${{ github.ref }}
 
       - name: Set up Python
         id: python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      # A fresh pip install took ~17s of every ~34s run. Restore a ready-made
-      # environment instead; the date in the key rebuilds it daily so library
-      # fixes (yfinance especially) still arrive.
-      - name: Pick cache day
-        id: day
-        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-
+      # Library versions are pinned, so the ready-made environment is reused
+      # until requirements.txt changes (the weekly update job moves the pins).
       - name: Restore installed packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .venv
-          key: venv-${{ runner.os }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}-${{ steps.day.outputs.day }}
+          key: venv-${{ runner.os }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
         run: |
@@ -62,7 +57,7 @@ jobs:
 
       - name: Restore the bot's latest state
         id: state
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: data/trading_engine.db
           key: bot-state-${{ github.run_id }}
@@ -86,13 +81,19 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # The step limit leaves time for the state to be saved even if a pulse hangs.
       - name: Run one pulse
         id: pulse
         if: steps.guard.outputs.run == 'true'
+        timeout-minutes: 6
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          BOT_PAUSED: ${{ vars.BOT_PAUSED }}
+          CB_NET_PURCHASES_TONNES: ${{ vars.CB_NET_PURCHASES_TONNES }}
+          CB_NET_PURCHASES_QUARTER: ${{ vars.CB_NET_PURCHASES_QUARTER }}
           SIGNAL_TIMEFRAME: "M5"
           BOT_LOG_LEVEL: "INFO"
         run: .venv/bin/python src/bot_runner.py
@@ -100,10 +101,22 @@ jobs:
       # Saved even if the pulse failed part-way: alerts it already sent are in it.
       - name: Save the bot's state
         if: always() && steps.pulse.outcome != 'skipped'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: data/trading_engine.db
           key: bot-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Delete old copies of the saved state (keep the newest 20)
+        if: always() && steps.pulse.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh cache list --key bot-state- --sort created_at --order desc --limit 100 \
+            --json id --jq '.[20:][].id' | while read -r cache_id; do
+            gh cache delete "$cache_id" >/dev/null || true
+          done
 
       - name: Copy the state into the repository (at most every 6 hours)
         if: always() && steps.pulse.outcome != 'skipped'
@@ -130,3 +143,14 @@ jobs:
           git commit -m "pulse: state snapshot [skip ci]"
           # Retry push once after rebasing, in case a manual commit landed meanwhile.
           git push || (git pull --rebase && git push)
+
+      - name: Tell the outside watchdog how this run went
+        if: always()
+        env:
+          HC_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
+          OUTCOME: ${{ steps.pulse.outcome }}
+        run: |
+          [ -n "$HC_URL" ] || exit 0
+          if [ "$OUTCOME" = "success" ]; then suffix=""; else suffix="/fail"; fi
+          curl -fsS -m 10 --retry 3 -o /dev/null "${HC_URL}${suffix}" \
+            || echo "::warning::Could not reach the watchdog (healthchecks.io)."
