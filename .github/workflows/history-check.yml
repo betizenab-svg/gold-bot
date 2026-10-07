@@ -42,6 +42,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
       - name: Read the stored check window
         id: window
         run: |
