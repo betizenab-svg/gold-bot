@@ -167,6 +167,10 @@
   [
    1791303900,
    8.48
+  ],
+  [
+   1791353400,
+   10.73
   ]
  ],
  "history": {
@@ -297,6 +301,15 @@
  },
  "last10": [
   {
+   "closed_at": 1791353400,
+   "code": "#E62",
+   "direction": "SHORT",
+   "name": "Euro",
+   "result_r": 2.25,
+   "status": "CLOSED_TP2",
+   "symbol": "EURUSD"
+  },
+  {
    "closed_at": 1791303900,
    "code": "#P61",
    "direction": "SHORT",
@@ -376,25 +389,16 @@
    "result_r": 2.25,
    "status": "CLOSED_TP2",
    "symbol": "GBPUSD"
-  },
-  {
-   "closed_at": 1791185700,
-   "code": "#P51",
-   "direction": "LONG",
-   "name": "Pound",
-   "result_r": 0.0,
-   "status": "CLOSED_BE",
-   "symbol": "GBPUSD"
   }
  ],
  "last_30_days": {
   "deepest_dip_r": 2.0,
   "flat": 7,
   "losses": 9,
-  "net_r": 13.98,
-  "trades": 30,
-  "win_rate": 46.7,
-  "wins": 14,
+  "net_r": 16.23,
+  "trades": 31,
+  "win_rate": 48.4,
+  "wins": 15,
   "worst_losing_streak": 2
  },
  "markets": {
@@ -414,10 +418,10 @@
    "flat": 3,
    "losses": 5,
    "name": "Euro",
-   "net_r": 2.75,
-   "trades": 14,
-   "win_rate": 42.9,
-   "wins": 6,
+   "net_r": 5.0,
+   "trades": 15,
+   "win_rate": 46.7,
+   "wins": 7,
    "worst_losing_streak": 1
   },
   "GBPUSD": {
@@ -471,10 +475,10 @@
    "flat": 3,
    "losses": 6,
    "month": "2026-10",
-   "net_r": 6.5,
-   "trades": 17,
-   "win_rate": 47.1,
-   "wins": 8,
+   "net_r": 8.75,
+   "trades": 18,
+   "win_rate": 50.0,
+   "wins": 9,
    "worst_losing_streak": 2
   }
  ],
@@ -486,19 +490,6 @@
   }
  ],
  "open": [
-  {
-   "code": "#E62",
-   "direction": "SHORT",
-   "entry": 1.12529,
-   "name": "Euro",
-   "order": "STOP",
-   "status": "PARTIAL_TP1",
-   "stop": 1.12609,
-   "symbol": "EURUSD",
-   "time": 1791331800,
-   "tp1": 1.12409,
-   "tp2": 1.12289
-  },
   {
    "code": "#B65",
    "direction": "SHORT",
@@ -558,10 +549,10 @@
    "deepest_dip_r": 2.25,
    "flat": 5,
    "losses": 8,
-   "net_r": 0.75,
-   "trades": 20,
-   "win_rate": 35.0,
-   "wins": 7,
+   "net_r": 3.0,
+   "trades": 21,
+   "win_rate": 38.1,
+   "wins": 8,
    "worst_losing_streak": 2
   },
   "ZONE_BOUNCE": {
@@ -579,12 +570,12 @@
   "deepest_dip_r": 7.25,
   "flat": 8,
   "losses": 17,
-  "net_r": 8.48,
-  "net_r_after_costs": 6.27,
-  "trades": 42,
-  "win_rate": 40.5,
-  "wins": 17,
+  "net_r": 10.73,
+  "net_r_after_costs": 8.47,
+  "trades": 43,
+  "win_rate": 41.9,
+  "wins": 18,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-07T04:15:21Z"
+ "updated": "2026-10-07T06:15:20Z"
 }
