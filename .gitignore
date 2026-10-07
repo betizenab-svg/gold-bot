@@ -17,3 +17,5 @@ data/replay_report.json
 # Downloaded price history and proof-engine working files (rebuilt on demand)
 data/history/
 data/proof/
+data/control_room.db
+data/control_room.part

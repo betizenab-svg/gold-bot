@@ -961,6 +961,19 @@ def create_app() -> Flask:
             flash("Could not save news event.", "error")
         return redirect(url_for("risk"))
 
+    @flask_app.route("/control")
+    @login_required
+    def control_room() -> Any:
+        from src.dashboard import control_room as room
+
+        days = max(1, min(365, _to_int(request.args.get("days", 30), 30)))
+        try:
+            with _db_connection() as conn:
+                data = room.build(conn, days=days)
+        except sqlite3.Error:
+            data = room.build(sqlite3.connect(":memory:"), days=days)
+        return render_template("control.html", room=data)
+
     @flask_app.route("/market")
     @login_required
     def market() -> Any:

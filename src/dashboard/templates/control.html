@@ -1,0 +1,106 @@
+{% extends "base.html" %} {% block title %}Control room | XAUUSD Intelligence{% endblock %}
+{% block page_title %}Control room{% endblock %} {% block content %}
+{% set card = "rounded-2xl border border-white/10 bg-slatecore/55 p-5 shadow-luxe" %}
+<p class="mb-4 text-sm text-slate-400">
+  Public trades only unless marked. Idea and price-source numbers cover the last
+  {{ room.days }} days
+  (<a class="underline" href="?days=7">7</a> · <a class="underline" href="?days=30">30</a> ·
+  <a class="underline" href="?days=90">90</a>).
+</p>
+
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Running total and dips</h2>
+    <p class="text-xs text-slate-400">
+      Worst dip {{ "%+.2f"|format(room.curve.worst_dip) }}R · now
+      {{ "%+.2f"|format(room.curve.current_dip) }}R below the best point
+    </p>
+    <canvas id="totalChart" height="140"></canvas>
+  </div>
+
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Traffic lights (last 30 trades vs history)</h2>
+    <table class="mt-2 w-full text-sm">
+      <tr class="text-left text-slate-400"><th>Market</th><th>Strategy</th><th>Trades</th><th>Recent</th><th>History</th><th></th></tr>
+      {% for l in room.lights %}
+      <tr title="{{ l.note }}">
+        <td>{{ l.symbol }}</td><td>{{ l.strategy }}</td><td>{{ l.recent_trades }}</td>
+        <td>{{ "%+.2f"|format(l.recent_avg_r) }}R</td>
+        <td>{% if l.history_avg_r is not none %}{{ "%+.2f"|format(l.history_avg_r) }}R{% else %}—{% endif %}</td>
+        <td>{% if l.light == "green" %}🟢{% elif l.light == "amber" %}🟠{% elif l.light == "red" %}🔴{% else %}⚪{% endif %} <span class="text-xs text-slate-400">{{ l.note }}</span></td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="text-slate-500">No closed public trades yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+
+  {% for title, rows in [("By market", room.markets), ("By strategy", room.strategies), ("By hour sent (Ethiopia time)", room.hours)] %}
+  <div class="{{ card }}">
+    <h2 class="font-semibold">{{ title }}</h2>
+    <table class="mt-2 w-full text-sm">
+      <tr class="text-left text-slate-400"><th></th><th>Trades</th><th>Win %</th><th>Total</th></tr>
+      {% for g in rows %}
+      <tr><td>{{ g.name }}{% if title.startswith("By hour") %}:00{% endif %}</td><td>{{ g.trades }}</td><td>{{ g.win_pct }}</td>
+        <td class="{% if g.net_r >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">{{ "%+.2f"|format(g.net_r) }}R</td></tr>
+      {% else %}<tr><td colspan="4" class="text-slate-500">Nothing yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+  {% endfor %}
+
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Idea funnel</h2>
+    <p class="text-sm">{{ room.funnel.spotted }} ideas spotted → {{ room.funnel.sent }} sent to the public</p>
+    <h3 class="mt-3 text-xs text-slate-400">Where ideas ended up</h3>
+    <ul class="text-sm">{% for name, n in room.funnel.stages %}<li>{{ name }}: {{ n }}</li>{% endfor %}</ul>
+    <h3 class="mt-3 text-xs text-slate-400">Why ideas were stopped</h3>
+    <ul class="text-sm">{% for name, n in room.funnel.reasons %}<li>{{ name }}: {{ n }}</li>{% endfor %}</ul>
+  </div>
+
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Filter report card</h2>
+    <p class="text-xs text-slate-400">What the stopped ideas would have made if sent anyway. Negative = the filter saved money.</p>
+    <table class="mt-2 w-full text-sm">
+      <tr class="text-left text-slate-400"><th>Filter</th><th>Stopped</th><th>Would have made</th><th></th></tr>
+      {% for f in room.filters %}
+      <tr><td>{{ f.filter }}</td><td>{{ f.stopped }}</td><td>{{ "%+.2f"|format(f.would_have_made_r) }}R</td><td>{{ f.verdict }}</td></tr>
+      {% else %}<tr><td colspan="4" class="text-slate-500">No finished "what if" results yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Price sources</h2>
+    <table class="mt-2 w-full text-sm">
+      <tr class="text-left text-slate-400"><th>Source</th><th>Checks</th><th>Used</th><th>Failures</th><th>Avg delay</th><th>Worst</th></tr>
+      {% for s in room.sources %}
+      <tr><td>{{ s.source }}</td><td>{{ s.checks }}</td><td>{{ s.share_pct }}%</td><td>{{ s.failures }}</td>
+        <td>{{ s.avg_lag|int if s.avg_lag is not none else "—" }}s</td><td>{{ s.worst_lag if s.worst_lag is not none else "—" }}s</td></tr>
+      {% else %}<tr><td colspan="6" class="text-slate-500">No price checks recorded.</td></tr>{% endfor %}
+    </table>
+  </div>
+
+  <div class="{{ card }}">
+    <h2 class="font-semibold">Trial strategies too (owner only)</h2>
+    <table class="mt-2 w-full text-sm">
+      {% for l in room.trial_lights %}
+      <tr><td>{{ l.symbol }}</td><td>{{ l.strategy }}</td><td>{{ l.recent_trades }}</td><td>{{ "%+.2f"|format(l.recent_avg_r) }}R</td><td>{{ l.light }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+  const totals = {{ room.curve.totals|tojson }};
+  const dips = {{ room.curve.dips|tojson }};
+  new Chart(document.getElementById("totalChart"), {
+    type: "line",
+    data: {
+      labels: totals.map((_, i) => i + 1),
+      datasets: [
+        { label: "Running total (R)", data: totals, borderColor: "#e6c174", pointRadius: 0 },
+        { label: "Dip below best (R)", data: dips, borderColor: "#f43f5e", backgroundColor: "rgba(244,63,94,.15)", fill: true, pointRadius: 0 },
+      ],
+    },
+    options: { plugins: { legend: { labels: { color: "#cbd5e1" } } } },
+  });
+</script>
+{% endblock %}

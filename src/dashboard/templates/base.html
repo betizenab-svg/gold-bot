@@ -89,6 +89,11 @@
               >Risk</a
             >
             <a
+              class="nav-item {% if request.path.startswith('/control') %}active{% endif %}"
+              href="{{ url_for('control_room') }}"
+              >Control room</a
+            >
+            <a
               class="nav-item {% if request.path.startswith('/market') %}active{% endif %}"
               href="{{ url_for('market') }}"
               >Market</a
