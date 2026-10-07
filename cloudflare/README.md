@@ -29,20 +29,21 @@ answers people and manages members.
    - `PLANS`: your prices.
    - Leave `SALES_MODE = "auto"`: VIP opens by itself only after the public record has
      100+ finished trades with a positive result after costs.
-9. Publish the bot: `npx wrangler deploy`. It prints the address, e.g.
-   `https://gold-signals-bot.YOURNAME.workers.dev`.
+9. Publish the bot: `npx wrangler deploy`. It prints your bot's address, like
+   `https://gold-signals-bot.<your-subdomain>.workers.dev`. Copy that exact address.
 10. Store the secrets (you type them; they are never saved in files):
     - `npx wrangler secret put TELEGRAM_BOT_TOKEN`
-    - `npx wrangler secret put WEBHOOK_SECRET` (make up a long random password)
+    - `npx wrangler secret put WEBHOOK_SECRET` (make up a long random password using only
+      letters, numbers, `_` and `-`; Telegram refuses other symbols)
     - `npx wrangler secret put ADMIN_PAGE_KEY` (another long random password, for the money page)
     - optional: `npx wrangler secret put TRONGRID_API_KEY` (free key from https://www.trongrid.io)
-11. Connect Telegram to the Worker: `./set_webhook.sh https://gold-signals-bot.YOURNAME.workers.dev`
+11. Connect Telegram to the Worker: `./set_webhook.sh <the address from step 9>`
     (it asks for the token and the webhook secret).
 12. Test: send `/help` and `/stats` to your bot in Telegram.
 
 ## Your money page
 
-Open `https://gold-signals-bot.YOURNAME.workers.dev/admin?key=YOUR_ADMIN_PAGE_KEY`
+Open `<the address from step 9>/admin?key=YOUR_ADMIN_PAGE_KEY`
 in a browser. In Telegram you also have `/members`, `/revenue`, `/left`,
 `/extend user_id days` and `/broadcast text` (owner only).
 
