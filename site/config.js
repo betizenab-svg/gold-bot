@@ -1,7 +1,7 @@
 // Site settings. Change the two links once your channels exist.
 window.SITE_CONFIG = {
   // Public free Telegram channel (e.g. https://t.me/your_free_channel).
-  freeChannelUrl: "",
+  freeChannelUrl: "https://t.me/ariftradeer",
   // VIP membership bot: opens the join menu (e.g. https://t.me/YourBot?start=join).
   vipUrl: "",
   // Where the track record lives (raw files on GitHub, always up to date).
