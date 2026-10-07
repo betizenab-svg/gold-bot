@@ -87,7 +87,7 @@ GitHub settings live at **github.com/betizenab-svg/gold-bot → Settings → Sec
 
 18. **Amharic.** Ask a native speaker to read the Amharic lines in `src/alerting/i18n.py` and correct them. Then set the **Variable** `MESSAGE_LANGUAGE` to `both` (or `am`).
 19. **Independent proof (Myfxbook).** On a computer that can stay on, install MT5 with a free demo account and follow `tools/mt5/README.md`. Then connect the demo account to a free Myfxbook account. The copier is untested, so watch it on the demo first.
-20. **Renting signals to other channels.** When a partner adds your bot as an admin in their channel, add their channel id to the **Variable** `PARTNER_CHAT_IDS` (comma-separated).
+20. **Renting signals to other channels.** When a partner adds your bot as an admin in their channel, add their channel id to the **Secret** `PARTNER_CHAT_IDS` (comma-separated).
 
 ## Good to know
 
