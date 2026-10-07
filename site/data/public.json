@@ -487,6 +487,11 @@
    "currency": "USD",
    "label": "FOMC Meeting Minutes",
    "time": 1791396000
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Gov Bailey Speaks",
+   "time": 1791461700
   }
  ],
  "open": [
@@ -496,7 +501,7 @@
    "entry": 84076.9,
    "name": "Bitcoin",
    "order": "STOP",
-   "status": "ACTIVE",
+   "status": "PARTIAL_TP1",
    "stop": 84381.7,
    "symbol": "BTCUSD",
    "time": 1791344700,
@@ -577,5 +582,5 @@
   "wins": 18,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-07T06:15:20Z"
+ "updated": "2026-10-07T09:45:28Z"
 }
