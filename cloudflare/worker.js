@@ -45,11 +45,14 @@ function fmtPrice(value, decimals) {
 }
 
 function isAdmin(env, userId) {
+  return adminIds(env).includes(String(userId));
+}
+
+function adminIds(env) {
   return String(env.ADMIN_IDS || "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean)
-    .includes(String(userId));
+    .filter(Boolean);
 }
 
 export function plans(env) {
@@ -114,7 +117,7 @@ export function helpText(env, admin = false) {
     "/broker - VIP free through our broker partner",
   ];
   if (admin) {
-    lines.push("", "<b>Owner</b>", "/members  /revenue  /left  /extend user_id days  /broadcast text");
+    lines.push("", "<b>Owner</b>", "/pending  /members  /revenue  /left  /extend user_id days  /broadcast text");
   }
   if (env.SITE_URL) lines.push("", `Full public record: ${env.SITE_URL}`);
   return lines.join("\n");
@@ -304,23 +307,74 @@ async function markPaid(env, order, reference, received) {
   return true;
 }
 
-async function sendToReview(env, order, reference, note) {
+async function sendToReview(env, order, reference, note, photoId = null) {
   await env.DB.prepare("UPDATE orders SET status = 'review', reference = ? WHERE id = ?").bind(reference, order.id).run();
-  if (!env.ADMIN_CHAT_ID) return;
-  await say(
-    env,
-    env.ADMIN_CHAT_ID,
-    `\u{1F9FE} <b>Payment to check</b> (order ${order.id})\nMember: <code>${order.user_id}</code>\n` +
-      `Plan: ${esc(order.plan)} \u00b7 ${esc(order.method)} ${order.amount} ${esc(order.currency)}\n${esc(note || "")}`,
-    {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: "\u2705 Approve", callback_data: `adm:ok:${order.id}` },
-          { text: "\u274c Reject", callback_data: `adm:no:${order.id}` },
-        ]],
-      },
-    },
+  const member = await env.DB.prepare("SELECT username, first_name FROM members WHERE user_id = ?")
+    .bind(order.user_id)
+    .first();
+  await notifyOwner(env, reviewText(order, member, note), reviewButtons(order), photoId);
+}
+
+function reviewText(order, member, note) {
+  const who = member ? [member.first_name, member.username ? `@${member.username}` : ""].filter(Boolean).join(" ") : "";
+  return (
+    `\u{1F9FE} <b>Payment to check</b> (order ${order.id})\nMember: <code>${order.user_id}</code> ${esc(who)}\n` +
+    `Plan: ${esc(order.plan)} \u00b7 ${esc(order.method)} ${order.amount} ${esc(order.currency)}\n${esc(note || "")}`
   );
+}
+
+function reviewButtons(order) {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: "\u2705 Approve", callback_data: `adm:ok:${order.id}` },
+        { text: "\u274c Reject", callback_data: `adm:no:${order.id}` },
+      ]],
+    },
+  };
+}
+
+// To the owner group; if that fails (wrong id, bot removed), to each owner's private chat.
+async function notifyOwner(env, text, extra = {}, photoId = null) {
+  const send = (chat) =>
+    photoId
+      ? tg(env, "sendPhoto", { chat_id: chat, photo: photoId, caption: text, parse_mode: "HTML", ...extra })
+      : say(env, chat, text, extra);
+  if (env.ADMIN_CHAT_ID && (await send(env.ADMIN_CHAT_ID))) return true;
+  let delivered = false;
+  for (const id of adminIds(env)) delivered = Boolean(await send(id)) || delivered;
+  return delivered;
+}
+
+function receiptPhotoId(reference) {
+  const parts = String(reference || "").split("|");
+  return parts.length > 1 ? parts[1] : null;
+}
+
+async function cmdPending(env, chatId) {
+  const { results } = await env.DB.prepare(
+    "SELECT o.*, m.username, m.first_name FROM orders o LEFT JOIN members m ON m.user_id = o.user_id " +
+      "WHERE o.status = 'review' ORDER BY o.id LIMIT 20",
+  ).all();
+  if (!results || !results.length) return say(env, chatId, "No payments are waiting for you.");
+  for (const order of results) {
+    const photoId = receiptPhotoId(order.reference);
+    const sentAt = `Sent ${eatTime(order.created_at)}.`;
+    let note = sentAt;
+    if (!photoId && String(order.reference || "").startsWith("telebirr:photo:")) {
+      note = `${sentAt} Receipt photo not kept: check your Telebirr app for this amount.`;
+    } else if (!photoId && order.reference) {
+      note = `${sentAt} Receipt: ${order.reference.replace(/^telebirr:/, "")}`;
+    }
+    const sent = await tg(
+      env,
+      photoId ? "sendPhoto" : "sendMessage",
+      photoId
+        ? { chat_id: chatId, photo: photoId, caption: reviewText(order, order, note), parse_mode: "HTML", ...reviewButtons(order) }
+        : { chat_id: chatId, text: reviewText(order, order, note), parse_mode: "HTML", ...reviewButtons(order) },
+    );
+    if (!sent && photoId) await say(env, chatId, reviewText(order, order, note), reviewButtons(order));
+  }
 }
 
 async function cmdJoin(env, chatId) {
@@ -581,6 +635,8 @@ export async function handleUpdate(update, env) {
     }
     if (!admin) return;
     switch (command) {
+      case "/pending":
+        return cmdPending(env, chatId);
       case "/members":
         return cmdMembers(env, chatId);
       case "/revenue":
@@ -617,12 +673,12 @@ export async function handleUpdate(update, env) {
     }
     const photo = (message.photo || []).slice(-1)[0];
     const reference = photo ? `telebirr:photo:${photo.file_unique_id}` : `telebirr:${text.slice(0, 60)}`;
-    const used = await env.DB.prepare("SELECT 1 FROM orders WHERE reference = ?").bind(reference).first();
+    const used = await env.DB.prepare("SELECT 1 FROM orders WHERE reference = ? OR substr(reference, 1, ?) = ?")
+      .bind(reference, reference.length + 1, `${reference}|`)
+      .first();
     if (used) return say(env, chatId, "This receipt was already used.");
-    if (env.ADMIN_CHAT_ID) {
-      await tg(env, "forwardMessage", { chat_id: env.ADMIN_CHAT_ID, from_chat_id: chatId, message_id: message.message_id });
-    }
-    await sendToReview(env, order, reference, photo ? "Receipt photo above." : `Receipt: ${text}`);
+    const stored = photo && photo.file_id ? `${reference}|${photo.file_id}` : reference;
+    await sendToReview(env, order, stored, photo ? "" : `Receipt: ${text}`, photo ? photo.file_id : null);
     return say(env, chatId, "Thanks! The owner will check the receipt and let you in.");
   }
 }

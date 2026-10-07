@@ -62,6 +62,7 @@ const data = {
 let calls;
 let env;
 let tronTransfers;
+let unreachableChats;
 
 function fakeFetch(url, init = {}) {
   const href = String(url);
@@ -69,6 +70,10 @@ function fakeFetch(url, init = {}) {
     const method = href.split("/").pop();
     const body = init.body ? JSON.parse(init.body) : {};
     calls.push({ method, body });
+    if (unreachableChats.has(String(body.chat_id))) {
+      const refused = { ok: false, error_code: 400, description: "Bad Request: chat not found" };
+      return Promise.resolve(new Response(JSON.stringify(refused), { status: 400 }));
+    }
     const result = method === "createChatInviteLink" ? { invite_link: "https://t.me/+abc" } : { message_id: calls.length };
     return Promise.resolve(new Response(JSON.stringify({ ok: true, result }), { status: 200 }));
   }
@@ -83,6 +88,7 @@ beforeEach(() => {
   db.exec(schema);
   calls = [];
   tronTransfers = [];
+  unreachableChats = new Set();
   globalThis.fetch = fakeFetch;
   env = {
     DB: d1(db),
@@ -170,10 +176,14 @@ test("a short USDT payment goes to the owner instead of being accepted", async (
 
 test("Telebirr receipt is approved by the owner with one tap", async () => {
   await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 5 }, message: { chat: { id: 5 } } } }, env);
-  await handleUpdate(msg(5, "", { photo: [{ file_unique_id: "rcpt1" }] }), env);
+  await handleUpdate(msg(5, "", { photo: [{ file_unique_id: "rcpt1", file_id: "F-rcpt1" }] }), env);
   const order = await env.DB.prepare("SELECT * FROM orders WHERE user_id = 5").first();
   assert.equal(order.status, "review");
-  assert.equal(sent("forwardMessage").length, 1);
+  // The receipt photo and the Approve/Reject buttons arrive together in the owner group.
+  const review = sent("sendPhoto").find((c) => c.body.chat_id === "-100owner");
+  assert.equal(review.body.photo, "F-rcpt1");
+  assert.match(review.body.caption, /Payment to check/);
+  assert.equal(review.body.reply_markup.inline_keyboard[0][0].callback_data, `adm:ok:${order.id}`);
   // Someone who is not the owner cannot approve.
   await handleUpdate({ callback_query: { id: "q", data: `adm:ok:${order.id}`, from: { id: 5 }, message: { chat: { id: 5 } } } }, env);
   assert.equal((await env.DB.prepare("SELECT status FROM orders WHERE id = ?").bind(order.id).first()).status, "review");
@@ -185,8 +195,46 @@ test("Telebirr receipt is approved by the owner with one tap", async () => {
 
 test("a receipt sent without an open Telebirr order gets directions, not silence", async () => {
   await handleUpdate(msg(6, "", { photo: [{ file_unique_id: "late1" }] }), env);
-  assert.equal(sent("forwardMessage").length, 0);
+  assert.equal(sent("sendPhoto").length, 0);
   assert.match(sent("sendMessage").at(-1).body.text, /tap \/join/);
+});
+
+test("if the owner group is unreachable, receipts go to the owner privately", async () => {
+  unreachableChats.add("-100owner");
+  await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 4 }, message: { chat: { id: 4 } } } }, env);
+  await handleUpdate(msg(4, "", { photo: [{ file_unique_id: "r4", file_id: "F-r4" }] }), env);
+  assert.ok(sent("sendPhoto").some((c) => c.body.chat_id === "999" && c.body.photo === "F-r4"));
+});
+
+test("/pending shows every payment waiting for the owner, old and new", async () => {
+  await handleUpdate(msg(999, "/pending"), env);
+  assert.match(sent("sendMessage").at(-1).body.text, /No payments are waiting/);
+  await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 3 }, message: { chat: { id: 3 } } } }, env);
+  await handleUpdate(msg(3, "", { photo: [{ file_unique_id: "r3", file_id: "F-r3" }] }), env);
+  // An order from before photos were kept (as in the live database).
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare(
+    "INSERT INTO orders (user_id, plan, method, amount, currency, status, reference, created_at, expires_at) " +
+      "VALUES (2, 'monthly', 'TELEBIRR', 2000, 'ETB', 'review', 'telebirr:photo:old', ?, ?)",
+  ).bind(now, now + 86400).run();
+  calls = [];
+  await handleUpdate(msg(999, "/pending"), env);
+  const photoReview = sent("sendPhoto").find((c) => c.body.chat_id === 999);
+  assert.equal(photoReview.body.photo, "F-r3");
+  const oldReview = sent("sendMessage").find((c) => /Receipt photo not kept/.test(c.body.text));
+  assert.ok(oldReview.body.reply_markup.inline_keyboard[0][0].callback_data.startsWith("adm:ok:"));
+  // Members cannot use it.
+  calls = [];
+  await handleUpdate(msg(3, "/pending"), env);
+  assert.equal(calls.length, 0);
+});
+
+test("the same receipt photo cannot pay twice", async () => {
+  await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 5 }, message: { chat: { id: 5 } } } }, env);
+  await handleUpdate(msg(5, "", { photo: [{ file_unique_id: "same", file_id: "F-1" }] }), env);
+  await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 6 }, message: { chat: { id: 6 } } } }, env);
+  await handleUpdate(msg(6, "", { photo: [{ file_unique_id: "same", file_id: "F-2" }] }), env);
+  assert.match(sent("sendMessage").at(-1).body.text, /already used/);
 });
 
 test("reminders, removal when time runs out, and owner broadcasts", async () => {

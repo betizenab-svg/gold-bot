@@ -25,7 +25,7 @@ GitHub settings live at **github.com/betizenab-svg/gold-bot → Settings → Sec
 4. **Admin chat.**
    1. In Telegram, create a private group (for example "Gold bot – owner") and add your bot to it.
    2. Send any message in the group.
-   3. Open `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser and copy the `chat` → `id` number. It starts with `-100`.
+   3. Open `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser and copy the `chat` → `id` number exactly as shown, minus sign included. Small groups look like `-5384019257`; channels and big groups start with `-100`. Don't add or remove digits.
    4. On GitHub, add the **Secret** `TELEGRAM_ADMIN_CHAT_ID` with that number.
 5. **Watchdog.**
    1. Sign up free at healthchecks.io.
