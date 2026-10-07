@@ -29,7 +29,7 @@ GitHub settings live at **github.com/betizenab-svg/gold-bot → Settings → Sec
    4. On GitHub, add the **Secret** `TELEGRAM_ADMIN_CHAT_ID` with that number.
 5. **Watchdog.**
    1. Sign up free at healthchecks.io.
-   2. Create a check with period **15 minutes** and grace **10 minutes**, and connect Telegram in its Integrations page.
+   2. Create a check with period **5 minutes** and grace **10 minutes**, so you hear within 15 minutes if the bot goes quiet. Connect Telegram in its Integrations page.
    3. Copy the ping URL and add it as the **Secret** `HEALTHCHECK_PING_URL`.
 6. **Run timing.**
    1. At cron-job.org, open the job that starts the bot.
