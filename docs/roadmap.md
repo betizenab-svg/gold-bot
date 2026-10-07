@@ -2,6 +2,24 @@
 
 Status is ticked off as items are finished. "You" marks steps only the owner can do.
 
+## Status: all 100 items built ✅
+Every item has its code in place and tested; the full test suite passes. Items that also need a step from you are listed in [owner-tasks.md](owner-tasks.md).
+
+Changes from the original plan:
+- **23** used HistData (free, no sign-up) instead of Dukascopy, which blocks automatic downloads.
+- **46** added the US500 instead of the US30; there is no free, on-time Dow feed.
+- **48** oil has no free history download, so it stays a trial with no proof.
+- **73** the MT5 copier is written but untested; it needs MT5 on your computer.
+- **99** the mood switch only skips "wild" markets. It is off until the monthly proof shows it helps.
+
+What the history said, after costs over 36 months:
+- Most market-and-strategy pairs **lose**, and the evidence file switches them off.
+- The two clearly positive ones are:
+  - gold on the 1-hour chart (swing): +14.8R over 110 trades;
+  - gold's Asian-range breakout: +7.7R over 116 trades.
+- Both run as owner-only trials until they prove themselves live.
+- The VIP stays closed until the rule in Milestone 8 is met.
+
 ### Milestone 1 — Fix what is quietly hurting results
 *Done when: all tests pass, live runs stay green, and the bot's gold prices match a broker's XAUUSD chart.*
 1. Switch gold to the real spot price from TwelveData. It's free and needs no card, and one call every 5 minutes (288 a day) fits the free 800 a day. **You:** sign up, or tell me if a key is already saved in GitHub.
