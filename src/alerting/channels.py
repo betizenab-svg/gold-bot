@@ -41,6 +41,15 @@ def free_signals_per_day() -> int:
         return 1
 
 
+def vip_invite(lead: str = "") -> str:
+    """Sales line for free-channel posts; empty unless the VIP channel and join link are set."""
+    join = (os.getenv("VIP_JOIN_URL") or "").strip()
+    if not (vip_chat_id() and join):
+        return ""
+    words = " ".join(part for part in (lead, "Subscribe to VIP for full access") if part)
+    return f"\n\n\U0001f512 {words} \U0001f449 {join}"
+
+
 def _copies_key(signal_hash: str) -> str:
     return f"signal_copies:{signal_hash}"
 
@@ -69,9 +78,11 @@ def send_copies(
     client_factory: Callable[[str], Any] = lambda chat: TelegramClient(chat_id=chat),
 ) -> dict[str, int]:
     copies: dict[str, int] = {}
+    free = free_chat_id()
     for chat in targets:
+        body = text + vip_invite("This one is free. Want every signal?") if chat == free else text
         try:
-            copies[chat] = deliver(client_factory(chat), repository, text, chat_id=chat, kind="copy",
+            copies[chat] = deliver(client_factory(chat), repository, body, chat_id=chat, kind="copy",
                                    signal_hash=signal_hash)
         except (TelegramAPIError, ValueError) as exc:
             logging.error("Signal copy to %s not delivered: %s", chat, exc)
@@ -112,9 +123,5 @@ def free_channel_has_copy(repository: Any, signal_hash: str) -> bool:
 
 
 def result_teaser(code: str, market: str, result_r: Optional[float]) -> str:
-    join = (os.getenv("VIP_JOIN_URL") or "").strip()
     outcome = f"{result_r:+.2f}R" if result_r is not None else "closed"
-    return (
-        f"\U0001f512 VIP signal <b>{code}</b> ({market}) closed: <b>{outcome}</b>."
-        + (f"\nJoin VIP: {join}" if join else "")
-    )
+    return f"\U0001f512 VIP signal <b>{code}</b> ({market}) closed: <b>{outcome}</b>." + vip_invite()

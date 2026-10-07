@@ -1567,9 +1567,11 @@ class PulseOrchestrator:
             if repository.get_kv("morning_briefing_date") == today:
                 return
             repository.set_kv("morning_briefing_date", today)
+            from src.alerting.channels import vip_invite
             from src.alerting.public_posts import build_morning_briefing
 
-            self._public_post(repository, build_morning_briefing(repository, now), "briefing")
+            text = build_morning_briefing(repository, now) + vip_invite("Want every signal?")
+            self._public_post(repository, text, "briefing")
         except Exception as exc:
             logging.debug("Morning briefing skipped: %s", exc)
 

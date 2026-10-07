@@ -52,9 +52,30 @@ def test_copies_are_threaded_with_their_updates(tmp_path: Path, monkeypatch) -> 
     assert send_copy_updates(repository, "h1", ["TP 1 hit", "reason"], client_factory=factory) == 4
     reply = clients["p1"].send_message.call_args_list[-1]
     assert reply.kwargs["reply_to_message_id"] == copies["p1"]
-    assert "Join VIP" not in result_teaser("#G1", "Gold", 2.25)
+    assert "Subscribe to VIP" not in result_teaser("#G1", "Gold", 2.25)
     monkeypatch.setenv("VIP_JOIN_URL", "https://t.me/Bot?start=join")
-    assert "+2.25R" in result_teaser("#G1", "Gold", 2.25) and "start=join" in result_teaser("#G1", "Gold", 2.25)
+    monkeypatch.setenv("TELEGRAM_VIP_CHAT_ID", "vip")
+    teaser = result_teaser("#G1", "Gold", 2.25)
+    assert "+2.25R" in teaser and "Subscribe to VIP for full access" in teaser and "start=join" in teaser
+    repository.close()
+
+
+def test_free_signal_copy_invites_to_vip_but_partner_copies_do_not(tmp_path: Path, monkeypatch) -> None:
+    repository = _repo(tmp_path)
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "free")
+    monkeypatch.setenv("TELEGRAM_VIP_CHAT_ID", "vip")
+    monkeypatch.setenv("VIP_JOIN_URL", "https://t.me/Bot?start=join")
+    clients: dict[str, MagicMock] = {}
+
+    def factory(chat: str) -> MagicMock:
+        client = clients.setdefault(chat, MagicMock(chat_id=chat))
+        client.send_message.return_value = 700
+        return client
+
+    send_copies(repository, "h9", "card", ["p1", "free"], client_factory=factory)
+    free_text = clients["free"].send_message.call_args.args[0]
+    assert free_text.startswith("card") and "Subscribe to VIP for full access" in free_text
+    assert clients["p1"].send_message.call_args.args[0] == "card"
     repository.close()
 
 
