@@ -58,12 +58,12 @@ def test_signal_formatter() -> None:
     )
 
     formatted = formatter.format_initial_signal(signal)
-    assert "🚨 <b>Signal Alert</b>" in formatted
-    assert "🟡 <b>Status:</b> market execution/pending order" in formatted
-    assert "entry @ <code>2015.00</code>" in formatted
-    assert "sl @ <code>2008.00</code>" in formatted
-    assert "tp 1 @ <code>2025.50</code>" in formatted
-    assert "tp 2 @ <code>2036.00</code>" in formatted
+    assert "<b>BUY Gold</b>" in formatted
+    assert "Buy limit:" in formatted
+    assert "Entry @ <code>2015.00</code>" in formatted
+    assert "Stop @ <code>2008.00</code>" in formatted
+    assert "Target 1 @ <code>2025.50</code>" in formatted
+    assert "Target 2 @ <code>2036.00</code>" in formatted
 
     reasoning = formatter.format_trade_reasoning(
         signal,

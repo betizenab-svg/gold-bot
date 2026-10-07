@@ -45,3 +45,6 @@ os.environ.setdefault("SPREAD_CUSHION_ENABLED", "0")
 os.environ.setdefault("WEEKEND_ACTION", "off")
 os.environ.setdefault("MONTHLY_RISK_REVIEW_ENABLED", "0")
 os.environ.setdefault("TREND_DAY_FILTER", "off")
+# Subscriber posts (briefing, pause notices, weekly card/lesson) have their own tests.
+for _post in ("MORNING_BRIEFING_ENABLED", "PAUSE_NOTICES_ENABLED", "WEEKLY_CARD_ENABLED", "WEEKLY_LESSON_ENABLED"):
+    os.environ.setdefault(_post, "0")

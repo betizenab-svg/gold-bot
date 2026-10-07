@@ -91,12 +91,12 @@ def test_signal_formatter() -> None:
     )
 
     initial_signal = formatter.format_initial_signal(signal)
-    assert "🚨 <b>Signal Alert</b>" in initial_signal
-    assert "🟡 <b>Status:</b> market execution/pending order" in initial_signal
-    assert "entry @ <code>2000.50</code>" in initial_signal
-    assert "sl @ <code>1990.00</code>" in initial_signal
-    assert "tp 1 @ <code>2010.00</code>" in initial_signal
-    assert "tp 2 @ <code>2020.00</code>" in initial_signal
+    assert "<b>BUY Gold</b>" in initial_signal
+    assert "Buy limit:" in initial_signal
+    assert "Entry @ <code>2000.50</code>" in initial_signal
+    assert "Stop @ <code>1990.00</code>" in initial_signal
+    assert "Target 1 @ <code>2010.00</code>" in initial_signal
+    assert "Target 2 @ <code>2020.00</code>" in initial_signal
 
     alert_message, explanation_message = formatter.format_lifecycle_update(
         "TP1_SMASH",

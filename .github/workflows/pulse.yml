@@ -99,6 +99,8 @@ jobs:
           SYMBOLS: ${{ vars.SYMBOLS }}
           PROMOTED_SYMBOLS: ${{ vars.PROMOTED_SYMBOLS }}
           TRIAL_STRATEGIES: ${{ vars.TRIAL_STRATEGIES }}
+          # en (default), am or both; switch on Amharic only after checking its wording.
+          MESSAGE_LANGUAGE: ${{ vars.MESSAGE_LANGUAGE }}
           SIGNAL_TIMEFRAME: "M5"
           BOT_LOG_LEVEL: "INFO"
         run: .venv/bin/python src/bot_runner.py
@@ -122,6 +124,20 @@ jobs:
             --json id --jq '.[20:][].id' | while read -r cache_id; do
             gh cache delete "$cache_id" >/dev/null || true
           done
+
+      # Public track record: every signal is committed the run it is sent, in an
+      # append-only, hash-chained ledger (the git history proves nothing changed).
+      - name: Publish the public track record
+        if: always() && steps.pulse.outcome != 'skipped'
+        continue-on-error: true
+        run: |
+          .venv/bin/python scripts/publish_site_data.py
+          git add site/data
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "gold-bot"
+          git config user.email "gold-bot@users.noreply.github.com"
+          git commit -m "record: track record update [skip ci]"
+          git push || (git pull --rebase && git push)
 
       - name: Copy the state into the repository (at most every 6 hours)
         if: always() && steps.pulse.outcome != 'skipped'

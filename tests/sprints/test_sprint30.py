@@ -61,9 +61,9 @@ def test_html_formatting() -> None:
     )
 
     formatted = formatter.format_initial_signal(signal)
-    assert "🚨 <b>Signal Alert</b>" in formatted
-    assert "🟡 <b>Status:</b> market execution/pending order" in formatted
-    assert "entry @ <code>2000.50</code>" in formatted
+    assert "<b>BUY Gold</b>" in formatted
+    assert "Buy limit:" in formatted
+    assert "Entry @ <code>2000.50</code>" in formatted
 
 
 def test_lifecycle_formatting() -> None:

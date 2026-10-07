@@ -233,6 +233,14 @@ MONTHLY_RISK_REVIEW_ENABLED = _env_bool("MONTHLY_RISK_REVIEW_ENABLED", True)
 # Strong one-way day: "block" signals against the day's direction, or "off".
 TREND_DAY_FILTER = (os.getenv("TREND_DAY_FILTER") or "block").strip().lower()
 
+# --- Subscriber posts (public channel) ---
+# Language of subscriber messages: MESSAGE_LANGUAGE = en | am | both (read in src/alerting/i18n.py).
+MORNING_BRIEFING_ENABLED = _env_bool("MORNING_BRIEFING_ENABLED", True)
+MORNING_BRIEFING_HOUR_UTC = int(os.getenv("MORNING_BRIEFING_HOUR_UTC") or "4")  # 07:00 in Ethiopia
+PAUSE_NOTICES_ENABLED = _env_bool("PAUSE_NOTICES_ENABLED", True)
+WEEKLY_CARD_ENABLED = _env_bool("WEEKLY_CARD_ENABLED", True)
+WEEKLY_LESSON_ENABLED = _env_bool("WEEKLY_LESSON_ENABLED", True)
+
 # --- Evidence ---
 # Follow every blocked/rejected idea to see what it would have done.
 SHADOW_TRACKING_ENABLED = _env_bool("SHADOW_TRACKING_ENABLED", True)

@@ -1,0 +1,38 @@
+name = "gold-signals-bot"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# Every 10 minutes: check USDT payments, end expired VIP time, send reminders
+# and queued owner broadcasts. (Free plan: up to 5 cron triggers.)
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+# Where the signal engine publishes its public track record.
+DATA_URL = "https://raw.githubusercontent.com/betizenab-svg/gold-bot/main/site/data/public.json"
+SITE_URL = "https://betizenab-svg.github.io/gold-bot/"
+# Fill these in (see README.md). Empty = that feature stays off.
+BOT_USERNAME = ""
+VIP_CHAT_ID = ""
+ADMIN_CHAT_ID = ""
+ADMIN_IDS = ""
+USDT_ADDRESS = ""
+TELEBIRR_NUMBER = ""
+TELEBIRR_NAME = ""
+BROKER_LINK = ""
+BROKER_DAYS = "30"
+TRIAL_DAYS = "7"
+REFERRAL_DAYS = "7"
+# auto = VIP opens by itself once the public record has 100+ finished trades
+# with a positive result after costs; open / closed = decide by hand.
+SALES_MODE = "auto"
+# Prices are examples: set your own. Longer plans cost less per month.
+PLANS = '{"monthly":{"label":"1 month","days":30,"usdt":15,"etb":2000},"quarterly":{"label":"3 months","days":90,"usdt":39,"etb":5200},"yearly":{"label":"12 months","days":365,"usdt":129,"etb":17000}}'
+
+# Private member database (free). Create it with:
+#   npx wrangler d1 create gold-members
+# then paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "gold-members"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"

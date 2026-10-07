@@ -48,6 +48,8 @@ os.environ["AUTO_QUARANTINE_ENABLED"] = "0"
 os.environ["OPS_TELEMETRY_ENABLED"] = "0"
 os.environ["EVIDENCE_ENABLED"] = "0"
 os.environ["MONTHLY_RISK_REVIEW_ENABLED"] = "0"
+for _post in ("MORNING_BRIEFING_ENABLED", "PAUSE_NOTICES_ENABLED", "WEEKLY_CARD_ENABLED", "WEEKLY_LESSON_ENABLED"):
+    os.environ[_post] = "0"
 os.environ["SPOT_FEED_ENABLED"] = "0"
 os.environ["TELEGRAM_ADMIN_CHAT_ID"] = ""
 os.environ["TELEGRAM_BOT_TOKEN"] = ""

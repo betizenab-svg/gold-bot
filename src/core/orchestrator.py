@@ -70,6 +70,8 @@ from config.settings import (
     FEED_LAG_ALERT_MINUTES,
     MARKET_DATA_RETENTION_DAYS,
     NEWS_AUTOFETCH_ENABLED,
+    NEWS_BLACKOUT_AFTER_MIN,
+    NEWS_BLACKOUT_BEFORE_MIN,
     NEWS_CALENDAR_REFRESH_HOURS,
     OPS_TELEMETRY_ENABLED,
     SHADOW_MAX_AGE_DAYS,
@@ -950,6 +952,11 @@ class PulseOrchestrator:
 
         repository.save_signal(signal)
         logging.info("Saved actionable signal: %s", signal.signal_hash)
+        try:
+            # The stored number gives the card its short code, e.g. #G142.
+            signal = dataclass_replace(signal, id=repository.get_signal_id(signal.signal_hash))
+        except (TypeError, AttributeError):
+            pass
 
         lifecycle_manager = self.lifecycle_manager_factory(repository)
         target_chat_id = getattr(lifecycle_manager.telegram_client, "chat_id", None)
@@ -1518,6 +1525,147 @@ class PulseOrchestrator:
         except Exception as exc:
             logging.debug("Live-vs-history check skipped: %s", exc)
 
+    def _public_post(self, repository: Repository, text: str, kind: str) -> bool:
+        """A message for the public channel (outbox-protected)."""
+        client = self.telegram_client_factory()
+        chat = getattr(client, "chat_id", None)
+        if not chat:
+            return False
+        try:
+            deliver(client, repository, text, chat_id=str(chat), kind=kind)
+            return True
+        except (TelegramAPIError, ValueError) as exc:
+            logging.error("Public %s post not delivered (queued): %s", kind, exc)
+            return False
+
+    def _maybe_post_morning_briefing(self, repository: Repository) -> None:
+        """Weekdays, first run after MORNING_BRIEFING_HOUR_UTC: key gold
+        levels, today's big news in Ethiopian time and the day's leaning."""
+        if not app_settings.MORNING_BRIEFING_ENABLED:
+            return
+        now = int(time.time())
+        moment = time.gmtime(now)
+        if moment.tm_wday >= 5 or moment.tm_hour < int(app_settings.MORNING_BRIEFING_HOUR_UTC):
+            return
+        today = time.strftime("%Y-%m-%d", moment)
+        try:
+            if repository.get_kv("morning_briefing_date") == today:
+                return
+            repository.set_kv("morning_briefing_date", today)
+            from src.alerting.public_posts import build_morning_briefing
+
+            self._public_post(repository, build_morning_briefing(repository, now), "briefing")
+        except Exception as exc:
+            logging.debug("Morning briefing skipped: %s", exc)
+
+    def _maybe_post_news_pauses(self, repository: Repository) -> None:
+        """One public notice when a news pause starts (events at the same
+        minute share one notice)."""
+        if not app_settings.PAUSE_NOTICES_ENABLED:
+            return
+        try:
+            from src.alerting.public_posts import _events, _public_currencies, news_pause_notice
+            from src.analysis.risk_governor import event_currency
+
+            now = int(time.time())
+            currencies = _public_currencies()
+            due: dict[int, list[dict[str, Any]]] = {}
+            for event in _events(repository):
+                event_ts = int(event.get("timestamp", 0) or 0)
+                if 0 < event_ts - now <= NEWS_BLACKOUT_BEFORE_MIN * 60 and event_currency(event) in currencies:
+                    due.setdefault(event_ts, []).append(event)
+            for event_ts, events in sorted(due.items()):
+                key = f"news_pause_posted:{event_ts}"
+                if repository.get_kv(key):
+                    continue
+                repository.set_kv(key, str(now))
+                merged = dict(events[0])
+                merged["label"] = " + ".join(str(e.get("label") or "news") for e in events[:3])
+                self._public_post(
+                    repository,
+                    news_pause_notice(merged, NEWS_BLACKOUT_BEFORE_MIN, NEWS_BLACKOUT_AFTER_MIN),
+                    "pause",
+                )
+        except Exception as exc:
+            logging.debug("News pause notice skipped: %s", exc)
+
+    def _maybe_post_brake_notice(
+        self, repository: Repository, reason: str, symbol: str, setup: dict[str, Any]
+    ) -> None:
+        """Tell subscribers once why signals stopped (daily/weekly loss limit, owner pause)."""
+        if not app_settings.PAUSE_NOTICES_ENABLED or is_trial(symbol, setup.get("strategy")):
+            return
+        try:
+            from src.alerting.public_posts import brake_notice
+
+            found = brake_notice(reason)
+            if found is None:
+                return
+            marker, text = found
+            period = time.strftime("%G-W%V" if "weekly" in marker else "%Y-%m-%d", time.gmtime())
+            key = f"brake_notice:{marker}:{period}"
+            if repository.get_kv(key):
+                return
+            repository.set_kv(key, str(int(time.time())))
+            self._public_post(repository, text, "pause")
+        except Exception as exc:
+            logging.debug("Brake notice skipped: %s", exc)
+
+    def _maybe_post_weekly_card(self, repository: Repository) -> None:
+        """Saturday morning: the week's results as an image, losses included."""
+        if not app_settings.WEEKLY_CARD_ENABLED:
+            return
+        now = int(time.time())
+        moment = time.gmtime(now)
+        if moment.tm_wday != 5 or moment.tm_hour < 6:
+            return
+        try:
+            from src.alerting.public_posts import (
+                render_weekly_card,
+                results_week_start,
+                weekly_caption,
+                weekly_results,
+            )
+
+            week_start = results_week_start(now)
+            if repository.get_kv("weekly_card_week") == str(week_start):
+                return
+            repository.set_kv("weekly_card_week", str(week_start))
+            stats = weekly_results(repository, week_start)
+            caption = weekly_caption(stats)
+            client = self.telegram_client_factory()
+            if not getattr(client, "chat_id", None):
+                return
+            if stats["trades"]:
+                client.send_photo(render_weekly_card(stats), caption=caption)
+            else:
+                deliver(client, repository, caption, chat_id=str(client.chat_id), kind="weekly")
+        except Exception as exc:
+            logging.error("Weekly results card not posted: %s", exc)
+
+    def _maybe_post_weekly_lesson(self, repository: Repository) -> None:
+        """Sunday evening (Ethiopia): one short lesson on risk and patience."""
+        if not app_settings.WEEKLY_LESSON_ENABLED:
+            return
+        now = int(time.time())
+        moment = time.gmtime(now)
+        if moment.tm_wday != 6 or moment.tm_hour < 16:
+            return
+        week = time.strftime("%G-W%V", moment)
+        try:
+            if repository.get_kv("weekly_lesson_week") == week:
+                return
+            repository.set_kv("weekly_lesson_week", week)
+            from src.alerting.i18n import t
+            from src.alerting.public_posts import lesson_for_week
+
+            iso_week = int(time.strftime("%V", moment))
+            self._public_post(
+                repository, f"\U0001f4d8 <b>{t('lesson')}</b>\n{lesson_for_week(iso_week)}", "lesson"
+            )
+        except Exception as exc:
+            logging.debug("Weekly lesson skipped: %s", exc)
+
     def _maybe_send_monthly_risk_review(self, repository: Repository) -> None:
         """First run of each month: last month's worst day, worst losing
         streak and biggest loss against the plan, in the owner's chat."""
@@ -2014,6 +2162,7 @@ class PulseOrchestrator:
                     repository, symbol, potential_setup, current_candle, governor_reason,
                     levels=self._hypothetical_levels(potential_setup, recent_candles, symbol),
                 )
+                self._maybe_post_brake_notice(repository, governor_reason, symbol, potential_setup)
                 return signals_generated, errors_encountered
 
             raw_macro_bias_state = repository.get_kv("macro_bias_state")
@@ -2301,6 +2450,10 @@ class PulseOrchestrator:
             # Housekeeping runs even on quiet pulses (weekends included).
             self._maybe_prune_market_data(repository)
             self._maybe_refresh_news_calendar(repository)
+            self._maybe_post_news_pauses(repository)
+            self._maybe_post_morning_briefing(repository)
+            self._maybe_post_weekly_card(repository)
+            self._maybe_post_weekly_lesson(repository)
             self._maybe_send_weekly_report(repository)
             self._maybe_update_strategy_quarantine(repository)
             self._maybe_check_live_vs_history(repository)
