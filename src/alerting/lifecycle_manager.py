@@ -469,6 +469,8 @@ class SignalLifecycleManager:
                         signal_hash,
                         exc,
                     )
+            self._relay_update(active_repository, signal, signal_hash, event_type, current_candle,
+                               [alert_message, explanation_message], chat_id, is_closure)
             logging.info(
                 "Processed signal lifecycle event: signal=%s event=%s status=%s",
                 signal_hash,
@@ -476,6 +478,47 @@ class SignalLifecycleManager:
                 new_status,
             )
         return undelivered
+
+    def _relay_update(
+        self,
+        repository: Any,
+        signal: Any,
+        signal_hash: str,
+        event_type: str,
+        current_candle: Candle,
+        texts: list[str],
+        chat_id: Any,
+        is_closure: bool,
+    ) -> None:
+        """Copies of the signal (free channel, partners) get the same updates;
+        in VIP mode the free channel also sees how each VIP trade ended."""
+        if bool(self._get_value(signal, "trial", default=False)) or not uses_outbox(repository):
+            return
+        try:
+            from src.alerting.channels import (
+                free_channel_has_copy,
+                free_chat_id,
+                result_teaser,
+                send_copy_updates,
+                vip_chat_id,
+            )
+            from src.alerting.formatter import signal_code
+
+            send_copy_updates(repository, signal_hash, texts)
+            vip = vip_chat_id()
+            new_status = self.EVENT_STATUS_MAP.get(event_type, "")
+            if (
+                is_closure and new_status.startswith("CLOSED") and vip and str(chat_id or "") == vip
+                and free_chat_id() and not free_channel_has_copy(repository, signal_hash)
+            ):
+                deliver(
+                    TelegramClient(chat_id=free_chat_id()), repository,
+                    result_teaser(signal_code(signal) or "#", self._signal_instrument(signal).display_name,
+                                  self._event_realized_r(signal, event_type, current_candle)),
+                    chat_id=free_chat_id(), kind="teaser", signal_hash=signal_hash,
+                )
+        except Exception as exc:
+            logging.error("Signal copy updates skipped: %s", exc)
 
     def send_lifecycle_update(
         self,

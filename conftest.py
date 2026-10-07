@@ -37,6 +37,8 @@ os.environ.setdefault("DASHBOARD_PASSWORD", "test-password")
 os.environ.setdefault("TWELVEDATA_API_KEY", "")
 os.environ.setdefault("TELEGRAM_ADMIN_CHAT_ID", "")
 os.environ.setdefault("HEALTHCHECK_PING_URL", "")
+os.environ.setdefault("TELEGRAM_VIP_CHAT_ID", "")
+os.environ.setdefault("PARTNER_CHAT_IDS", "")
 # Tests must not depend on the committed history evidence (quiet hours etc.).
 os.environ.setdefault("EVIDENCE_ENABLED", "0")
 # Legacy suites pin exact chart-level prices and weekday timings; the spread

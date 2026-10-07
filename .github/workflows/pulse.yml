@@ -101,6 +101,13 @@ jobs:
           TRIAL_STRATEGIES: ${{ vars.TRIAL_STRATEGIES }}
           # en (default), am or both; switch on Amharic only after checking its wording.
           MESSAGE_LANGUAGE: ${{ vars.MESSAGE_LANGUAGE }}
+          # VIP mode (only after the record is proven): full signals to the VIP channel,
+          # the free channel gets FREE_SIGNALS_PER_DAY copies plus every VIP result.
+          TELEGRAM_VIP_CHAT_ID: ${{ secrets.TELEGRAM_VIP_CHAT_ID }}
+          FREE_SIGNALS_PER_DAY: ${{ vars.FREE_SIGNALS_PER_DAY }}
+          VIP_JOIN_URL: ${{ vars.VIP_JOIN_URL }}
+          # Channels that rent the signals (off unless set).
+          PARTNER_CHAT_IDS: ${{ secrets.PARTNER_CHAT_IDS }}
           SIGNAL_TIMEFRAME: "M5"
           BOT_LOG_LEVEL: "INFO"
         run: .venv/bin/python src/bot_runner.py

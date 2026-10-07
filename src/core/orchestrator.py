@@ -20,6 +20,7 @@ from config.database import get_connection
 from src.core.logger import StructuredLogger
 from src.core.telemetry import MemoryProfiler
 from src.alerting.lifecycle_manager import LifecycleManager, SignalLifecycleManager
+from src.alerting.channels import copy_targets, send_copies, vip_chat_id
 from src.alerting.messenger import OutboxFlusher, admin_chat_id, deliver, notify_admin, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
 from src.analysis.outcomes import realized_r_for_event
@@ -963,6 +964,8 @@ class PulseOrchestrator:
         if trial:
             # Trial markets and strategies prove themselves in the owner's chat first.
             target_chat_id = admin_chat_id() or None
+        elif vip_chat_id():
+            target_chat_id = vip_chat_id()
         if not target_chat_id:
             logging.info(
                 "Telegram chat id not configured (including UAT routing); skipping signal dispatch for %s",
@@ -1004,6 +1007,16 @@ class PulseOrchestrator:
                 exc,
             )
             return True, 1
+        if not trial:
+            try:
+                targets = copy_targets(repository, int(signal.timestamp))
+                if targets:
+                    send_copies(
+                        repository, signal.signal_hash,
+                        lifecycle_manager.formatter.format_initial_signal(signal), targets,
+                    )
+            except Exception as exc:
+                logging.error("Signal copies skipped: %s", exc)
         return True, 0
 
     def _run_macro_regime_check(self, repository: Repository) -> None:
