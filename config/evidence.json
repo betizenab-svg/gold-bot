@@ -1,0 +1,772 @@
+{
+ "baselines": {
+  "BTCUSD|ENGULFING_ZONE": {
+   "expectancy_r": -0.112,
+   "std_r": 1.118,
+   "trades": 44
+  },
+  "BTCUSD|H2_PULLBACK": {
+   "expectancy_r": -0.129,
+   "std_r": 1.066,
+   "trades": 72
+  },
+  "BTCUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.277,
+   "std_r": 0.968,
+   "trades": 48
+  },
+  "BTCUSD|L2_PULLBACK": {
+   "expectancy_r": -0.261,
+   "std_r": 1.037,
+   "trades": 34
+  },
+  "BTCUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.033,
+   "std_r": 1.087,
+   "trades": 473
+  },
+  "BTCUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.177,
+   "std_r": 1.054,
+   "trades": 128
+  },
+  "ETHUSD|ENGULFING_ZONE": {
+   "expectancy_r": -0.009,
+   "std_r": 0.981,
+   "trades": 36
+  },
+  "ETHUSD|H2_PULLBACK": {
+   "expectancy_r": -0.239,
+   "std_r": 0.977,
+   "trades": 63
+  },
+  "ETHUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.115,
+   "std_r": 1.042,
+   "trades": 163
+  },
+  "ETHUSD|L2_PULLBACK": {
+   "expectancy_r": -0.316,
+   "std_r": 0.815,
+   "trades": 52
+  },
+  "ETHUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.189,
+   "std_r": 1.01,
+   "trades": 337
+  },
+  "ETHUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.136,
+   "std_r": 1.021,
+   "trades": 178
+  },
+  "EURUSD_H1|ENGULFING_ZONE": {
+   "expectancy_r": -0.587,
+   "std_r": 0.499,
+   "trades": 11
+  },
+  "EURUSD_H1|H2_PULLBACK": {
+   "expectancy_r": 0.348,
+   "std_r": 1.356,
+   "trades": 7
+  },
+  "EURUSD_H1|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.351,
+   "std_r": 0.954,
+   "trades": 17
+  },
+  "EURUSD_H1|L2_PULLBACK": {
+   "expectancy_r": 0.017,
+   "std_r": 0.947,
+   "trades": 11
+  },
+  "EURUSD_H1|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.038,
+   "std_r": 1.034,
+   "trades": 99
+  },
+  "EURUSD_H1|ZONE_BOUNCE": {
+   "expectancy_r": -0.348,
+   "std_r": 0.701,
+   "trades": 35
+  },
+  "EURUSD|ENGULFING_ZONE": {
+   "expectancy_r": 0.0,
+   "std_r": 0.946,
+   "trades": 145
+  },
+  "EURUSD|H2_PULLBACK": {
+   "expectancy_r": -0.171,
+   "std_r": 1.081,
+   "trades": 83
+  },
+  "EURUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": 0.012,
+   "std_r": 1.119,
+   "trades": 150
+  },
+  "EURUSD|L2_PULLBACK": {
+   "expectancy_r": -0.165,
+   "std_r": 0.991,
+   "trades": 90
+  },
+  "EURUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.036,
+   "std_r": 1.085,
+   "trades": 209
+  },
+  "EURUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.124,
+   "std_r": 1.004,
+   "trades": 1052
+  },
+  "EURUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.176,
+   "std_r": 1.011,
+   "trades": 258
+  },
+  "GBPUSD_H1|ENGULFING_ZONE": {
+   "expectancy_r": -0.161,
+   "std_r": 1.267,
+   "trades": 12
+  },
+  "GBPUSD_H1|H2_PULLBACK": {
+   "expectancy_r": -0.02,
+   "std_r": 1.384,
+   "trades": 8
+  },
+  "GBPUSD_H1|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.012,
+   "std_r": 1.071,
+   "trades": 32
+  },
+  "GBPUSD_H1|L2_PULLBACK": {
+   "expectancy_r": 0.198,
+   "std_r": 1.226,
+   "trades": 10
+  },
+  "GBPUSD_H1|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.106,
+   "std_r": 0.928,
+   "trades": 122
+  },
+  "GBPUSD_H1|ZONE_BOUNCE": {
+   "expectancy_r": -0.028,
+   "std_r": 0.988,
+   "trades": 42
+  },
+  "GBPUSD|ENGULFING_ZONE": {
+   "expectancy_r": -0.14,
+   "std_r": 1.053,
+   "trades": 141
+  },
+  "GBPUSD|H2_PULLBACK": {
+   "expectancy_r": -0.077,
+   "std_r": 1.075,
+   "trades": 81
+  },
+  "GBPUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.181,
+   "std_r": 0.982,
+   "trades": 99
+  },
+  "GBPUSD|L2_PULLBACK": {
+   "expectancy_r": -0.323,
+   "std_r": 0.911,
+   "trades": 60
+  },
+  "GBPUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.163,
+   "std_r": 1.024,
+   "trades": 165
+  },
+  "GBPUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.168,
+   "std_r": 0.991,
+   "trades": 1027
+  },
+  "GBPUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.192,
+   "std_r": 1.016,
+   "trades": 240
+  },
+  "US100|ENGULFING_ZONE": {
+   "expectancy_r": 0.209,
+   "std_r": 1.724,
+   "trades": 2
+  },
+  "US100|H2_PULLBACK": {
+   "expectancy_r": 0.034,
+   "std_r": 1.173,
+   "trades": 46
+  },
+  "US100|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.136,
+   "std_r": 1.04,
+   "trades": 49
+  },
+  "US100|L2_PULLBACK": {
+   "expectancy_r": -0.29,
+   "std_r": 0.997,
+   "trades": 28
+  },
+  "US100|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.165,
+   "std_r": 1.032,
+   "trades": 70
+  },
+  "US100|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.01,
+   "std_r": 1.068,
+   "trades": 79
+  },
+  "US100|ZONE_BOUNCE": {
+   "expectancy_r": -0.039,
+   "std_r": 1.129,
+   "trades": 82
+  },
+  "XAUUSD_H1|ENGULFING_ZONE": {
+   "expectancy_r": 0.131,
+   "std_r": 1.404,
+   "trades": 4
+  },
+  "XAUUSD_H1|H2_PULLBACK": {
+   "expectancy_r": 0.131,
+   "std_r": 1.189,
+   "trades": 30
+  },
+  "XAUUSD_H1|INSIDE_BAR_TRAP": {
+   "expectancy_r": 0.175,
+   "std_r": 1.28,
+   "trades": 34
+  },
+  "XAUUSD_H1|L2_PULLBACK": {
+   "expectancy_r": 0.21,
+   "std_r": 1.198,
+   "trades": 12
+  },
+  "XAUUSD_H1|PIN_BAR_REJECTION": {
+   "expectancy_r": 0.112,
+   "std_r": 1.071,
+   "trades": 23
+  },
+  "XAUUSD_H1|ZONE_BOUNCE": {
+   "expectancy_r": 0.052,
+   "std_r": 1.086,
+   "trades": 36
+  },
+  "XAUUSD_H4|H2_PULLBACK": {
+   "expectancy_r": 0.183,
+   "std_r": 1.374,
+   "trades": 9
+  },
+  "XAUUSD_H4|INSIDE_BAR_TRAP": {
+   "expectancy_r": 0.014,
+   "std_r": 1.453,
+   "trades": 13
+  },
+  "XAUUSD_H4|L2_PULLBACK": {
+   "expectancy_r": -0.507,
+   "std_r": 0.577,
+   "trades": 4
+  },
+  "XAUUSD_H4|PIN_BAR_REJECTION": {
+   "expectancy_r": 0.127,
+   "std_r": 1.168,
+   "trades": 8
+  },
+  "XAUUSD_H4|ZONE_BOUNCE": {
+   "expectancy_r": -0.193,
+   "std_r": 0.854,
+   "trades": 11
+  },
+  "XAUUSD|ASIAN_RANGE_BREAKOUT": {
+   "expectancy_r": 0.066,
+   "std_r": 1.066,
+   "trades": 116
+  },
+  "XAUUSD|ENGULFING_ZONE": {
+   "expectancy_r": 0.09,
+   "std_r": 1.045,
+   "trades": 15
+  },
+  "XAUUSD|H2_PULLBACK": {
+   "expectancy_r": -0.132,
+   "std_r": 1.032,
+   "trades": 146
+  },
+  "XAUUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.207,
+   "std_r": 1.028,
+   "trades": 195
+  },
+  "XAUUSD|L2_PULLBACK": {
+   "expectancy_r": -0.23,
+   "std_r": 0.963,
+   "trades": 100
+  },
+  "XAUUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.038,
+   "std_r": 1.095,
+   "trades": 234
+  },
+  "XAUUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.184,
+   "std_r": 1.012,
+   "trades": 304
+  },
+  "XAUUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.102,
+   "std_r": 0.986,
+   "trades": 323
+  }
+ },
+ "check_window": {
+  "from": "2026-04",
+  "net_r_after_costs": {
+   "BTCUSD": -19.46,
+   "ETHUSD": -42.16,
+   "EURUSD": -48.99,
+   "EURUSD_H1": -8.48,
+   "GBPUSD": -94.08,
+   "GBPUSD_H1": -1.64,
+   "XAUUSD": -0.32,
+   "XAUUSD_H1": -1.78,
+   "XAUUSD_H4": 2.04
+  },
+  "to": "2026-09",
+  "trades": {
+   "BTCUSD": 144,
+   "ETHUSD": 163,
+   "EURUSD": 320,
+   "EURUSD_H1": 31,
+   "GBPUSD": 295,
+   "GBPUSD_H1": 34,
+   "XAUUSD": 307,
+   "XAUUSD_H1": 18,
+   "XAUUSD_H4": 3
+  }
+ },
+ "disabled_pairs": [
+  {
+   "expectancy_r": -0.177,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "BTCUSD",
+   "trades": 128
+  },
+  {
+   "expectancy_r": -0.129,
+   "strategy": "H2_PULLBACK",
+   "symbol": "BTCUSD",
+   "trades": 72
+  },
+  {
+   "expectancy_r": -0.112,
+   "strategy": "ENGULFING_ZONE",
+   "symbol": "BTCUSD",
+   "trades": 44
+  },
+  {
+   "expectancy_r": -0.277,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "BTCUSD",
+   "trades": 48
+  },
+  {
+   "expectancy_r": -0.261,
+   "strategy": "L2_PULLBACK",
+   "symbol": "BTCUSD",
+   "trades": 34
+  },
+  {
+   "expectancy_r": -0.189,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "ETHUSD",
+   "trades": 337
+  },
+  {
+   "expectancy_r": -0.136,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "ETHUSD",
+   "trades": 178
+  },
+  {
+   "expectancy_r": -0.316,
+   "strategy": "L2_PULLBACK",
+   "symbol": "ETHUSD",
+   "trades": 52
+  },
+  {
+   "expectancy_r": -0.115,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "ETHUSD",
+   "trades": 163
+  },
+  {
+   "expectancy_r": -0.239,
+   "strategy": "H2_PULLBACK",
+   "symbol": "ETHUSD",
+   "trades": 63
+  },
+  {
+   "expectancy_r": -0.176,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "EURUSD",
+   "trades": 258
+  },
+  {
+   "expectancy_r": -0.124,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "EURUSD",
+   "trades": 1052
+  },
+  {
+   "expectancy_r": -0.165,
+   "strategy": "L2_PULLBACK",
+   "symbol": "EURUSD",
+   "trades": 90
+  },
+  {
+   "expectancy_r": -0.171,
+   "strategy": "H2_PULLBACK",
+   "symbol": "EURUSD",
+   "trades": 83
+  },
+  {
+   "expectancy_r": -0.348,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "EURUSD_H1",
+   "trades": 35
+  },
+  {
+   "expectancy_r": -0.168,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "GBPUSD",
+   "trades": 1027
+  },
+  {
+   "expectancy_r": -0.181,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "GBPUSD",
+   "trades": 99
+  },
+  {
+   "expectancy_r": -0.192,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "GBPUSD",
+   "trades": 240
+  },
+  {
+   "expectancy_r": -0.14,
+   "strategy": "ENGULFING_ZONE",
+   "symbol": "GBPUSD",
+   "trades": 141
+  },
+  {
+   "expectancy_r": -0.163,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "GBPUSD",
+   "trades": 165
+  },
+  {
+   "expectancy_r": -0.323,
+   "strategy": "L2_PULLBACK",
+   "symbol": "GBPUSD",
+   "trades": 60
+  },
+  {
+   "expectancy_r": -0.077,
+   "strategy": "H2_PULLBACK",
+   "symbol": "GBPUSD",
+   "trades": 81
+  },
+  {
+   "expectancy_r": -0.106,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "GBPUSD_H1",
+   "trades": 122
+  },
+  {
+   "expectancy_r": -0.165,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "US100",
+   "trades": 70
+  },
+  {
+   "expectancy_r": -0.136,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "US100",
+   "trades": 49
+  },
+  {
+   "expectancy_r": -0.102,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "XAUUSD",
+   "trades": 323
+  },
+  {
+   "expectancy_r": -0.184,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "XAUUSD",
+   "trades": 304
+  },
+  {
+   "expectancy_r": -0.207,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "XAUUSD",
+   "trades": 195
+  },
+  {
+   "expectancy_r": -0.132,
+   "strategy": "H2_PULLBACK",
+   "symbol": "XAUUSD",
+   "trades": 146
+  },
+  {
+   "expectancy_r": -0.23,
+   "strategy": "L2_PULLBACK",
+   "symbol": "XAUUSD",
+   "trades": 100
+  }
+ ],
+ "generated_at": "2026-10-07 02:42 UTC",
+ "luck": {
+  "ALL": {
+   "actual_losing_streak": 23,
+   "actual_max_drawdown_r": 967.3154,
+   "bad_luck_losing_streak": 29,
+   "bad_luck_max_drawdown_r": 975.39,
+   "total_r": -955.95,
+   "trades": 7807,
+   "typical_losing_streak": 22,
+   "typical_max_drawdown_r": 962.2
+  },
+  "BTCUSD": {
+   "actual_losing_streak": 14,
+   "actual_max_drawdown_r": 83.9495,
+   "bad_luck_losing_streak": 22,
+   "bad_luck_max_drawdown_r": 96.86,
+   "total_r": -74.52,
+   "trades": 799,
+   "typical_losing_streak": 15,
+   "typical_max_drawdown_r": 83.39
+  },
+  "ETHUSD": {
+   "actual_losing_streak": 13,
+   "actual_max_drawdown_r": 145.2195,
+   "bad_luck_losing_streak": 21,
+   "bad_luck_max_drawdown_r": 151.4,
+   "total_r": -138.35,
+   "trades": 829,
+   "typical_losing_streak": 15,
+   "typical_max_drawdown_r": 142.37
+  },
+  "EURUSD": {
+   "actual_losing_streak": 18,
+   "actual_max_drawdown_r": 216.1833,
+   "bad_luck_losing_streak": 26,
+   "bad_luck_max_drawdown_r": 231.04,
+   "total_r": -210.24,
+   "trades": 1987,
+   "typical_losing_streak": 19,
+   "typical_max_drawdown_r": 217.51
+  },
+  "EURUSD_H1": {
+   "actual_losing_streak": 9,
+   "actual_max_drawdown_r": 26.2213,
+   "bad_luck_losing_streak": 16,
+   "bad_luck_max_drawdown_r": 36.67,
+   "total_r": -25.74,
+   "trades": 180,
+   "typical_losing_streak": 10,
+   "typical_max_drawdown_r": 29.85
+  },
+  "GBPUSD": {
+   "actual_losing_streak": 19,
+   "actual_max_drawdown_r": 309.5509,
+   "bad_luck_losing_streak": 26,
+   "bad_luck_max_drawdown_r": 322.04,
+   "total_r": -308.79,
+   "trades": 1813,
+   "typical_losing_streak": 19,
+   "typical_max_drawdown_r": 312.85
+  },
+  "GBPUSD_H1": {
+   "actual_losing_streak": 13,
+   "actual_max_drawdown_r": 25.4095,
+   "bad_luck_losing_streak": 19,
+   "bad_luck_max_drawdown_r": 31.52,
+   "total_r": -14.62,
+   "trades": 226,
+   "typical_losing_streak": 12,
+   "typical_max_drawdown_r": 23.04
+  },
+  "US100": {
+   "actual_losing_streak": 15,
+   "actual_max_drawdown_r": 35.5085,
+   "bad_luck_losing_streak": 19,
+   "bad_luck_max_drawdown_r": 48.86,
+   "total_r": -28.38,
+   "trades": 356,
+   "typical_losing_streak": 13,
+   "typical_max_drawdown_r": 37.83
+  },
+  "XAUUSD": {
+   "actual_losing_streak": 19,
+   "actual_max_drawdown_r": 172.1886,
+   "bad_luck_losing_streak": 24,
+   "bad_luck_max_drawdown_r": 189.74,
+   "total_r": -171.36,
+   "trades": 1433,
+   "typical_losing_streak": 18,
+   "typical_max_drawdown_r": 177.63
+  },
+  "XAUUSD_H1": {
+   "actual_losing_streak": 11,
+   "actual_max_drawdown_r": 8.8329,
+   "bad_luck_losing_streak": 13,
+   "bad_luck_max_drawdown_r": 14.33,
+   "total_r": 17.35,
+   "trades": 139,
+   "typical_losing_streak": 9,
+   "typical_max_drawdown_r": 8.96
+  },
+  "XAUUSD_H4": {
+   "actual_losing_streak": 11,
+   "actual_max_drawdown_r": 8.8048,
+   "bad_luck_losing_streak": 13,
+   "bad_luck_max_drawdown_r": 12.14,
+   "total_r": -1.31,
+   "trades": 45,
+   "typical_losing_streak": 8,
+   "typical_max_drawdown_r": 8.0
+  }
+ },
+ "markets": {
+  "BTCUSD": {
+   "net_r_after_costs": -74.52,
+   "passed": false,
+   "profit_factor": 0.82,
+   "trades": 799
+  },
+  "ETHUSD": {
+   "net_r_after_costs": -138.35,
+   "passed": false,
+   "profit_factor": 0.68,
+   "trades": 829
+  },
+  "EURUSD": {
+   "net_r_after_costs": -210.24,
+   "passed": false,
+   "profit_factor": 0.78,
+   "trades": 1987
+  },
+  "EURUSD_H1": {
+   "net_r_after_costs": -25.74,
+   "passed": false,
+   "profit_factor": 0.7,
+   "trades": 180
+  },
+  "GBPUSD": {
+   "net_r_after_costs": -308.79,
+   "passed": false,
+   "profit_factor": 0.67,
+   "trades": 1813
+  },
+  "GBPUSD_H1": {
+   "net_r_after_costs": -14.62,
+   "passed": false,
+   "profit_factor": 0.85,
+   "trades": 226
+  },
+  "US100": {
+   "net_r_after_costs": -28.38,
+   "passed": false,
+   "profit_factor": 0.84,
+   "trades": 356
+  },
+  "XAUUSD": {
+   "net_r_after_costs": -171.36,
+   "passed": false,
+   "profit_factor": 0.76,
+   "trades": 1433
+  },
+  "XAUUSD_H1": {
+   "net_r_after_costs": 17.35,
+   "passed": true,
+   "profit_factor": 1.3,
+   "trades": 139
+  },
+  "XAUUSD_H4": {
+   "net_r_after_costs": -1.31,
+   "passed": false,
+   "profit_factor": 0.94,
+   "trades": 45
+  }
+ },
+ "quiet_hours": {
+  "BTCUSD": [
+   2,
+   4,
+   7,
+   9,
+   10,
+   12
+  ],
+  "ETHUSD": [
+   7,
+   8,
+   10,
+   11,
+   12,
+   15,
+   17,
+   21
+  ],
+  "EURUSD": [
+   2,
+   3,
+   10,
+   12,
+   13,
+   16,
+   17,
+   18,
+   20,
+   23
+  ],
+  "GBPUSD": [
+   0,
+   2,
+   3,
+   4,
+   7,
+   9,
+   11,
+   12,
+   15,
+   16,
+   17,
+   18,
+   20
+  ],
+  "US100": [
+   16
+  ],
+  "XAUUSD": [
+   0,
+   3,
+   9,
+   10,
+   11,
+   12,
+   13,
+   17
+  ]
+ },
+ "suggested_settings": {},
+ "window": {
+  "from": "2023-10",
+  "to": "2026-09"
+ }
+}
