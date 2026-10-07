@@ -413,6 +413,16 @@
    "currency": "GBP",
    "label": "BOE Gov Bailey Speaks",
    "time": 1791461700
+  },
+  {
+   "currency": "CAD",
+   "label": "Employment Change",
+   "time": 1791549000
+  },
+  {
+   "currency": "CAD",
+   "label": "Unemployment Rate",
+   "time": 1791549000
   }
  ],
  "open": [],
@@ -489,5 +499,5 @@
   "wins": 19,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-07T19:00:26Z"
+ "updated": "2026-10-07T21:50:20Z"
 }
