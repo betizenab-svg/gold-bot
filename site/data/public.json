@@ -170,9 +170,15 @@
   ]
  ],
  "history": {
-  "bad_luck_dip_r": 975.39,
-  "bad_luck_losing_streak": 29,
+  "bad_luck_dip_r": 2044.42,
+  "bad_luck_losing_streak": 31,
   "markets": {
+   "AUDUSD": {
+    "net_r_after_costs": -435.01,
+    "passed": false,
+    "profit_factor": 0.58,
+    "trades": 1896
+   },
    "BTCUSD": {
     "net_r_after_costs": -74.52,
     "passed": false,
@@ -186,10 +192,10 @@
     "trades": 829
    },
    "EURUSD": {
-    "net_r_after_costs": -210.24,
+    "net_r_after_costs": -225.39,
     "passed": false,
-    "profit_factor": 0.78,
-    "trades": 1987
+    "profit_factor": 0.77,
+    "trades": 1970
    },
    "EURUSD_H1": {
     "net_r_after_costs": -25.74,
@@ -198,10 +204,10 @@
     "trades": 180
    },
    "GBPUSD": {
-    "net_r_after_costs": -308.79,
+    "net_r_after_costs": -307.86,
     "passed": false,
     "profit_factor": 0.67,
-    "trades": 1813
+    "trades": 1815
    },
    "GBPUSD_H1": {
     "net_r_after_costs": -14.62,
@@ -215,11 +221,35 @@
     "profit_factor": 0.84,
     "trades": 356
    },
-   "XAUUSD": {
-    "net_r_after_costs": -171.36,
+   "US500": {
+    "net_r_after_costs": -56.38,
     "passed": false,
-    "profit_factor": 0.76,
-    "trades": 1433
+    "profit_factor": 0.74,
+    "trades": 419
+   },
+   "USDJPY": {
+    "net_r_after_costs": -307.49,
+    "passed": false,
+    "profit_factor": 0.69,
+    "trades": 1869
+   },
+   "WTIUSD": {
+    "net_r_after_costs": -7.16,
+    "passed": false,
+    "profit_factor": 0.72,
+    "trades": 40
+   },
+   "XAGUSD": {
+    "net_r_after_costs": -246.73,
+    "passed": false,
+    "profit_factor": 0.6,
+    "trades": 1121
+   },
+   "XAUUSD": {
+    "net_r_after_costs": -177.26,
+    "passed": false,
+    "profit_factor": 0.75,
+    "trades": 1417
    },
    "XAUUSD_H1": {
     "net_r_after_costs": 17.35,
@@ -475,7 +505,7 @@
    "entry": 84076.9,
    "name": "Bitcoin",
    "order": "STOP",
-   "status": "PENDING",
+   "status": "ACTIVE",
    "stop": 84381.7,
    "symbol": "BTCUSD",
    "time": 1791344700,
@@ -556,5 +586,5 @@
   "wins": 17,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-07T04:01:13Z"
+ "updated": "2026-10-07T04:15:21Z"
 }
