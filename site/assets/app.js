@@ -156,9 +156,9 @@
       .map((o) => {
         const r = results[o.id];
         const outcome = !r ? "open" : r.event === "CANCEL" ? "cancelled (never opened)" : fmtR(r.result_r);
-        return `<tr><td>${esc(o.code)}${o.backfilled ? ' <span class="muted">*</span>' : ""}</td><td>${eat(o.signal_time)}</td><td>${esc(name(o.symbol))}</td><td>${o.direction === "LONG" ? "Buy" : "Sell"}</td><td class="num">${esc(o.entry)}</td><td class="num">${esc(o.stop)}</td><td class="num">${esc(o.tp1)} / ${esc(o.tp2)}</td><td class="num ${r && r.event === "CLOSE" ? cls(Number(r.result_r)) : ""}">${outcome}</td></tr>`;
+        return `<tr><td>${esc(o.code)}${o.backfilled ? ' <span class="muted">*</span>' : ""}</td><td>${eat(o.signal_time)}</td><td>${esc(name(o.symbol))}</td><td>${o.direction === "LONG" ? "Buy" : "Sell"}</td><td class="num">${esc(o.entry)}</td><td class="num">${esc(o.stop)}</td><td class="num">${esc(o.tp1)} / ${esc(o.tp2)}</td><td class="num ${r && r.event === "CLOSE" ? cls(Number(r.result_r)) : ""}">${outcome}</td><td class="muted">${esc(String(o.code_version || "—").slice(0, 7))}</td></tr>`;
       });
-    return `<div class="scroll"><table><tr><th>Code</th><th>Sent</th><th>Market</th><th>Side</th><th class="num">Entry</th><th class="num">Stop</th><th class="num">Targets</th><th class="num">Result</th></tr>${rows.join("") || '<tr><td colspan="8" class="muted">No signals yet.</td></tr>'}</table></div><p class="muted">* recorded from the bot's database when this public record started, not at the moment it was sent.</p>`;
+    return `<div class="scroll"><table><tr><th>Code</th><th>Sent</th><th>Market</th><th>Side</th><th class="num">Entry</th><th class="num">Stop</th><th class="num">Targets</th><th class="num">Result</th><th title="Which version of the bot's code sent it">Bot version</th></tr>${rows.join("") || '<tr><td colspan="9" class="muted">No signals yet.</td></tr>'}</table></div><p class="muted">* recorded from the bot's database when this public record started, not at the moment it was sent. Bot version = the code commit that sent the signal (look it up on GitHub to see exactly what the bot was running).</p>`;
   }
 
   async function sha256(text) {

@@ -36,6 +36,12 @@ jobs:
       - name: Check code style and obvious mistakes
         run: ruff check .
 
+      - name: Check no secrets are committed
+        run: python scripts/secret_scan.py
+
+      - name: Check the default settings make sense
+        run: python -m config.validate
+
       - name: Run the test suite
         run: python -m pytest -q -p no:cacheprovider
 

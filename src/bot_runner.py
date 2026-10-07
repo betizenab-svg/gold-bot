@@ -31,6 +31,15 @@ if str(ROOT_DIR) not in sys.path:
 
 load_dotenv(ROOT_DIR / ".env")
 
+from config.validate import check as _check_settings  # noqa: E402
+
+_SETTING_PROBLEMS = _check_settings()
+if _SETTING_PROBLEMS:
+    print("Settings problems found - fix these GitHub variables / .env values:", file=sys.stderr)
+    for _problem in _SETTING_PROBLEMS:
+        print(f" - {_problem}", file=sys.stderr)
+    sys.exit(2)
+
 LOCK_FILE_PATH = str(ROOT_DIR / "data" / "bot.lock")
 LOG_FILE_PATH = str(ROOT_DIR / "logs" / "daily-run.log")
 
