@@ -31,14 +31,11 @@ GitHub settings live at **github.com/betizenab-svg/gold-bot → Settings → Sec
    1. Sign up free at healthchecks.io.
    2. Create a check with period **5 minutes** and grace **10 minutes**, so you hear within 15 minutes if the bot goes quiet. Connect Telegram in its Integrations page.
    3. Copy the ping URL and add it as the **Secret** `HEALTHCHECK_PING_URL`.
-6. **Run timing.**
-   1. At cron-job.org, open the job that starts the bot.
-   2. Set it to run at minutes **1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56** of every hour (choose "Custom" and type those minutes).
-   3. Save.
+6. **Leave the cron-job.org timer as it is** (every 5 minutes). Nothing to change: the bot already gets each new price candle on time.
 
 ## Part 3: The public website
 
-7. **Turn on the website.** On GitHub, go to **Settings → Pages → Source** and choose **GitHub Actions**. The site appears at `https://betizenab-svg.github.io/gold-bot/` after the next code change, or when you run the "Pages" workflow by hand (Actions → Pages → Run workflow).
+7. **Turn on the website.** On GitHub, go to **Settings → Pages → Source** and choose **GitHub Actions**. The site appears at `https://betizenab-svg.github.io/gold-bot/` after the next code change, or when you run the "Website" workflow by hand (Actions → Website → Run workflow).
 8. **Add your channel links.**
    1. Edit `site/config.js` on GitHub (click the file, then the pencil).
    2. Fill in `freeChannelUrl` with your public channel link.

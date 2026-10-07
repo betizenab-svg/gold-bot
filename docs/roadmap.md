@@ -10,6 +10,7 @@ Changes from the original plan:
 - **46** added the US500 instead of the US30; there is no free, on-time Dow feed.
 - **48** oil has no free history download, so it stays a trial with no proof.
 - **73** the MT5 copier is written but untested; it needs MT5 on your computer.
+- **16** not needed: GitHub takes 15–90 seconds to start each run, so the bot already gets each candle after it closes. The cron-job.org timer stays at every 5 minutes.
 - **99** the mood switch only skips "wild" markets. It is off until the monthly proof shows it helps.
 
 What the history said, after costs over 36 months:
