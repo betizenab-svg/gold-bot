@@ -1,20 +1,32 @@
 # History proof report
 
-Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result below is after spread and slippage. R = one unit of risk.
+Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result below is after spread and slippage. R = one unit of risk.
 
 ## Markets
+- Aussie dollar (does not pass yet): 1896 trades, -435.0R after costs (-0.23R per trade, win rate 29%, profit factor 0.58, worst dip 436.6R)
 - Bitcoin (does not pass yet): 799 trades, -74.5R after costs (-0.09R per trade, win rate 32%, profit factor 0.82, worst dip 84.0R)
 - Ethereum (does not pass yet): 829 trades, -138.3R after costs (-0.17R per trade, win rate 33%, profit factor 0.68, worst dip 145.2R)
-- Euro (does not pass yet): 1987 trades, -210.2R after costs (-0.11R per trade, win rate 30%, profit factor 0.78, worst dip 216.2R)
+- Euro (does not pass yet): 1970 trades, -225.4R after costs (-0.11R per trade, win rate 29%, profit factor 0.77, worst dip 229.7R)
 - Euro 1-hour swing (does not pass yet): 180 trades, -25.7R after costs (-0.14R per trade, win rate 33%, profit factor 0.7, worst dip 26.2R)
-- Pound (does not pass yet): 1813 trades, -308.8R after costs (-0.17R per trade, win rate 29%, profit factor 0.67, worst dip 309.6R)
+- Pound (does not pass yet): 1815 trades, -307.9R after costs (-0.17R per trade, win rate 29%, profit factor 0.67, worst dip 309.2R)
 - Pound 1-hour swing (does not pass yet): 226 trades, -14.6R after costs (-0.07R per trade, win rate 30%, profit factor 0.85, worst dip 25.4R)
 - US100 (Nasdaq) (does not pass yet): 356 trades, -28.4R after costs (-0.08R per trade, win rate 31%, profit factor 0.84, worst dip 35.5R)
-- Gold (does not pass yet): 1433 trades, -171.4R after costs (-0.12R per trade, win rate 30%, profit factor 0.76, worst dip 172.2R)
+- US500 (S&P 500) (does not pass yet): 419 trades, -56.4R after costs (-0.14R per trade, win rate 29%, profit factor 0.74, worst dip 56.4R)
+- Dollar/Yen (does not pass yet): 1869 trades, -307.5R after costs (-0.17R per trade, win rate 28%, profit factor 0.69, worst dip 307.5R)
+- Oil (WTI) (does not pass yet): 40 trades, -7.2R after costs (-0.18R per trade, win rate 30%, profit factor 0.72, worst dip 9.1R)
+- Silver (does not pass yet): 1121 trades, -246.7R after costs (-0.22R per trade, win rate 30%, profit factor 0.6, worst dip 248.0R)
+- Gold (does not pass yet): 1417 trades, -177.3R after costs (-0.12R per trade, win rate 29%, profit factor 0.75, worst dip 178.1R)
 - Gold 1-hour swing (passes): 139 trades, +17.4R after costs (+0.12R per trade, win rate 37%, profit factor 1.3, worst dip 8.8R)
 - Gold 4-hour swing (does not pass yet): 45 trades, -1.3R after costs (-0.03R per trade, win rate 29%, profit factor 0.94, worst dip 8.8R)
 
 ## Switched off (clear losers after costs)
+- PIN_BAR_REJECTION on AUDUSD: 975 trades, -0.28R per trade
+- L2_PULLBACK on AUDUSD: 80 trades, -0.20R per trade
+- OPENING_RANGE_BREAKOUT on AUDUSD: 197 trades, -0.19R per trade
+- ZONE_BOUNCE on AUDUSD: 261 trades, -0.20R per trade
+- INSIDE_BAR_TRAP on AUDUSD: 147 trades, -0.13R per trade
+- ENGULFING_ZONE on AUDUSD: 143 trades, -0.07R per trade
+- H2_PULLBACK on AUDUSD: 93 trades, -0.26R per trade
 - ZONE_BOUNCE on BTCUSD: 128 trades, -0.18R per trade
 - H2_PULLBACK on BTCUSD: 72 trades, -0.13R per trade
 - ENGULFING_ZONE on BTCUSD: 44 trades, -0.11R per trade
@@ -25,42 +37,95 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result
 - L2_PULLBACK on ETHUSD: 52 trades, -0.32R per trade
 - INSIDE_BAR_TRAP on ETHUSD: 163 trades, -0.12R per trade
 - H2_PULLBACK on ETHUSD: 63 trades, -0.24R per trade
-- ZONE_BOUNCE on EURUSD: 258 trades, -0.18R per trade
-- PIN_BAR_REJECTION on EURUSD: 1052 trades, -0.12R per trade
-- L2_PULLBACK on EURUSD: 90 trades, -0.17R per trade
-- H2_PULLBACK on EURUSD: 83 trades, -0.17R per trade
+- ZONE_BOUNCE on EURUSD: 267 trades, -0.11R per trade
+- PIN_BAR_REJECTION on EURUSD: 1057 trades, -0.13R per trade
+- L2_PULLBACK on EURUSD: 77 trades, -0.27R per trade
+- OPENING_RANGE_BREAKOUT on EURUSD: 193 trades, -0.06R per trade
+- ENGULFING_ZONE on EURUSD: 145 trades, -0.06R per trade
+- H2_PULLBACK on EURUSD: 87 trades, -0.13R per trade
 - ZONE_BOUNCE on EURUSD_H1: 35 trades, -0.35R per trade
 - PIN_BAR_REJECTION on GBPUSD: 1027 trades, -0.17R per trade
-- INSIDE_BAR_TRAP on GBPUSD: 99 trades, -0.18R per trade
-- ZONE_BOUNCE on GBPUSD: 240 trades, -0.19R per trade
-- ENGULFING_ZONE on GBPUSD: 141 trades, -0.14R per trade
-- OPENING_RANGE_BREAKOUT on GBPUSD: 165 trades, -0.16R per trade
-- L2_PULLBACK on GBPUSD: 60 trades, -0.32R per trade
-- H2_PULLBACK on GBPUSD: 81 trades, -0.08R per trade
+- INSIDE_BAR_TRAP on GBPUSD: 106 trades, -0.21R per trade
+- ZONE_BOUNCE on GBPUSD: 243 trades, -0.19R per trade
+- ENGULFING_ZONE on GBPUSD: 137 trades, -0.12R per trade
+- OPENING_RANGE_BREAKOUT on GBPUSD: 175 trades, -0.17R per trade
+- L2_PULLBACK on GBPUSD: 62 trades, -0.33R per trade
+- H2_PULLBACK on GBPUSD: 65 trades, -0.07R per trade
 - PIN_BAR_REJECTION on GBPUSD_H1: 122 trades, -0.11R per trade
 - OPENING_RANGE_BREAKOUT on US100: 70 trades, -0.17R per trade
 - INSIDE_BAR_TRAP on US100: 49 trades, -0.14R per trade
-- ZONE_BOUNCE on XAUUSD: 323 trades, -0.10R per trade
-- PIN_BAR_REJECTION on XAUUSD: 304 trades, -0.18R per trade
-- INSIDE_BAR_TRAP on XAUUSD: 195 trades, -0.21R per trade
-- H2_PULLBACK on XAUUSD: 146 trades, -0.13R per trade
-- L2_PULLBACK on XAUUSD: 100 trades, -0.23R per trade
+- PIN_BAR_REJECTION on US500: 76 trades, -0.30R per trade
+- ZONE_BOUNCE on US500: 100 trades, -0.10R per trade
+- OPENING_RANGE_BREAKOUT on US500: 84 trades, -0.05R per trade
+- L2_PULLBACK on US500: 30 trades, -0.37R per trade
+- INSIDE_BAR_TRAP on US500: 65 trades, -0.12R per trade
+- OPENING_RANGE_BREAKOUT on USDJPY: 230 trades, -0.09R per trade
+- L2_PULLBACK on USDJPY: 129 trades, -0.07R per trade
+- PIN_BAR_REJECTION on USDJPY: 836 trades, -0.20R per trade
+- ENGULFING_ZONE on USDJPY: 103 trades, -0.16R per trade
+- ZONE_BOUNCE on USDJPY: 294 trades, -0.12R per trade
+- INSIDE_BAR_TRAP on USDJPY: 168 trades, -0.28R per trade
+- H2_PULLBACK on USDJPY: 109 trades, -0.14R per trade
+- PIN_BAR_REJECTION on XAGUSD: 210 trades, -0.24R per trade
+- L2_PULLBACK on XAGUSD: 99 trades, -0.19R per trade
+- ZONE_BOUNCE on XAGUSD: 311 trades, -0.15R per trade
+- INSIDE_BAR_TRAP on XAGUSD: 159 trades, -0.34R per trade
+- H2_PULLBACK on XAGUSD: 92 trades, -0.34R per trade
+- OPENING_RANGE_BREAKOUT on XAGUSD: 238 trades, -0.19R per trade
+- ZONE_BOUNCE on XAUUSD: 331 trades, -0.11R per trade
+- PIN_BAR_REJECTION on XAUUSD: 295 trades, -0.22R per trade
+- INSIDE_BAR_TRAP on XAUUSD: 173 trades, -0.23R per trade
+- H2_PULLBACK on XAUUSD: 138 trades, -0.18R per trade
+- L2_PULLBACK on XAUUSD: 101 trades, -0.23R per trade
 
 ## Quiet hours (UTC) where new signals pause
+- AUDUSD: 00:00, 01:00, 03:00, 04:00, 06:00, 07:00, 08:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00, 20:00, 21:00, 22:00, 23:00
 - BTCUSD: 02:00, 04:00, 07:00, 09:00, 10:00, 12:00
 - ETHUSD: 07:00, 08:00, 10:00, 11:00, 12:00, 15:00, 17:00, 21:00
-- EURUSD: 02:00, 03:00, 10:00, 12:00, 13:00, 16:00, 17:00, 18:00, 20:00, 23:00
-- GBPUSD: 00:00, 02:00, 03:00, 04:00, 07:00, 09:00, 11:00, 12:00, 15:00, 16:00, 17:00, 18:00, 20:00
+- EURUSD: 02:00, 03:00, 10:00, 13:00, 16:00, 18:00, 19:00, 20:00, 21:00, 23:00
+- GBPUSD: 00:00, 02:00, 03:00, 07:00, 11:00, 12:00, 15:00, 16:00, 17:00, 18:00, 19:00, 20:00, 22:00, 23:00
 - US100: 16:00
-- XAUUSD: 00:00, 03:00, 09:00, 10:00, 11:00, 12:00, 13:00, 17:00
+- US500: 18:00, 19:00
+- USDJPY: 01:00, 04:00, 06:00, 08:00, 09:00, 11:00, 13:00, 14:00, 17:00, 18:00, 19:00, 20:00, 21:00, 22:00
+- XAGUSD: 00:00, 02:00, 03:00, 04:00, 05:00, 06:00, 07:00, 08:00, 10:00, 11:00, 12:00, 14:00, 16:00, 18:00, 19:00
+- XAUUSD: 00:00, 02:00, 03:00, 10:00, 11:00, 12:00, 13:00, 15:00, 17:00
 
 ## Do higher scores win more?
-- score 75-79: 1477 trades, -178.2R after costs (-0.12R per trade, win rate 30%, profit factor 0.76, worst dip 184.2R)
-- score 80-84: 1306 trades, -155.6R after costs (-0.12R per trade, win rate 31%, profit factor 0.76, worst dip 165.1R)
-- score 85-89: 1058 trades, -87.9R after costs (-0.08R per trade, win rate 32%, profit factor 0.83, worst dip 97.4R)
-- score 90+: 3966 trades, -534.3R after costs (-0.14R per trade, win rate 30%, profit factor 0.73, worst dip 551.2R)
+- score 75-79: 2502 trades, -416.7R after costs (-0.17R per trade, win rate 29%, profit factor 0.68, worst dip 425.0R)
+- score 80-84: 2280 trades, -325.9R after costs (-0.14R per trade, win rate 30%, profit factor 0.72, worst dip 336.9R)
+- score 85-89: 1815 trades, -287.6R after costs (-0.16R per trade, win rate 29%, profit factor 0.7, worst dip 290.5R)
+- score 90+: 6524 trades, -998.7R after costs (-0.15R per trade, win rate 30%, profit factor 0.7, worst dip 1015.4R)
 
 ## What each filter saved or missed (followed ideas that were not sent)
+- AUDUSD | Rejected: Barbwire: 5101 ideas would have made -1082.2R (saved money)
+- AUDUSD | Rejected: RSI #: 5499 ideas would have made -971.5R (saved money)
+- AUDUSD | Other block: 7132 ideas would have made -937.3R (saved money)
+- AUDUSD | Losing-streak pause: 2283 ideas would have made -373.8R (saved money)
+- AUDUSD | Score just under the bar (watchlist): 1643 ideas would have made -353.1R (saved money)
+- AUDUSD | Rejected: Both timeframes trend against the trade: 2624 ideas would have made -301.0R (saved money)
+- AUDUSD | Rejected: Counter-trend long without a downtrend-line b: 972 ideas would have made -227.9R (saved money)
+- AUDUSD | Same dollar bet already open: 1169 ideas would have made -205.3R (saved money)
+- AUDUSD | One-way day block: 1166 ideas would have made -191.1R (saved money)
+- AUDUSD | Rejected: Day already extended # the Asian range — cont: 560 ideas would have made -143.4R (saved money)
+- AUDUSD | Rejected: Counter-trend short without an uptrend-line b: 926 ideas would have made -142.7R (saved money)
+- AUDUSD | Rejected: # of last # closes below EMA#: 833 ideas would have made -142.3R (saved money)
+- AUDUSD | Rejected: # of last # closes above EMA#: 959 ideas would have made -133.7R (saved money)
+- AUDUSD | Rejected: Three-push exhaustion: 824 ideas would have made -114.8R (saved money)
+- AUDUSD | Rejected: RSI # overbought: 385 ideas would have made -113.9R (saved money)
+- AUDUSD | Weekly loss brake: 391 ideas would have made -95.5R (saved money)
+- AUDUSD | Cool-down after a stop: 791 ideas would have made -79.0R (saved money)
+- AUDUSD | Score too low: 278 ideas would have made -58.6R (saved money)
+- AUDUSD | Rejected: RSI # oversold: 305 ideas would have made -49.3R (saved money)
+- AUDUSD | Weekend close: 267 ideas would have made -42.1R (saved money)
+- AUDUSD | Daily profit lock: 217 ideas would have made -36.3R (saved money)
+- AUDUSD | Rejected: Giant bar (# ATR): 114 ideas would have made -21.0R (saved money)
+- AUDUSD | Too many trades open: 168 ideas would have made -18.2R (saved money)
+- AUDUSD | Daily loss limit: 216 ideas would have made -16.5R (saved money)
+- AUDUSD | Rejected: Price below EMA# below EMA#: 17 ideas would have made -8.4R (saved money)
+- AUDUSD | Rejected: Price above EMA# above EMA#: 23 ideas would have made -6.9R (saved money)
+- AUDUSD | Daily signal cap: 64 ideas would have made -2.9R (saved money)
+- AUDUSD | Rejected: Climax exhaustion: 1 ideas would have made +0.9R (missed profit)
+- AUDUSD | Rejected: EXTREME volatility (x# baseline): 29 ideas would have made +7.5R (missed profit)
 - BTCUSD | Rejected: Barbwire: 2484 ideas would have made -290.8R (saved money)
 - BTCUSD | Rejected: RSI #: 1552 ideas would have made -107.7R (saved money)
 - BTCUSD | One-way day block: 440 ideas would have made -105.6R (saved money)
@@ -110,35 +175,35 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result
 - ETHUSD | Rejected: Price below EMA# below EMA#: 7 ideas would have made -0.5R (saved money)
 - ETHUSD | Daily loss limit: 3 ideas would have made +3.1R (missed profit)
 - ETHUSD | Rejected: EXTREME volatility (x# baseline): 6 ideas would have made +4.6R (missed profit)
-- EURUSD | Rejected: Barbwire: 5207 ideas would have made -845.9R (saved money)
-- EURUSD | Other block: 5138 ideas would have made -789.2R (saved money)
-- EURUSD | Rejected: RSI #: 5715 ideas would have made -657.4R (saved money)
-- EURUSD | Rejected: Day already extended # the Asian range — cont: 1526 ideas would have made -240.8R (saved money)
-- EURUSD | Daily signal cap: 1209 ideas would have made -200.8R (saved money)
-- EURUSD | Losing-streak pause: 2006 ideas would have made -190.5R (saved money)
-- EURUSD | Cool-down after a stop: 829 ideas would have made -159.1R (saved money)
-- EURUSD | Score just under the bar (watchlist): 1361 ideas would have made -156.8R (saved money)
-- EURUSD | Rejected: Three-push exhaustion: 783 ideas would have made -132.4R (saved money)
-- EURUSD | Rejected: Both timeframes trend against the trade: 2751 ideas would have made -130.6R (saved money)
-- EURUSD | Same dollar bet already open: 1065 ideas would have made -119.2R (saved money)
-- EURUSD | Rejected: # of last # closes below EMA#: 921 ideas would have made -106.8R (saved money)
-- EURUSD | Rejected: Counter-trend long without a downtrend-line b: 853 ideas would have made -88.8R (saved money)
-- EURUSD | Rejected: # of last # closes above EMA#: 927 ideas would have made -75.1R (saved money)
-- EURUSD | Daily loss limit: 272 ideas would have made -53.4R (saved money)
+- EURUSD | Rejected: Barbwire: 5273 ideas would have made -851.0R (saved money)
+- EURUSD | Other block: 5485 ideas would have made -782.2R (saved money)
+- EURUSD | Rejected: RSI #: 5856 ideas would have made -721.8R (saved money)
+- EURUSD | Rejected: Day already extended # the Asian range — cont: 1599 ideas would have made -250.7R (saved money)
+- EURUSD | Losing-streak pause: 2248 ideas would have made -248.0R (saved money)
+- EURUSD | Rejected: Both timeframes trend against the trade: 2815 ideas would have made -175.4R (saved money)
+- EURUSD | Score just under the bar (watchlist): 1356 ideas would have made -168.7R (saved money)
+- EURUSD | Cool-down after a stop: 833 ideas would have made -150.6R (saved money)
+- EURUSD | Rejected: Three-push exhaustion: 796 ideas would have made -138.8R (saved money)
+- EURUSD | Same dollar bet already open: 1093 ideas would have made -108.3R (saved money)
+- EURUSD | Rejected: # of last # closes below EMA#: 937 ideas would have made -105.8R (saved money)
+- EURUSD | Rejected: # of last # closes above EMA#: 945 ideas would have made -74.0R (saved money)
+- EURUSD | Rejected: Counter-trend long without a downtrend-line b: 871 ideas would have made -72.9R (saved money)
+- EURUSD | Rejected: Counter-trend short without an uptrend-line b: 847 ideas would have made -63.7R (saved money)
 - EURUSD | One-way day block: 1101 ideas would have made -52.6R (saved money)
-- EURUSD | Daily profit lock: 252 ideas would have made -50.3R (saved money)
-- EURUSD | Score too low: 209 ideas would have made -46.9R (saved money)
-- EURUSD | Rejected: Counter-trend short without an uptrend-line b: 838 ideas would have made -46.2R (saved money)
-- EURUSD | Rejected: Giant bar (# ATR): 131 ideas would have made -40.5R (saved money)
+- EURUSD | Daily loss limit: 286 ideas would have made -44.7R (saved money)
+- EURUSD | Score too low: 248 ideas would have made -42.6R (saved money)
+- EURUSD | Rejected: Giant bar (# ATR): 134 ideas would have made -41.4R (saved money)
+- EURUSD | Daily signal cap: 72 ideas would have made -35.9R (saved money)
+- EURUSD | Daily profit lock: 304 ideas would have made -35.3R (saved money)
 - EURUSD | Weekend close: 273 ideas would have made -34.8R (saved money)
-- EURUSD | Weekly loss brake: 259 ideas would have made -20.1R (saved money)
-- EURUSD | Rejected: RSI # oversold: 343 ideas would have made -17.6R (saved money)
-- EURUSD | Rejected: Price below EMA# below EMA#: 17 ideas would have made -2.4R (saved money)
-- EURUSD | Rejected: EXTREME volatility (x# baseline): 22 ideas would have made -2.3R (saved money)
-- EURUSD | Rejected: RSI # overbought: 375 ideas would have made -1.6R (saved money)
+- EURUSD | Rejected: RSI # oversold: 348 ideas would have made -25.4R (saved money)
+- EURUSD | Rejected: Price below EMA# below EMA#: 19 ideas would have made -4.0R (saved money)
+- EURUSD | Too many trades open: 96 ideas would have made -3.0R (saved money)
+- EURUSD | Rejected: EXTREME volatility (x# baseline): 24 ideas would have made -2.5R (saved money)
 - EURUSD | Rejected: Price above EMA# above EMA#: 15 ideas would have made -1.4R (saved money)
 - EURUSD | Rejected: Climax exhaustion: 2 ideas would have made -1.1R (saved money)
-- EURUSD | Too many trades open: 80 ideas would have made +25.1R (missed profit)
+- EURUSD | Rejected: RSI # overbought: 379 ideas would have made -0.1R (saved money)
+- EURUSD | Weekly loss brake: 248 ideas would have made +2.4R (missed profit)
 - EURUSD_H1 | Rejected: Both timeframes trend against the trade: 165 ideas would have made -12.4R (saved money)
 - EURUSD_H1 | Rejected: Barbwire: 407 ideas would have made -11.8R (saved money)
 - EURUSD_H1 | Other block: 44 ideas would have made -10.7R (saved money)
@@ -162,35 +227,35 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result
 - EURUSD_H1 | Rejected: RSI #: 347 ideas would have made +4.1R (missed profit)
 - EURUSD_H1 | Rejected: RSI # overbought: 34 ideas would have made +6.1R (missed profit)
 - EURUSD_H1 | Rejected: Counter-trend short without an uptrend-line b: 68 ideas would have made +6.6R (missed profit)
-- GBPUSD | Rejected: Barbwire: 5442 ideas would have made -625.2R (saved money)
-- GBPUSD | Rejected: RSI #: 5770 ideas would have made -571.4R (saved money)
-- GBPUSD | Other block: 5866 ideas would have made -438.8R (saved money)
-- GBPUSD | Losing-streak pause: 2173 ideas would have made -402.3R (saved money)
-- GBPUSD | Rejected: Both timeframes trend against the trade: 2742 ideas would have made -286.3R (saved money)
-- GBPUSD | Score just under the bar (watchlist): 1435 ideas would have made -222.6R (saved money)
-- GBPUSD | Rejected: Day already extended # the Asian range — cont: 1749 ideas would have made -180.8R (saved money)
-- GBPUSD | Same dollar bet already open: 882 ideas would have made -169.8R (saved money)
-- GBPUSD | Daily signal cap: 886 ideas would have made -162.9R (saved money)
-- GBPUSD | Rejected: # of last # closes above EMA#: 961 ideas would have made -138.6R (saved money)
-- GBPUSD | Rejected: # of last # closes below EMA#: 902 ideas would have made -116.2R (saved money)
-- GBPUSD | Rejected: Counter-trend short without an uptrend-line b: 800 ideas would have made -110.4R (saved money)
-- GBPUSD | Rejected: Counter-trend long without a downtrend-line b: 819 ideas would have made -106.5R (saved money)
+- GBPUSD | Rejected: Barbwire: 5618 ideas would have made -619.6R (saved money)
+- GBPUSD | Rejected: RSI #: 5964 ideas would have made -603.7R (saved money)
+- GBPUSD | Other block: 5612 ideas would have made -486.4R (saved money)
+- GBPUSD | Losing-streak pause: 2252 ideas would have made -439.1R (saved money)
+- GBPUSD | Rejected: Both timeframes trend against the trade: 2844 ideas would have made -307.1R (saved money)
+- GBPUSD | Score just under the bar (watchlist): 1504 ideas would have made -218.0R (saved money)
+- GBPUSD | Rejected: Day already extended # the Asian range — cont: 1816 ideas would have made -190.7R (saved money)
+- GBPUSD | Same dollar bet already open: 899 ideas would have made -166.8R (saved money)
+- GBPUSD | Rejected: # of last # closes above EMA#: 1003 ideas would have made -124.5R (saved money)
+- GBPUSD | Rejected: # of last # closes below EMA#: 947 ideas would have made -124.2R (saved money)
+- GBPUSD | Rejected: Counter-trend long without a downtrend-line b: 843 ideas would have made -122.8R (saved money)
+- GBPUSD | Rejected: Counter-trend short without an uptrend-line b: 848 ideas would have made -115.5R (saved money)
 - GBPUSD | One-way day block: 1068 ideas would have made -91.2R (saved money)
-- GBPUSD | Rejected: Three-push exhaustion: 784 ideas would have made -72.1R (saved money)
-- GBPUSD | Rejected: RSI # overbought: 409 ideas would have made -54.6R (saved money)
-- GBPUSD | Cool-down after a stop: 742 ideas would have made -51.9R (saved money)
-- GBPUSD | Score too low: 293 ideas would have made -49.4R (saved money)
+- GBPUSD | Cool-down after a stop: 767 ideas would have made -78.2R (saved money)
+- GBPUSD | Daily loss limit: 258 ideas would have made -55.7R (saved money)
+- GBPUSD | Rejected: RSI # overbought: 409 ideas would have made -52.0R (saved money)
+- GBPUSD | Score too low: 326 ideas would have made -47.7R (saved money)
 - GBPUSD | Weekend close: 320 ideas would have made -47.4R (saved money)
-- GBPUSD | Daily loss limit: 236 ideas would have made -41.0R (saved money)
-- GBPUSD | Rejected: RSI # oversold: 374 ideas would have made -41.0R (saved money)
-- GBPUSD | Weekly loss brake: 254 ideas would have made -34.9R (saved money)
-- GBPUSD | Rejected: Price below EMA# below EMA#: 34 ideas would have made -12.4R (saved money)
-- GBPUSD | Rejected: Giant bar (# ATR): 132 ideas would have made -11.4R (saved money)
-- GBPUSD | Rejected: EXTREME volatility (x# baseline): 7 ideas would have made -3.9R (saved money)
+- GBPUSD | Rejected: Three-push exhaustion: 809 ideas would have made -45.4R (saved money)
+- GBPUSD | Weekly loss brake: 247 ideas would have made -44.9R (saved money)
+- GBPUSD | Rejected: RSI # oversold: 386 ideas would have made -32.0R (saved money)
+- GBPUSD | Rejected: Giant bar (# ATR): 135 ideas would have made -18.9R (saved money)
+- GBPUSD | Daily profit lock: 291 ideas would have made -17.6R (saved money)
+- GBPUSD | Rejected: Price below EMA# below EMA#: 33 ideas would have made -11.4R (saved money)
 - GBPUSD | Rejected: Price above EMA# above EMA#: 23 ideas would have made -2.4R (saved money)
+- GBPUSD | Rejected: EXTREME volatility (x# baseline): 8 ideas would have made -2.3R (saved money)
 - GBPUSD | Rejected: Climax exhaustion: 2 ideas would have made -2.1R (saved money)
-- GBPUSD | Daily profit lock: 272 ideas would have made -1.2R (saved money)
-- GBPUSD | Too many trades open: 87 ideas would have made +13.7R (missed profit)
+- GBPUSD | Too many trades open: 94 ideas would have made +8.7R (missed profit)
+- GBPUSD | Daily signal cap: 120 ideas would have made +27.0R (missed profit)
 - GBPUSD_H1 | Rejected: Barbwire: 449 ideas would have made -51.7R (saved money)
 - GBPUSD_H1 | Rejected: # of last # closes above EMA#: 93 ideas would have made -21.2R (saved money)
 - GBPUSD_H1 | Rejected: Both timeframes trend against the trade: 200 ideas would have made -14.9R (saved money)
@@ -235,34 +300,134 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result
 - US100 | Other block: 152 ideas would have made +7.4R (missed profit)
 - US100 | Rejected: # of last # closes above EMA#: 139 ideas would have made +9.6R (missed profit)
 - US100 | Rejected: Counter-trend short without an uptrend-line b: 130 ideas would have made +19.5R (missed profit)
-- XAUUSD | Rejected: Barbwire: 3269 ideas would have made -386.3R (saved money)
-- XAUUSD | Rejected: RSI #: 2532 ideas would have made -186.0R (saved money)
-- XAUUSD | Other block: 2106 ideas would have made -168.7R (saved money)
-- XAUUSD | Losing-streak pause: 910 ideas would have made -137.3R (saved money)
-- XAUUSD | Rejected: Both timeframes trend against the trade: 1478 ideas would have made -124.0R (saved money)
-- XAUUSD | Score just under the bar (watchlist): 1326 ideas would have made -119.5R (saved money)
+- US500 | Rejected: Barbwire: 917 ideas would have made -106.9R (saved money)
+- US500 | Rejected: Both timeframes trend against the trade: 371 ideas would have made -63.1R (saved money)
+- US500 | Rejected: RSI #: 858 ideas would have made -59.6R (saved money)
+- US500 | Rejected: Three-push exhaustion: 169 ideas would have made -42.8R (saved money)
+- US500 | Weekend close: 154 ideas would have made -35.6R (saved money)
+- US500 | Score just under the bar (watchlist): 416 ideas would have made -29.0R (saved money)
+- US500 | One-way day block: 130 ideas would have made -27.5R (saved money)
+- US500 | Rejected: Counter-trend long without a downtrend-line b: 182 ideas would have made -14.2R (saved money)
+- US500 | Rejected: RSI # oversold: 136 ideas would have made -13.5R (saved money)
+- US500 | Cool-down after a stop: 101 ideas would have made -11.9R (saved money)
+- US500 | Other block: 164 ideas would have made -10.2R (saved money)
+- US500 | Rejected: # of last # closes above EMA#: 126 ideas would have made -8.5R (saved money)
+- US500 | Score too low: 49 ideas would have made -4.7R (saved money)
+- US500 | Rejected: Price below EMA# below EMA#: 3 ideas would have made -3.1R (saved money)
+- US500 | Rejected: Price above EMA# above EMA#: 7 ideas would have made -2.4R (saved money)
+- US500 | Daily profit lock: 2 ideas would have made -0.3R (saved money)
+- US500 | Too many trades open: 1 ideas would have made -0.1R (saved money)
+- US500 | Rejected: EXTREME volatility (x# baseline): 5 ideas would have made +0.2R (missed profit)
+- US500 | Rejected: Giant bar (# ATR): 18 ideas would have made +3.6R (missed profit)
+- US500 | Rejected: # of last # closes below EMA#: 102 ideas would have made +7.3R (missed profit)
+- US500 | Rejected: RSI # overbought: 219 ideas would have made +7.6R (missed profit)
+- US500 | Losing-streak pause: 124 ideas would have made +8.8R (missed profit)
+- US500 | Rejected: Counter-trend short without an uptrend-line b: 135 ideas would have made +10.4R (missed profit)
+- USDJPY | Other block: 5780 ideas would have made -974.3R (saved money)
+- USDJPY | Rejected: Barbwire: 4449 ideas would have made -528.7R (saved money)
+- USDJPY | Rejected: RSI #: 4406 ideas would have made -440.8R (saved money)
+- USDJPY | Rejected: Both timeframes trend against the trade: 2137 ideas would have made -317.3R (saved money)
+- USDJPY | Losing-streak pause: 1877 ideas would have made -252.7R (saved money)
+- USDJPY | Score just under the bar (watchlist): 1567 ideas would have made -200.6R (saved money)
+- USDJPY | Rejected: Counter-trend long without a downtrend-line b: 954 ideas would have made -121.5R (saved money)
+- USDJPY | Rejected: Counter-trend short without an uptrend-line b: 818 ideas would have made -88.3R (saved money)
+- USDJPY | Cool-down after a stop: 727 ideas would have made -81.9R (saved money)
+- USDJPY | Rejected: Three-push exhaustion: 888 ideas would have made -81.2R (saved money)
+- USDJPY | Rejected: # of last # closes above EMA#: 827 ideas would have made -59.0R (saved money)
+- USDJPY | Rejected: Day already extended # the Asian range — cont: 645 ideas would have made -57.5R (saved money)
+- USDJPY | Same dollar bet already open: 441 ideas would have made -55.6R (saved money)
+- USDJPY | Weekly loss brake: 263 ideas would have made -52.9R (saved money)
+- USDJPY | One-way day block: 1160 ideas would have made -50.6R (saved money)
+- USDJPY | Daily loss limit: 194 ideas would have made -49.4R (saved money)
+- USDJPY | Rejected: # of last # closes below EMA#: 605 ideas would have made -40.8R (saved money)
+- USDJPY | Rejected: RSI # oversold: 312 ideas would have made -37.2R (saved money)
+- USDJPY | Rejected: RSI # overbought: 418 ideas would have made -33.6R (saved money)
+- USDJPY | Weekend close: 297 ideas would have made -31.2R (saved money)
+- USDJPY | Daily signal cap: 72 ideas would have made -20.6R (saved money)
+- USDJPY | Score too low: 316 ideas would have made -14.5R (saved money)
+- USDJPY | Rejected: Giant bar (# ATR): 132 ideas would have made -14.1R (saved money)
+- USDJPY | Too many trades open: 16 ideas would have made -9.4R (saved money)
+- USDJPY | Rejected: Price below EMA# below EMA#: 22 ideas would have made -8.6R (saved money)
+- USDJPY | Rejected: Price above EMA# above EMA#: 22 ideas would have made -7.0R (saved money)
+- USDJPY | Rejected: EXTREME volatility (x# baseline): 30 ideas would have made -2.7R (saved money)
+- USDJPY | Daily profit lock: 224 ideas would have made -1.8R (saved money)
+- USDJPY | Rejected: Climax exhaustion: 2 ideas would have made +0.1R (missed profit)
+- WTIUSD | Rejected: RSI #: 55 ideas would have made -14.5R (saved money)
+- WTIUSD | Rejected: Barbwire: 50 ideas would have made -11.0R (saved money)
+- WTIUSD | Score just under the bar (watchlist): 29 ideas would have made -8.7R (saved money)
+- WTIUSD | Rejected: Three-push exhaustion: 7 ideas would have made -3.0R (saved money)
+- WTIUSD | One-way day block: 9 ideas would have made -2.9R (saved money)
+- WTIUSD | Rejected: RSI # overbought: 4 ideas would have made -2.2R (saved money)
+- WTIUSD | Rejected: Giant bar (# ATR): 2 ideas would have made -2.1R (saved money)
+- WTIUSD | Cool-down after a stop: 6 ideas would have made -1.6R (saved money)
+- WTIUSD | Rejected: RSI # oversold: 6 ideas would have made -0.8R (saved money)
+- WTIUSD | Score too low: 8 ideas would have made -0.4R (saved money)
+- WTIUSD | Too many trades open: 2 ideas would have made -0.2R (saved money)
+- WTIUSD | Daily profit lock: 1 ideas would have made -0.1R (saved money)
+- WTIUSD | Rejected: # of last # closes below EMA#: 4 ideas would have made +0.3R (missed profit)
+- WTIUSD | Other block: 16 ideas would have made +0.7R (missed profit)
+- WTIUSD | Weekend close: 4 ideas would have made +0.9R (missed profit)
+- WTIUSD | Rejected: Counter-trend short without an uptrend-line b: 14 ideas would have made +1.9R (missed profit)
+- WTIUSD | Rejected: # of last # closes above EMA#: 10 ideas would have made +2.4R (missed profit)
+- WTIUSD | Losing-streak pause: 4 ideas would have made +2.8R (missed profit)
+- WTIUSD | Rejected: Counter-trend long without a downtrend-line b: 9 ideas would have made +4.3R (missed profit)
+- WTIUSD | Rejected: Day already extended # the Asian range — cont: 17 ideas would have made +10.2R (missed profit)
+- WTIUSD | Rejected: Both timeframes trend against the trade: 29 ideas would have made +13.6R (missed profit)
+- XAGUSD | Rejected: Barbwire: 3985 ideas would have made -1102.2R (saved money)
+- XAGUSD | Rejected: RSI #: 2510 ideas would have made -557.6R (saved money)
+- XAGUSD | Other block: 1836 ideas would have made -463.6R (saved money)
+- XAGUSD | Rejected: Both timeframes trend against the trade: 1516 ideas would have made -344.4R (saved money)
+- XAGUSD | Score just under the bar (watchlist): 1352 ideas would have made -334.8R (saved money)
+- XAGUSD | One-way day block: 625 ideas would have made -158.5R (saved money)
+- XAGUSD | Rejected: Counter-trend long without a downtrend-line b: 638 ideas would have made -125.5R (saved money)
+- XAGUSD | Rejected: Three-push exhaustion: 569 ideas would have made -117.0R (saved money)
+- XAGUSD | Rejected: # of last # closes below EMA#: 357 ideas would have made -110.3R (saved money)
+- XAGUSD | Losing-streak pause: 710 ideas would have made -100.5R (saved money)
+- XAGUSD | Rejected: # of last # closes above EMA#: 439 ideas would have made -82.9R (saved money)
+- XAGUSD | Score too low: 381 ideas would have made -74.7R (saved money)
+- XAGUSD | Rejected: Day already extended # the Asian range — cont: 395 ideas would have made -51.4R (saved money)
+- XAGUSD | Cool-down after a stop: 288 ideas would have made -51.1R (saved money)
+- XAGUSD | Rejected: RSI # oversold: 154 ideas would have made -42.6R (saved money)
+- XAGUSD | Weekend close: 154 ideas would have made -35.1R (saved money)
+- XAGUSD | Rejected: Counter-trend short without an uptrend-line b: 496 ideas would have made -32.7R (saved money)
+- XAGUSD | Rejected: RSI # overbought: 217 ideas would have made -11.6R (saved money)
+- XAGUSD | Weekly loss brake: 25 ideas would have made -8.9R (saved money)
+- XAGUSD | Rejected: Giant bar (# ATR): 50 ideas would have made -8.2R (saved money)
+- XAGUSD | Daily profit lock: 40 ideas would have made -6.5R (saved money)
+- XAGUSD | Rejected: Price above EMA# above EMA#: 18 ideas would have made -5.6R (saved money)
+- XAGUSD | Rejected: Price below EMA# below EMA#: 10 ideas would have made -5.0R (saved money)
+- XAGUSD | Rejected: EXTREME volatility (x# baseline): 8 ideas would have made -3.2R (saved money)
+- XAGUSD | Daily loss limit: 36 ideas would have made -2.8R (saved money)
+- XAGUSD | Too many trades open: 12 ideas would have made -2.4R (saved money)
+- XAGUSD | Same dollar bet already open: 175 ideas would have made -2.2R (saved money)
+- XAUUSD | Rejected: Barbwire: 3287 ideas would have made -420.1R (saved money)
+- XAUUSD | Rejected: RSI #: 2559 ideas would have made -194.8R (saved money)
+- XAUUSD | Losing-streak pause: 927 ideas would have made -133.6R (saved money)
+- XAUUSD | Score just under the bar (watchlist): 1354 ideas would have made -130.6R (saved money)
+- XAUUSD | Other block: 2049 ideas would have made -125.0R (saved money)
+- XAUUSD | Rejected: Both timeframes trend against the trade: 1510 ideas would have made -123.3R (saved money)
 - XAUUSD | One-way day block: 550 ideas would have made -108.5R (saved money)
-- XAUUSD | Rejected: Three-push exhaustion: 633 ideas would have made -90.6R (saved money)
-- XAUUSD | Rejected: Counter-trend short without an uptrend-line b: 485 ideas would have made -88.9R (saved money)
-- XAUUSD | Rejected: # of last # closes above EMA#: 339 ideas would have made -74.1R (saved money)
-- XAUUSD | Rejected: Day already extended # the Asian range — cont: 447 ideas would have made -61.0R (saved money)
-- XAUUSD | Rejected: Counter-trend long without a downtrend-line b: 691 ideas would have made -50.0R (saved money)
-- XAUUSD | Same dollar bet already open: 241 ideas would have made -45.9R (saved money)
+- XAUUSD | Rejected: Three-push exhaustion: 647 ideas would have made -91.1R (saved money)
+- XAUUSD | Rejected: Counter-trend short without an uptrend-line b: 491 ideas would have made -90.7R (saved money)
+- XAUUSD | Rejected: # of last # closes above EMA#: 338 ideas would have made -69.0R (saved money)
+- XAUUSD | Rejected: Day already extended # the Asian range — cont: 446 ideas would have made -61.4R (saved money)
+- XAUUSD | Rejected: Counter-trend long without a downtrend-line b: 694 ideas would have made -50.0R (saved money)
+- XAUUSD | Same dollar bet already open: 251 ideas would have made -46.5R (saved money)
+- XAUUSD | Score too low: 368 ideas would have made -32.9R (saved money)
+- XAUUSD | Rejected: RSI # overbought: 321 ideas would have made -27.2R (saved money)
 - XAUUSD | Weekend close: 165 ideas would have made -26.2R (saved money)
-- XAUUSD | Score too low: 345 ideas would have made -25.2R (saved money)
-- XAUUSD | Rejected: RSI # overbought: 325 ideas would have made -24.2R (saved money)
-- XAUUSD | Daily signal cap: 125 ideas would have made -21.6R (saved money)
-- XAUUSD | Cool-down after a stop: 356 ideas would have made -14.5R (saved money)
-- XAUUSD | Rejected: RSI # oversold: 218 ideas would have made -13.4R (saved money)
-- XAUUSD | Daily loss limit: 38 ideas would have made -13.2R (saved money)
-- XAUUSD | Daily profit lock: 105 ideas would have made -10.8R (saved money)
-- XAUUSD | Rejected: Price below EMA# below EMA#: 23 ideas would have made -3.3R (saved money)
-- XAUUSD | Rejected: # of last # closes below EMA#: 322 ideas would have made -1.1R (saved money)
+- XAUUSD | Cool-down after a stop: 352 ideas would have made -21.7R (saved money)
+- XAUUSD | Rejected: RSI # oversold: 220 ideas would have made -14.2R (saved money)
+- XAUUSD | Daily loss limit: 39 ideas would have made -12.3R (saved money)
+- XAUUSD | Daily profit lock: 110 ideas would have made -8.2R (saved money)
+- XAUUSD | Rejected: Price below EMA# below EMA#: 25 ideas would have made -2.3R (saved money)
+- XAUUSD | Rejected: # of last # closes below EMA#: 326 ideas would have made -0.5R (saved money)
+- XAUUSD | Daily signal cap: 8 ideas would have made +1.9R (missed profit)
 - XAUUSD | Rejected: EXTREME volatility (x# baseline): 12 ideas would have made +3.2R (missed profit)
-- XAUUSD | Too many trades open: 7 ideas would have made +7.8R (missed profit)
-- XAUUSD | Rejected: Giant bar (# ATR): 43 ideas would have made +8.2R (missed profit)
-- XAUUSD | Weekly loss brake: 30 ideas would have made +11.4R (missed profit)
+- XAUUSD | Too many trades open: 9 ideas would have made +8.8R (missed profit)
+- XAUUSD | Rejected: Giant bar (# ATR): 46 ideas would have made +9.9R (missed profit)
 - XAUUSD | Rejected: Price above EMA# above EMA#: 25 ideas would have made +11.6R (missed profit)
+- XAUUSD | Weekly loss brake: 33 ideas would have made +14.4R (missed profit)
 - XAUUSD_H1 | Rejected: Both timeframes trend against the trade: 77 ideas would have made -12.7R (saved money)
 - XAUUSD_H1 | One-way day block: 49 ideas would have made -10.5R (saved money)
 - XAUUSD_H1 | Rejected: RSI # overbought: 38 ideas would have made -8.5R (saved money)
@@ -301,5 +466,8 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 02:42 UTC). Every result
 - XAUUSD_H4 | Rejected: Barbwire: 54 ideas would have made +15.3R (missed profit)
 
 ## Luck test (all markets together)
-- Worst dip that actually happened: 967.3154R; typical: 962.2R; bad luck (1 in 20): 975.39R
-- Longest losing run that happened: 23; bad luck (1 in 20): 29
+- Worst dip that actually happened: 2029.3916R; typical: 2033.54R; bad luck (1 in 20): 2044.42R
+- Longest losing run that happened: 34; bad luck (1 in 20): 31
+
+## Suggested settings (never applied automatically)
+- XAUUSD: MACRO_GATES_MODE = block (best after costs: -127.1R vs -165.0R)
