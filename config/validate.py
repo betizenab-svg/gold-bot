@@ -39,6 +39,7 @@ CHOICES = {
     "ENTRY_MODE": {"limit", "market"},
     "WEEKEND_ACTION": {"close", "breakeven", "off"},
     "TREND_DAY_FILTER": {"block", "off"},
+    "MOOD_FILTER": {"block", "off"},
     "MESSAGE_LANGUAGE": {"en", "am", "both"},
 }
 

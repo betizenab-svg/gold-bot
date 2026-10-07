@@ -99,6 +99,8 @@ jobs:
           SYMBOLS: ${{ vars.SYMBOLS }}
           PROMOTED_SYMBOLS: ${{ vars.PROMOTED_SYMBOLS }}
           TRIAL_STRATEGIES: ${{ vars.TRIAL_STRATEGIES }}
+          MOOD_FILTER: ${{ vars.MOOD_FILTER }}
+          SECOND_OPINION_ENABLED: ${{ vars.SECOND_OPINION_ENABLED }}
           # en (default), am or both; switch on Amharic only after checking its wording.
           MESSAGE_LANGUAGE: ${{ vars.MESSAGE_LANGUAGE }}
           # VIP mode (only after the record is proven): full signals to the VIP channel,

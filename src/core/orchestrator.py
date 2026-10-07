@@ -40,6 +40,8 @@ from src.analysis.mitigation import ZoneLifecycleManager
 from src.analysis.order_block import OrderBlockScanner
 from src.analysis.signal_factory import SignalFactory
 from src.analysis.trend_day import against_trend_day
+from src.analysis.market_mood import mood_block_reason
+from src.analysis.second_opinion import veto_reason as second_opinion_veto
 from src.strategies.range_breakout import AsianRangeBreakoutStrategy, OpeningRangeBreakoutStrategy
 from src.analysis.scoring import ScoringEngine
 from src.analysis.structure import MarketStructureEngine
@@ -2342,6 +2344,24 @@ class PulseOrchestrator:
                 }
             except Exception as exc:
                 logging.debug("Trade plan context skipped: %s", exc)
+
+            if classification == "ACTIONABLE":
+                extra_veto = None
+                if str(app_settings.MOOD_FILTER).lower() == "block":
+                    extra_veto = mood_block_reason(recent_candles)
+                if extra_veto is None and app_settings.SECOND_OPINION_ENABLED:
+                    extra_veto = second_opinion_veto(
+                        {
+                            "symbol": symbol,
+                            "strategy": str(setup_strategy or "SMC_ZONE"),
+                            "direction": trade_direction,
+                            "score": int(total_score),
+                            "timestamp": int(current_candle.timestamp),
+                        }
+                    )
+                if extra_veto:
+                    classification = "REJECTED"
+                    vetoes_text = "; ".join(part for part in [extra_veto, vetoes_text] if part)
 
             repository.set_kv(state_key("latest_setup_score", symbol), total_score)
             repository.set_kv(

@@ -78,6 +78,10 @@ This guide covers every message the bot sends to **you only** (your admin chat).
 
 **What to do:** read the suggestions in the run summary. Apply one only if it improves results across several months, by changing the matching GitHub variable.
 
+The same monthly run also covers two optional switches, both **off** by default:
+- **Market mood** (`MOOD_FILTER`): skips ideas while the market is "wild" (bars much bigger than usual). The proof tests it as `mood_block`. If the report suggests `MOOD_FILTER=block`, you may set that GitHub variable.
+- **Second opinion** (`SECOND_OPINION_ENABLED`): a small learning model that skips ideas it thinks are unlikely to win. It needs at least 500 finished ideas first. The report says either "HELPS - you may set SECOND_OPINION_ENABLED=1" or "does not help". Even when switched on, the bot ignores the model unless its latest test says it helps.
+
 ---
 
 ## Promoting a trial

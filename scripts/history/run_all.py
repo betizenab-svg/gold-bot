@@ -35,6 +35,7 @@ SETTING_VARIANTS: list[tuple[str, list[str]]] = [
     ("entry_market", ["--set", "ENTRY_MODE=market"]),  # enter now instead of waiting
     ("expiry_180", ["--set", "SIGNAL_EXPIRY_MINUTES=180"]),  # wait longer for the entry
     ("trendday_off", ["--set", "TREND_DAY_FILTER=off"]),  # does the one-way-day block help?
+    ("mood_block", ["--set", "MOOD_FILTER=block"]),  # does skipping wild markets help?
 ]
 
 Job = tuple[str, str, list[str], str, str]

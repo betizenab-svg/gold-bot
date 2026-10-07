@@ -232,6 +232,10 @@ WEEKEND_EXIT_MINUTES = int(os.getenv("WEEKEND_EXIT_MINUTES") or "30")
 MONTHLY_RISK_REVIEW_ENABLED = _env_bool("MONTHLY_RISK_REVIEW_ENABLED", True)
 # Strong one-way day: "block" signals against the day's direction, or "off".
 TREND_DAY_FILTER = (os.getenv("TREND_DAY_FILTER") or "block").strip().lower()
+# Market mood (trending / ranging / wild): "block" skips ideas while wild, "off" (default).
+MOOD_FILTER = (os.getenv("MOOD_FILTER") or "off").strip().lower()
+# Learning "second opinion" model: used only when on AND its own walk-forward test says it helps.
+SECOND_OPINION_ENABLED = _env_bool("SECOND_OPINION_ENABLED", False)
 
 # --- Subscriber posts (public channel) ---
 # Language of subscriber messages: MESSAGE_LANGUAGE = en | am | both (read in src/alerting/i18n.py).
