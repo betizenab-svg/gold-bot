@@ -575,6 +575,9 @@ async function cmdBroadcast(env, chatId, text) {
 
 // --- message routing ------------------------------------------------------------------------------
 
+const MEMBER_COMMANDS = ["/join", "/plans", "/trial", "/status", "/refer", "/broker"];
+const OWNER_COMMANDS = ["/pending", "/members", "/revenue", "/left", "/extend", "/broadcast"];
+
 export async function handleUpdate(update, env) {
   if (update.callback_query) return handleCallback(update.callback_query, env);
   const message = update.message;
@@ -619,7 +622,12 @@ export async function handleUpdate(update, env) {
         return say(env, chatId, reply);
       }
     }
-    if (!env.DB || message.chat.type !== "private") return;
+    if (!env.DB) return;
+    const privateChat = message.chat.type === "private";
+    if (MEMBER_COMMANDS.includes(command) && !privateChat) {
+      const link = env.BOT_USERNAME ? ` https://t.me/${env.BOT_USERNAME}` : "";
+      return say(env, chatId, `Please send ${command} to me in a private chat:${link}`);
+    }
     switch (command) {
       case "/join":
       case "/plans":
@@ -633,7 +641,10 @@ export async function handleUpdate(update, env) {
       case "/broker":
         return cmdBroker(env, chatId, user, args);
     }
-    if (!admin) return;
+    if (!admin || !OWNER_COMMANDS.includes(command)) return;
+    if (!privateChat && String(chatId) !== String(env.ADMIN_CHAT_ID || "")) {
+      return say(env, chatId, "Owner commands work in the owner group or in my private chat.");
+    }
     switch (command) {
       case "/pending":
         return cmdPending(env, chatId);

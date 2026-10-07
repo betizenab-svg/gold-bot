@@ -229,6 +229,20 @@ test("/pending shows every payment waiting for the owner, old and new", async ()
   assert.equal(calls.length, 0);
 });
 
+test("owner commands work in the owner group; elsewhere the bot says where to use them", async () => {
+  const groupMsg = (chat, from, text) => ({ message: { message_id: 9, chat: { id: chat, type: "group" }, from: { id: from }, text } });
+  await handleUpdate(groupMsg("-100owner", 999, "/pending@GoldBot"), env);
+  assert.equal(sent("sendMessage").at(-1).body.chat_id, "-100owner");
+  assert.match(sent("sendMessage").at(-1).body.text, /No payments are waiting/);
+  await handleUpdate(groupMsg("-100public", 999, "/members@GoldBot"), env);
+  assert.match(sent("sendMessage").at(-1).body.text, /owner group or in my private chat/);
+  await handleUpdate(groupMsg("-100public", 42, "/join@GoldBot"), env);
+  assert.match(sent("sendMessage").at(-1).body.text, /private chat: https:\/\/t\.me\/GoldBot/);
+  calls = [];
+  await handleUpdate(groupMsg("-100owner", 42, "/pending"), env); // not the owner
+  assert.equal(calls.length, 0);
+});
+
 test("the same receipt photo cannot pay twice", async () => {
   await handleUpdate({ callback_query: { id: "q", data: "pay:monthly:TELEBIRR", from: { id: 5 }, message: { chat: { id: 5 } } } }, env);
   await handleUpdate(msg(5, "", { photo: [{ file_unique_id: "same", file_id: "F-1" }] }), env);
