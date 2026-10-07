@@ -29,6 +29,10 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# History must give the same answer on every computer: never read a local .env
+# (it can hold different limits from the live bot's defaults).
+os.environ["PYTHON_DOTENV_DISABLED"] = "1"
+
 PROOF_DIR = ROOT_DIR / "data" / "proof"
 WARMUP_CANDLES = 600
 KEEP_CANDLE_DAYS = 60

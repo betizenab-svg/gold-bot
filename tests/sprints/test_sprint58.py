@@ -269,3 +269,31 @@ def test_long_run_losers_are_switched_off():
     assert not should_disable({"trades": 80, "expectancy_r": -0.03, "profit_factor": 0.97})
     assert should_disable({"trades": 40, "expectancy_r": -0.2, "profit_factor": 0.7})
     assert not should_disable({"trades": 500, "expectancy_r": 0.01, "profit_factor": 1.02})
+
+
+def test_histdata_month_start_comes_from_the_previous_file(tmp_path: Path, monkeypatch) -> None:
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(sources, "HISTORY_DIR", tmp_path)
+
+    def ts(*parts: int) -> int:
+        return int(datetime(*parts, tzinfo=timezone.utc).timestamp())
+
+    # New York winter-time files: April's first UTC hours are in March's file,
+    # and the first hours of January in the previous year's file.
+    files = {
+        (2026, 3): [(ts(2026, 3, 20, 12), 1.0, 1.0, 1.0, 1.0, 0.0), (ts(2026, 4, 1, 1), 2.0, 2.0, 2.0, 2.0, 0.0)],
+        (2026, 4): [(ts(2026, 4, 10, 12), 3.0, 3.0, 3.0, 3.0, 0.0)],
+        (2025, None): [(ts(2025, 12, 31, 12), 4.0, 4.0, 4.0, 4.0, 0.0), (ts(2026, 1, 1, 2), 5.0, 5.0, 5.0, 5.0, 0.0)],
+        (2026, 1): [(ts(2026, 1, 5, 12), 6.0, 6.0, 6.0, 6.0, 0.0)],
+    }
+    client = MagicMock()
+    client.fetch.side_effect = lambda pair, year, month=None: files.get((year, month), [])
+    now = datetime(2026, 10, 6, tzinfo=timezone.utc)
+
+    assert sources.fetch_symbol("EURUSD", "HISTDATA", "EURUSD", "M5", [(2026, 4)], histdata=client, now=now) == 1
+    assert sources.load_month("EURUSD", "M5", 2026, 4)[0][0] == ts(2026, 4, 1, 1)
+    assert not sources.month_path("EURUSD", "M5", 2026, 3).exists()  # only read, not saved
+
+    sources.fetch_symbol("GBPUSD", "HISTDATA", "GBPUSD", "M5", [(2025, 12), (2026, 1)], histdata=client, now=now)
+    assert sources.load_month("GBPUSD", "M5", 2026, 1)[0][0] == ts(2026, 1, 1, 2)

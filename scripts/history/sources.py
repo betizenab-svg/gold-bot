@@ -264,17 +264,27 @@ def fetch_symbol(
     if source != "HISTDATA":
         raise ValueError(f"No free history source for {symbol}")
     client = histdata or HistDataSource()
+    wanted_months = set(missing)
     by_year: dict[int, list[int]] = {}
     for year, month in missing:
         by_year.setdefault(year, []).append(month)
+    carry: list[Row] = []
     for year, wanted in sorted(by_year.items()):
         if year < moment.year:
             pieces = [client.fetch(source_symbol, year)]
         else:
-            pieces = [client.fetch(source_symbol, year, month) for month in wanted]
-        minute_rows = sorted((row for piece in pieces for row in piece), key=lambda r: r[0])
+            # HistData files are in New York winter time: the first five UTC hours
+            # of a month sit in the previous month's file, so fetch that one too.
+            needed = sorted(set(wanted) | {m - 1 for m in wanted if m > 1})
+            pieces = [client.fetch(source_symbol, year, month) for month in needed]
+        minute_rows = sorted(carry + [row for piece in pieces for row in piece], key=lambda r: r[0])
+        carry = []
         for (row_year, row_month), rows in split_by_month(minute_rows).items():
-            if row_year == year and row_month in wanted:
+            if (row_year, row_month) not in wanted_months:
+                continue
+            if row_year > year:
+                carry.extend(rows)  # the rest of that month comes with next year's file
+            else:
                 saved += store(row_year, row_month, rows)
         logging.info("%s %s: saved %d month file(s)", symbol, year, saved)
     return saved
