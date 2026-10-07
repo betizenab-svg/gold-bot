@@ -260,3 +260,12 @@ def test_owner_is_told_when_live_results_fall_below_history(tmp_path: Path, monk
     repository.get_kv.return_value = str(int(__import__("time").time()))
     orchestrator._maybe_check_live_vs_history(repository)
     assert sent == []  # once a week only
+
+
+def test_long_run_losers_are_switched_off():
+    from scripts.history.report import should_disable
+
+    assert should_disable({"trades": 473, "expectancy_r": -0.033, "profit_factor": 0.97})
+    assert not should_disable({"trades": 80, "expectancy_r": -0.03, "profit_factor": 0.97})
+    assert should_disable({"trades": 40, "expectancy_r": -0.2, "profit_factor": 0.7})
+    assert not should_disable({"trades": 500, "expectancy_r": 0.01, "profit_factor": 1.02})

@@ -32,6 +32,20 @@ PROOF_DIR = ROOT_DIR / "data" / "proof"
 MIN_PAIR_TRADES = 30
 DISABLE_EXPECTANCY = -0.05
 DISABLE_PROFIT_FACTOR = 0.95
+# With this many trades, any loss after costs is enough to switch a pair off.
+LONG_RUN_TRADES = 100
+
+
+def should_disable(stats: dict) -> bool:
+    """Clear loser, or lost money over a long run of trades (after costs)."""
+    trades = int(stats.get("trades") or 0)
+    expectancy = float(stats.get("expectancy_r") or 0.0)
+    clear_loser = (
+        trades >= MIN_PAIR_TRADES
+        and expectancy <= DISABLE_EXPECTANCY
+        and (stats.get("profit_factor") or 0) < DISABLE_PROFIT_FACTOR
+    )
+    return clear_loser or (trades >= LONG_RUN_TRADES and expectancy < 0)
 MIN_HOUR_TRADES = 25
 QUIET_HOUR_EXPECTANCY = -0.15
 MARKET_PASS_TRADES = 50
@@ -228,11 +242,7 @@ def build(runs: dict[tuple[str, str], dict]) -> tuple[dict, dict, str]:
             evidence["baselines"][f"{symbol}|{strategy}"] = {
                 k: stats.get(k) for k in ("trades", "expectancy_r", "std_r")
             }
-            if (
-                stats["trades"] >= MIN_PAIR_TRADES
-                and stats["expectancy_r"] <= DISABLE_EXPECTANCY
-                and (stats.get("profit_factor") or 0) < DISABLE_PROFIT_FACTOR
-            ):
+            if should_disable(stats):
                 evidence["disabled_pairs"].append(
                     {
                         "symbol": symbol,
@@ -366,7 +376,7 @@ def render_markdown(report: dict, evidence: dict) -> str:
     for symbol, stats in report["markets"].items():
         verdict = "passes" if evidence["markets"].get(symbol, {}).get("passed") else "does not pass yet"
         lines.append(_line(f"{get_instrument(symbol).display_name} ({verdict})", stats))
-    lines += ["", "## Switched off (clear losers after costs)"]
+    lines += ["", "## Switched off (lost money after costs)"]
     if evidence["disabled_pairs"]:
         for item in evidence["disabled_pairs"]:
             lines.append(
