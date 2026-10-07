@@ -183,6 +183,12 @@ test("Telebirr receipt is approved by the owner with one tap", async () => {
   assert.match(await revenueText(env), /2000\.00 ETB/);
 });
 
+test("a receipt sent without an open Telebirr order gets directions, not silence", async () => {
+  await handleUpdate(msg(6, "", { photo: [{ file_unique_id: "late1" }] }), env);
+  assert.equal(sent("forwardMessage").length, 0);
+  assert.match(sent("sendMessage").at(-1).body.text, /tap \/join/);
+});
+
 test("reminders, removal when time runs out, and owner broadcasts", async () => {
   const now = Math.floor(Date.now() / 1000);
   env.DB.prepare("INSERT INTO members (user_id, status, expires_at, created_at, updated_at) VALUES (?, 'active', ?, ?, ?)").bind(20, now + 2 * 86400, now, now).run();

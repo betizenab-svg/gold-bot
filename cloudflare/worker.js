@@ -609,7 +609,12 @@ export async function handleUpdate(update, env) {
     )
       .bind(user.id, nowSec())
       .first();
-    if (!order) return;
+    if (!order) {
+      if (message.photo) {
+        return say(env, chatId, "To pay for VIP: tap /join, choose a plan and Telebirr, then send this receipt again.");
+      }
+      return;
+    }
     const photo = (message.photo || []).slice(-1)[0];
     const reference = photo ? `telebirr:photo:${photo.file_unique_id}` : `telebirr:${text.slice(0, 60)}`;
     const used = await env.DB.prepare("SELECT 1 FROM orders WHERE reference = ?").bind(reference).first();
