@@ -34,7 +34,11 @@ def download(url: str, target: Path) -> None:
     partial = target.with_suffix(".part")
     with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as handle:
         shutil.copyfileobj(response, handle)
-    sqlite3.connect(partial).execute("PRAGMA schema_version;").fetchone()  # is it a database?
+    check = sqlite3.connect(partial)
+    try:
+        check.execute("PRAGMA schema_version;").fetchone()  # is it a database?
+    finally:
+        check.close()
     partial.replace(target)
 
 
