@@ -60,7 +60,7 @@ from src.persistence.repository import Repository
 from src.persistence.schema import SchemaInitializer
 from src.validation.validator import DataValidator
 from src.domain.candle import Candle
-from config.instruments import active_symbols, get_instrument, is_trial, state_key
+from config.instruments import INSTRUMENTS, active_symbols, get_instrument, is_trial, state_key
 from config.settings import (
     ANALYSIS_LOOKBACK_CANDLES,
     AUTO_QUARANTINE_ENABLED,
@@ -649,6 +649,22 @@ class PulseOrchestrator:
 
             repository.update_zone_statuses(updated_zones)
             logging.info("Updated %d zones during lifecycle evaluation", len(updated_zones))
+
+    @staticmethod
+    def _open_trade_markets(repository: Repository, active: List[str]) -> List[str]:
+        """Markets switched off while they still have open trades stay in the pulse
+        (watch only) until those trades close, so nobody is left without updates."""
+        extra: List[str] = []
+        try:
+            open_signals = repository.get_open_signals() or []
+        except Exception as exc:
+            logging.debug("Open-trade markets check skipped: %s", exc)
+            return extra
+        for signal in open_signals:
+            name = str(getattr(signal, "symbol", "") or "").upper()
+            if name in INSTRUMENTS and name not in active and name not in extra:
+                extra.append(name)
+        return extra
 
     @staticmethod
     def _signal_symbol_matches(signal: Any, symbol: str) -> bool:
@@ -2639,7 +2655,7 @@ class PulseOrchestrator:
                 symbols = [os.getenv("MOCK_SYMBOL", "XAUUSD")]
             else:
                 client = self.client_factory(repository)
-                symbols = active_symbols()
+                symbols = active_symbols() + self._open_trade_markets(repository, active_symbols())
             logging.info("Selected ingestion client: %s", client.__class__.__name__)
             validator = DataValidator()
             self._load_auto_quarantine(repository)

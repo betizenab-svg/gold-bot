@@ -264,6 +264,17 @@ def test_system_trades_are_watched_on_five_minute_gold() -> None:
     assert not match(old_trade, "XAUUSD") and not match(system_trade, "EURUSD")
 
 
+def test_switched_off_markets_are_watched_until_their_trades_close() -> None:
+    repo = MagicMock()
+    repo.get_open_signals.return_value = [
+        MagicMock(symbol="BTCUSD"), MagicMock(symbol="BTCUSD"), MagicMock(symbol="XAUUSD_H4"),
+        MagicMock(symbol="AUDUSD"), MagicMock(symbol="NOT_A_MARKET"),
+    ]
+    assert PulseOrchestrator._open_trade_markets(repo, ["XAUUSD", "XAUUSD_H4"]) == ["BTCUSD", "AUDUSD"]
+    repo.get_open_signals.return_value = []
+    assert PulseOrchestrator._open_trade_markets(repo, ["XAUUSD"]) == []
+
+
 def test_gold_system_only_turns_the_other_charts_into_price_feeds(tmp_path: Path, monkeypatch) -> None:
     from src.validation.validator import DataValidator
 
