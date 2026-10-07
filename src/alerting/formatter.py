@@ -69,7 +69,9 @@ class SignalFormatter:
         created = self._optional(signal_obj, "timestamp")
         if order_type != "MARKET" and created:
             try:
-                expiry = int(created) + int(app_settings.SIGNAL_EXPIRY_MINUTES) * 60
+                from src.analysis.trade_windows import pending_window_seconds
+
+                expiry = int(created) + pending_window_seconds(symbol_name)
                 lines.append(t("valid_until", time=eat_time(expiry)))
             except (TypeError, ValueError):
                 pass

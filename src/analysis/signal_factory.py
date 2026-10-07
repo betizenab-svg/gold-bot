@@ -7,11 +7,9 @@ from typing import Any, Optional
 from config import settings as app_settings
 from config.instruments import get_instrument
 from config.settings import (
-    ACTIVE_MAX_HOLD_HOURS,
     ATR_SL_MULTIPLIER,
     CONVICTION_SIZING_ENABLED,
     RISK_PER_TRADE_PCT,
-    SIGNAL_EXPIRY_MINUTES,
     SL_MIN_ATR_MULT,
     SL_MIN_USD,
 )
@@ -194,10 +192,12 @@ class SignalFactory:
         )
         lines.append("Risk state: " + " | ".join(risk_bits))
 
+        from src.analysis.trade_windows import max_hold_seconds, pending_window_seconds
+
         lines.append(
             "Plan: TP1 hit -> bank half, stop to entry. "
-            f"No trigger in {int(SIGNAL_EXPIRY_MINUTES)} min -> cancelled. "
-            f"No TP1 within {int(ACTIVE_MAX_HOLD_HOURS)}h -> closed flat. "
+            f"No trigger in {pending_window_seconds(symbol) // 60} min -> cancelled. "
+            f"No TP1 within {max_hold_seconds(symbol) // 3600}h -> closed flat. "
             f"Thesis invalid on a close beyond {sl:.{nd}f}."
         )
 

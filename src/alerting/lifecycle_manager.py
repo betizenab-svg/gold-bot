@@ -6,11 +6,12 @@ from typing import Any, Optional, Sequence
 
 from config import settings as app_settings
 from config.instruments import get_instrument, state_key
-from config.settings import ACTIVE_MAX_HOLD_HOURS, BE_ARM_R as BE_ARM_R_SETTING, SIGNAL_EXPIRY_MINUTES
+from config.settings import BE_ARM_R as BE_ARM_R_SETTING
 from src.alerting.formatter import SignalFormatter
 from src.alerting.messenger import deliver, uses_outbox
 from src.alerting.telegram_client import TelegramAPIError, TelegramClient
 from src.analysis.market_hours import friday_close, minutes_to_weekly_close
+from src.analysis.trade_windows import max_hold_seconds, pending_window_seconds
 from src.analysis.outcomes import realized_r_for_event
 from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
@@ -338,7 +339,7 @@ class SignalLifecycleManager:
             int(current_candle.timestamp),
             weekend_closed=not self._signal_instrument(signal).weekend_trading,
         )
-        return age_seconds > int(SIGNAL_EXPIRY_MINUTES) * 60
+        return age_seconds > pending_window_seconds(self._signal_instrument(signal).symbol)
 
     def _is_active_stale(self, signal: Any, current_candle: Candle) -> bool:
         raw_created = self._get_value(signal, "timestamp", "created_at")
@@ -353,7 +354,7 @@ class SignalLifecycleManager:
             int(current_candle.timestamp),
             weekend_closed=not self._signal_instrument(signal).weekend_trading,
         )
-        return age_seconds > int(ACTIVE_MAX_HOLD_HOURS) * 3600
+        return age_seconds > max_hold_seconds(self._signal_instrument(signal).symbol)
 
     def process_open_signals(
         self,
