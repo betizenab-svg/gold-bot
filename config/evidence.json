@@ -1,5 +1,40 @@
 {
  "baselines": {
+  "AUDUSD|ENGULFING_ZONE": {
+   "expectancy_r": -0.067,
+   "std_r": 1.047,
+   "trades": 143
+  },
+  "AUDUSD|H2_PULLBACK": {
+   "expectancy_r": -0.263,
+   "std_r": 1.034,
+   "trades": 93
+  },
+  "AUDUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.133,
+   "std_r": 0.983,
+   "trades": 147
+  },
+  "AUDUSD|L2_PULLBACK": {
+   "expectancy_r": -0.204,
+   "std_r": 0.96,
+   "trades": 80
+  },
+  "AUDUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.19,
+   "std_r": 0.956,
+   "trades": 197
+  },
+  "AUDUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.284,
+   "std_r": 0.946,
+   "trades": 975
+  },
+  "AUDUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.196,
+   "std_r": 0.939,
+   "trades": 261
+  },
   "BTCUSD|ENGULFING_ZONE": {
    "expectancy_r": -0.112,
    "std_r": 1.118,
@@ -91,39 +126,39 @@
    "trades": 35
   },
   "EURUSD|ENGULFING_ZONE": {
-   "expectancy_r": 0.0,
-   "std_r": 0.946,
+   "expectancy_r": -0.062,
+   "std_r": 0.934,
    "trades": 145
   },
   "EURUSD|H2_PULLBACK": {
-   "expectancy_r": -0.171,
-   "std_r": 1.081,
-   "trades": 83
+   "expectancy_r": -0.129,
+   "std_r": 1.134,
+   "trades": 87
   },
   "EURUSD|INSIDE_BAR_TRAP": {
-   "expectancy_r": 0.012,
-   "std_r": 1.119,
-   "trades": 150
+   "expectancy_r": -0.036,
+   "std_r": 1.117,
+   "trades": 144
   },
   "EURUSD|L2_PULLBACK": {
-   "expectancy_r": -0.165,
-   "std_r": 0.991,
-   "trades": 90
+   "expectancy_r": -0.274,
+   "std_r": 0.927,
+   "trades": 77
   },
   "EURUSD|OPENING_RANGE_BREAKOUT": {
-   "expectancy_r": -0.036,
-   "std_r": 1.085,
-   "trades": 209
+   "expectancy_r": -0.062,
+   "std_r": 1.081,
+   "trades": 193
   },
   "EURUSD|PIN_BAR_REJECTION": {
-   "expectancy_r": -0.124,
-   "std_r": 1.004,
-   "trades": 1052
+   "expectancy_r": -0.13,
+   "std_r": 1.005,
+   "trades": 1057
   },
   "EURUSD|ZONE_BOUNCE": {
-   "expectancy_r": -0.176,
-   "std_r": 1.011,
-   "trades": 258
+   "expectancy_r": -0.111,
+   "std_r": 1.033,
+   "trades": 267
   },
   "GBPUSD_H1|ENGULFING_ZONE": {
    "expectancy_r": -0.161,
@@ -156,39 +191,39 @@
    "trades": 42
   },
   "GBPUSD|ENGULFING_ZONE": {
-   "expectancy_r": -0.14,
-   "std_r": 1.053,
-   "trades": 141
+   "expectancy_r": -0.115,
+   "std_r": 1.079,
+   "trades": 137
   },
   "GBPUSD|H2_PULLBACK": {
-   "expectancy_r": -0.077,
-   "std_r": 1.075,
-   "trades": 81
+   "expectancy_r": -0.071,
+   "std_r": 1.104,
+   "trades": 65
   },
   "GBPUSD|INSIDE_BAR_TRAP": {
-   "expectancy_r": -0.181,
-   "std_r": 0.982,
-   "trades": 99
+   "expectancy_r": -0.213,
+   "std_r": 0.975,
+   "trades": 106
   },
   "GBPUSD|L2_PULLBACK": {
-   "expectancy_r": -0.323,
-   "std_r": 0.911,
-   "trades": 60
+   "expectancy_r": -0.331,
+   "std_r": 0.901,
+   "trades": 62
   },
   "GBPUSD|OPENING_RANGE_BREAKOUT": {
-   "expectancy_r": -0.163,
+   "expectancy_r": -0.167,
    "std_r": 1.024,
-   "trades": 165
+   "trades": 175
   },
   "GBPUSD|PIN_BAR_REJECTION": {
-   "expectancy_r": -0.168,
-   "std_r": 0.991,
+   "expectancy_r": -0.165,
+   "std_r": 0.994,
    "trades": 1027
   },
   "GBPUSD|ZONE_BOUNCE": {
-   "expectancy_r": -0.192,
-   "std_r": 1.016,
-   "trades": 240
+   "expectancy_r": -0.189,
+   "std_r": 1.01,
+   "trades": 243
   },
   "US100|ENGULFING_ZONE": {
    "expectancy_r": 0.209,
@@ -224,6 +259,141 @@
    "expectancy_r": -0.039,
    "std_r": 1.129,
    "trades": 82
+  },
+  "US500|ENGULFING_ZONE": {
+   "expectancy_r": -0.058,
+   "std_r": 0.0,
+   "trades": 1
+  },
+  "US500|H2_PULLBACK": {
+   "expectancy_r": -0.003,
+   "std_r": 1.119,
+   "trades": 63
+  },
+  "US500|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.118,
+   "std_r": 1.087,
+   "trades": 65
+  },
+  "US500|L2_PULLBACK": {
+   "expectancy_r": -0.372,
+   "std_r": 0.962,
+   "trades": 30
+  },
+  "US500|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.054,
+   "std_r": 1.146,
+   "trades": 84
+  },
+  "US500|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.296,
+   "std_r": 1.0,
+   "trades": 76
+  },
+  "US500|ZONE_BOUNCE": {
+   "expectancy_r": -0.103,
+   "std_r": 0.968,
+   "trades": 100
+  },
+  "USDJPY|ENGULFING_ZONE": {
+   "expectancy_r": -0.162,
+   "std_r": 1.03,
+   "trades": 103
+  },
+  "USDJPY|H2_PULLBACK": {
+   "expectancy_r": -0.142,
+   "std_r": 1.089,
+   "trades": 109
+  },
+  "USDJPY|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.275,
+   "std_r": 0.913,
+   "trades": 168
+  },
+  "USDJPY|L2_PULLBACK": {
+   "expectancy_r": -0.075,
+   "std_r": 1.008,
+   "trades": 129
+  },
+  "USDJPY|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.086,
+   "std_r": 1.043,
+   "trades": 230
+  },
+  "USDJPY|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.195,
+   "std_r": 1.03,
+   "trades": 836
+  },
+  "USDJPY|ZONE_BOUNCE": {
+   "expectancy_r": -0.125,
+   "std_r": 1.034,
+   "trades": 294
+  },
+  "WTIUSD|H2_PULLBACK": {
+   "expectancy_r": -0.055,
+   "std_r": 1.759,
+   "trades": 3
+  },
+  "WTIUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.59,
+   "std_r": 1.179,
+   "trades": 6
+  },
+  "WTIUSD|L2_PULLBACK": {
+   "expectancy_r": -0.73,
+   "std_r": 0.594,
+   "trades": 3
+  },
+  "WTIUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.173,
+   "std_r": 1.077,
+   "trades": 14
+  },
+  "WTIUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": 0.775,
+   "std_r": 1.645,
+   "trades": 3
+  },
+  "WTIUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.106,
+   "std_r": 1.325,
+   "trades": 11
+  },
+  "XAGUSD|ENGULFING_ZONE": {
+   "expectancy_r": -0.09,
+   "std_r": 1.127,
+   "trades": 12
+  },
+  "XAGUSD|H2_PULLBACK": {
+   "expectancy_r": -0.34,
+   "std_r": 1.039,
+   "trades": 92
+  },
+  "XAGUSD|INSIDE_BAR_TRAP": {
+   "expectancy_r": -0.344,
+   "std_r": 0.92,
+   "trades": 159
+  },
+  "XAGUSD|L2_PULLBACK": {
+   "expectancy_r": -0.192,
+   "std_r": 0.969,
+   "trades": 99
+  },
+  "XAGUSD|OPENING_RANGE_BREAKOUT": {
+   "expectancy_r": -0.188,
+   "std_r": 0.953,
+   "trades": 238
+  },
+  "XAGUSD|PIN_BAR_REJECTION": {
+   "expectancy_r": -0.239,
+   "std_r": 0.992,
+   "trades": 210
+  },
+  "XAGUSD|ZONE_BOUNCE": {
+   "expectancy_r": -0.147,
+   "std_r": 0.987,
+   "trades": 311
   },
   "XAUUSD_H1|ENGULFING_ZONE": {
    "expectancy_r": 0.131,
@@ -281,9 +451,9 @@
    "trades": 11
   },
   "XAUUSD|ASIAN_RANGE_BREAKOUT": {
-   "expectancy_r": 0.066,
-   "std_r": 1.066,
-   "trades": 116
+   "expectancy_r": 0.13,
+   "std_r": 1.077,
+   "trades": 130
   },
   "XAUUSD|ENGULFING_ZONE": {
    "expectancy_r": 0.09,
@@ -291,63 +461,117 @@
    "trades": 15
   },
   "XAUUSD|H2_PULLBACK": {
-   "expectancy_r": -0.132,
-   "std_r": 1.032,
-   "trades": 146
+   "expectancy_r": -0.177,
+   "std_r": 0.991,
+   "trades": 138
   },
   "XAUUSD|INSIDE_BAR_TRAP": {
-   "expectancy_r": -0.207,
-   "std_r": 1.028,
-   "trades": 195
+   "expectancy_r": -0.23,
+   "std_r": 1.029,
+   "trades": 173
   },
   "XAUUSD|L2_PULLBACK": {
-   "expectancy_r": -0.23,
-   "std_r": 0.963,
-   "trades": 100
+   "expectancy_r": -0.228,
+   "std_r": 0.958,
+   "trades": 101
   },
   "XAUUSD|OPENING_RANGE_BREAKOUT": {
-   "expectancy_r": -0.038,
-   "std_r": 1.095,
+   "expectancy_r": -0.03,
+   "std_r": 1.091,
    "trades": 234
   },
   "XAUUSD|PIN_BAR_REJECTION": {
-   "expectancy_r": -0.184,
-   "std_r": 1.012,
-   "trades": 304
+   "expectancy_r": -0.217,
+   "std_r": 1.006,
+   "trades": 295
   },
   "XAUUSD|ZONE_BOUNCE": {
-   "expectancy_r": -0.102,
-   "std_r": 0.986,
-   "trades": 323
+   "expectancy_r": -0.113,
+   "std_r": 0.991,
+   "trades": 331
   }
  },
  "check_window": {
   "from": "2026-04",
   "net_r_after_costs": {
+   "AUDUSD": -74.17,
    "BTCUSD": -19.46,
    "ETHUSD": -42.16,
-   "EURUSD": -48.99,
+   "EURUSD": -53.78,
    "EURUSD_H1": -8.48,
-   "GBPUSD": -94.08,
+   "GBPUSD": -90.04,
    "GBPUSD_H1": -1.64,
-   "XAUUSD": -0.32,
+   "US100": -7.03,
+   "US500": -24.57,
+   "USDJPY": -83.04,
+   "WTIUSD": 0,
+   "XAGUSD": -51.37,
+   "XAUUSD": -2.72,
    "XAUUSD_H1": -1.78,
    "XAUUSD_H4": 2.04
   },
   "to": "2026-09",
   "trades": {
+   "AUDUSD": 340,
    "BTCUSD": 144,
    "ETHUSD": 163,
-   "EURUSD": 320,
+   "EURUSD": 321,
    "EURUSD_H1": 31,
-   "GBPUSD": 295,
+   "GBPUSD": 314,
    "GBPUSD_H1": 34,
-   "XAUUSD": 307,
+   "US100": 58,
+   "US500": 80,
+   "USDJPY": 316,
+   "WTIUSD": 0,
+   "XAGUSD": 205,
+   "XAUUSD": 304,
    "XAUUSD_H1": 18,
    "XAUUSD_H4": 3
   }
  },
  "disabled_pairs": [
+  {
+   "expectancy_r": -0.284,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "AUDUSD",
+   "trades": 975
+  },
+  {
+   "expectancy_r": -0.204,
+   "strategy": "L2_PULLBACK",
+   "symbol": "AUDUSD",
+   "trades": 80
+  },
+  {
+   "expectancy_r": -0.19,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "AUDUSD",
+   "trades": 197
+  },
+  {
+   "expectancy_r": -0.196,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "AUDUSD",
+   "trades": 261
+  },
+  {
+   "expectancy_r": -0.133,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "AUDUSD",
+   "trades": 147
+  },
+  {
+   "expectancy_r": -0.067,
+   "strategy": "ENGULFING_ZONE",
+   "symbol": "AUDUSD",
+   "trades": 143
+  },
+  {
+   "expectancy_r": -0.263,
+   "strategy": "H2_PULLBACK",
+   "symbol": "AUDUSD",
+   "trades": 93
+  },
   {
    "expectancy_r": -0.177,
    "strategy": "ZONE_BOUNCE",
@@ -409,28 +633,40 @@
    "trades": 63
   },
   {
-   "expectancy_r": -0.176,
+   "expectancy_r": -0.111,
    "strategy": "ZONE_BOUNCE",
    "symbol": "EURUSD",
-   "trades": 258
+   "trades": 267
   },
   {
-   "expectancy_r": -0.124,
+   "expectancy_r": -0.13,
    "strategy": "PIN_BAR_REJECTION",
    "symbol": "EURUSD",
-   "trades": 1052
+   "trades": 1057
   },
   {
-   "expectancy_r": -0.165,
+   "expectancy_r": -0.274,
    "strategy": "L2_PULLBACK",
    "symbol": "EURUSD",
-   "trades": 90
+   "trades": 77
   },
   {
-   "expectancy_r": -0.171,
+   "expectancy_r": -0.062,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "EURUSD",
+   "trades": 193
+  },
+  {
+   "expectancy_r": -0.062,
+   "strategy": "ENGULFING_ZONE",
+   "symbol": "EURUSD",
+   "trades": 145
+  },
+  {
+   "expectancy_r": -0.129,
    "strategy": "H2_PULLBACK",
    "symbol": "EURUSD",
-   "trades": 83
+   "trades": 87
   },
   {
    "expectancy_r": -0.348,
@@ -439,46 +675,46 @@
    "trades": 35
   },
   {
-   "expectancy_r": -0.168,
+   "expectancy_r": -0.165,
    "strategy": "PIN_BAR_REJECTION",
    "symbol": "GBPUSD",
    "trades": 1027
   },
   {
-   "expectancy_r": -0.181,
+   "expectancy_r": -0.213,
    "strategy": "INSIDE_BAR_TRAP",
    "symbol": "GBPUSD",
-   "trades": 99
+   "trades": 106
   },
   {
-   "expectancy_r": -0.192,
+   "expectancy_r": -0.189,
    "strategy": "ZONE_BOUNCE",
    "symbol": "GBPUSD",
-   "trades": 240
+   "trades": 243
   },
   {
-   "expectancy_r": -0.14,
+   "expectancy_r": -0.115,
    "strategy": "ENGULFING_ZONE",
    "symbol": "GBPUSD",
-   "trades": 141
+   "trades": 137
   },
   {
-   "expectancy_r": -0.163,
+   "expectancy_r": -0.167,
    "strategy": "OPENING_RANGE_BREAKOUT",
    "symbol": "GBPUSD",
-   "trades": 165
+   "trades": 175
   },
   {
-   "expectancy_r": -0.323,
+   "expectancy_r": -0.331,
    "strategy": "L2_PULLBACK",
    "symbol": "GBPUSD",
-   "trades": 60
+   "trades": 62
   },
   {
-   "expectancy_r": -0.077,
+   "expectancy_r": -0.071,
    "strategy": "H2_PULLBACK",
    "symbol": "GBPUSD",
-   "trades": 81
+   "trades": 65
   },
   {
    "expectancy_r": -0.106,
@@ -499,47 +735,165 @@
    "trades": 49
   },
   {
-   "expectancy_r": -0.102,
+   "expectancy_r": -0.296,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "US500",
+   "trades": 76
+  },
+  {
+   "expectancy_r": -0.103,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "US500",
+   "trades": 100
+  },
+  {
+   "expectancy_r": -0.054,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "US500",
+   "trades": 84
+  },
+  {
+   "expectancy_r": -0.372,
+   "strategy": "L2_PULLBACK",
+   "symbol": "US500",
+   "trades": 30
+  },
+  {
+   "expectancy_r": -0.118,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "US500",
+   "trades": 65
+  },
+  {
+   "expectancy_r": -0.086,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "USDJPY",
+   "trades": 230
+  },
+  {
+   "expectancy_r": -0.075,
+   "strategy": "L2_PULLBACK",
+   "symbol": "USDJPY",
+   "trades": 129
+  },
+  {
+   "expectancy_r": -0.195,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "USDJPY",
+   "trades": 836
+  },
+  {
+   "expectancy_r": -0.162,
+   "strategy": "ENGULFING_ZONE",
+   "symbol": "USDJPY",
+   "trades": 103
+  },
+  {
+   "expectancy_r": -0.125,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "USDJPY",
+   "trades": 294
+  },
+  {
+   "expectancy_r": -0.275,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "USDJPY",
+   "trades": 168
+  },
+  {
+   "expectancy_r": -0.142,
+   "strategy": "H2_PULLBACK",
+   "symbol": "USDJPY",
+   "trades": 109
+  },
+  {
+   "expectancy_r": -0.239,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "XAGUSD",
+   "trades": 210
+  },
+  {
+   "expectancy_r": -0.192,
+   "strategy": "L2_PULLBACK",
+   "symbol": "XAGUSD",
+   "trades": 99
+  },
+  {
+   "expectancy_r": -0.147,
+   "strategy": "ZONE_BOUNCE",
+   "symbol": "XAGUSD",
+   "trades": 311
+  },
+  {
+   "expectancy_r": -0.344,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "XAGUSD",
+   "trades": 159
+  },
+  {
+   "expectancy_r": -0.34,
+   "strategy": "H2_PULLBACK",
+   "symbol": "XAGUSD",
+   "trades": 92
+  },
+  {
+   "expectancy_r": -0.188,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "XAGUSD",
+   "trades": 238
+  },
+  {
+   "expectancy_r": -0.113,
    "strategy": "ZONE_BOUNCE",
    "symbol": "XAUUSD",
-   "trades": 323
+   "trades": 331
   },
   {
-   "expectancy_r": -0.184,
+   "expectancy_r": -0.217,
    "strategy": "PIN_BAR_REJECTION",
    "symbol": "XAUUSD",
-   "trades": 304
-  },
-  {
-   "expectancy_r": -0.207,
-   "strategy": "INSIDE_BAR_TRAP",
-   "symbol": "XAUUSD",
-   "trades": 195
-  },
-  {
-   "expectancy_r": -0.132,
-   "strategy": "H2_PULLBACK",
-   "symbol": "XAUUSD",
-   "trades": 146
+   "trades": 295
   },
   {
    "expectancy_r": -0.23,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "XAUUSD",
+   "trades": 173
+  },
+  {
+   "expectancy_r": -0.177,
+   "strategy": "H2_PULLBACK",
+   "symbol": "XAUUSD",
+   "trades": 138
+  },
+  {
+   "expectancy_r": -0.228,
    "strategy": "L2_PULLBACK",
    "symbol": "XAUUSD",
-   "trades": 100
+   "trades": 101
   }
  ],
- "generated_at": "2026-10-07 02:42 UTC",
+ "generated_at": "2026-10-07 04:11 UTC",
  "luck": {
   "ALL": {
-   "actual_losing_streak": 23,
-   "actual_max_drawdown_r": 967.3154,
-   "bad_luck_losing_streak": 29,
-   "bad_luck_max_drawdown_r": 975.39,
-   "total_r": -955.95,
-   "trades": 7807,
-   "typical_losing_streak": 22,
-   "typical_max_drawdown_r": 962.2
+   "actual_losing_streak": 34,
+   "actual_max_drawdown_r": 2029.3916,
+   "bad_luck_losing_streak": 31,
+   "bad_luck_max_drawdown_r": 2044.42,
+   "total_r": -2028.84,
+   "trades": 13121,
+   "typical_losing_streak": 24,
+   "typical_max_drawdown_r": 2033.54
+  },
+  "AUDUSD": {
+   "actual_losing_streak": 21,
+   "actual_max_drawdown_r": 436.6167,
+   "bad_luck_losing_streak": 27,
+   "bad_luck_max_drawdown_r": 444.28,
+   "total_r": -435.01,
+   "trades": 1896,
+   "typical_losing_streak": 19,
+   "typical_max_drawdown_r": 437.57
   },
   "BTCUSD": {
    "actual_losing_streak": 14,
@@ -563,13 +917,13 @@
   },
   "EURUSD": {
    "actual_losing_streak": 18,
-   "actual_max_drawdown_r": 216.1833,
+   "actual_max_drawdown_r": 229.6464,
    "bad_luck_losing_streak": 26,
-   "bad_luck_max_drawdown_r": 231.04,
-   "total_r": -210.24,
-   "trades": 1987,
+   "bad_luck_max_drawdown_r": 244.96,
+   "total_r": -225.39,
+   "trades": 1970,
    "typical_losing_streak": 19,
-   "typical_max_drawdown_r": 217.51
+   "typical_max_drawdown_r": 231.99
   },
   "EURUSD_H1": {
    "actual_losing_streak": 9,
@@ -583,13 +937,13 @@
   },
   "GBPUSD": {
    "actual_losing_streak": 19,
-   "actual_max_drawdown_r": 309.5509,
+   "actual_max_drawdown_r": 309.1791,
    "bad_luck_losing_streak": 26,
-   "bad_luck_max_drawdown_r": 322.04,
-   "total_r": -308.79,
-   "trades": 1813,
+   "bad_luck_max_drawdown_r": 321.15,
+   "total_r": -307.86,
+   "trades": 1815,
    "typical_losing_streak": 19,
-   "typical_max_drawdown_r": 312.85
+   "typical_max_drawdown_r": 311.95
   },
   "GBPUSD_H1": {
    "actual_losing_streak": 13,
@@ -611,15 +965,55 @@
    "typical_losing_streak": 13,
    "typical_max_drawdown_r": 37.83
   },
+  "US500": {
+   "actual_losing_streak": 13,
+   "actual_max_drawdown_r": 56.3811,
+   "bad_luck_losing_streak": 21,
+   "bad_luck_max_drawdown_r": 71.48,
+   "total_r": -56.38,
+   "trades": 419,
+   "typical_losing_streak": 14,
+   "typical_max_drawdown_r": 61.97
+  },
+  "USDJPY": {
+   "actual_losing_streak": 22,
+   "actual_max_drawdown_r": 307.4873,
+   "bad_luck_losing_streak": 28,
+   "bad_luck_max_drawdown_r": 321.86,
+   "total_r": -307.49,
+   "trades": 1869,
+   "typical_losing_streak": 20,
+   "typical_max_drawdown_r": 311.93
+  },
+  "WTIUSD": {
+   "actual_losing_streak": 8,
+   "actual_max_drawdown_r": 9.1002,
+   "bad_luck_losing_streak": 12,
+   "bad_luck_max_drawdown_r": 15.19,
+   "total_r": -7.16,
+   "trades": 40,
+   "typical_losing_streak": 7,
+   "typical_max_drawdown_r": 11.04
+  },
+  "XAGUSD": {
+   "actual_losing_streak": 16,
+   "actual_max_drawdown_r": 247.9683,
+   "bad_luck_losing_streak": 24,
+   "bad_luck_max_drawdown_r": 256.67,
+   "total_r": -246.73,
+   "trades": 1121,
+   "typical_losing_streak": 17,
+   "typical_max_drawdown_r": 249.59
+  },
   "XAUUSD": {
    "actual_losing_streak": 19,
-   "actual_max_drawdown_r": 172.1886,
-   "bad_luck_losing_streak": 24,
-   "bad_luck_max_drawdown_r": 189.74,
-   "total_r": -171.36,
-   "trades": 1433,
+   "actual_max_drawdown_r": 178.0969,
+   "bad_luck_losing_streak": 25,
+   "bad_luck_max_drawdown_r": 195.15,
+   "total_r": -177.26,
+   "trades": 1417,
    "typical_losing_streak": 18,
-   "typical_max_drawdown_r": 177.63
+   "typical_max_drawdown_r": 183.17
   },
   "XAUUSD_H1": {
    "actual_losing_streak": 11,
@@ -643,6 +1037,12 @@
   }
  },
  "markets": {
+  "AUDUSD": {
+   "net_r_after_costs": -435.01,
+   "passed": false,
+   "profit_factor": 0.58,
+   "trades": 1896
+  },
   "BTCUSD": {
    "net_r_after_costs": -74.52,
    "passed": false,
@@ -656,10 +1056,10 @@
    "trades": 829
   },
   "EURUSD": {
-   "net_r_after_costs": -210.24,
+   "net_r_after_costs": -225.39,
    "passed": false,
-   "profit_factor": 0.78,
-   "trades": 1987
+   "profit_factor": 0.77,
+   "trades": 1970
   },
   "EURUSD_H1": {
    "net_r_after_costs": -25.74,
@@ -668,10 +1068,10 @@
    "trades": 180
   },
   "GBPUSD": {
-   "net_r_after_costs": -308.79,
+   "net_r_after_costs": -307.86,
    "passed": false,
    "profit_factor": 0.67,
-   "trades": 1813
+   "trades": 1815
   },
   "GBPUSD_H1": {
    "net_r_after_costs": -14.62,
@@ -685,11 +1085,35 @@
    "profit_factor": 0.84,
    "trades": 356
   },
-  "XAUUSD": {
-   "net_r_after_costs": -171.36,
+  "US500": {
+   "net_r_after_costs": -56.38,
    "passed": false,
-   "profit_factor": 0.76,
-   "trades": 1433
+   "profit_factor": 0.74,
+   "trades": 419
+  },
+  "USDJPY": {
+   "net_r_after_costs": -307.49,
+   "passed": false,
+   "profit_factor": 0.69,
+   "trades": 1869
+  },
+  "WTIUSD": {
+   "net_r_after_costs": -7.16,
+   "passed": false,
+   "profit_factor": 0.72,
+   "trades": 40
+  },
+  "XAGUSD": {
+   "net_r_after_costs": -246.73,
+   "passed": false,
+   "profit_factor": 0.6,
+   "trades": 1121
+  },
+  "XAUUSD": {
+   "net_r_after_costs": -177.26,
+   "passed": false,
+   "profit_factor": 0.75,
+   "trades": 1417
   },
   "XAUUSD_H1": {
    "net_r_after_costs": 17.35,
@@ -705,6 +1129,29 @@
   }
  },
  "quiet_hours": {
+  "AUDUSD": [
+   0,
+   1,
+   3,
+   4,
+   6,
+   7,
+   8,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23
+  ],
   "BTCUSD": [
    2,
    4,
@@ -727,44 +1174,90 @@
    2,
    3,
    10,
-   12,
    13,
    16,
-   17,
    18,
+   19,
    20,
+   21,
    23
   ],
   "GBPUSD": [
    0,
    2,
    3,
-   4,
    7,
-   9,
    11,
    12,
    15,
    16,
    17,
    18,
-   20
+   19,
+   20,
+   22,
+   23
   ],
   "US100": [
    16
   ],
+  "US500": [
+   18,
+   19
+  ],
+  "USDJPY": [
+   1,
+   4,
+   6,
+   8,
+   9,
+   11,
+   13,
+   14,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22
+  ],
+  "XAGUSD": [
+   0,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   10,
+   11,
+   12,
+   14,
+   16,
+   18,
+   19
+  ],
   "XAUUSD": [
    0,
+   2,
    3,
-   9,
    10,
    11,
    12,
    13,
+   15,
    17
   ]
  },
- "suggested_settings": {},
+ "suggested_settings": {
+  "MACRO_GATES_MODE": {
+   "XAUUSD": {
+    "value": "block",
+    "why": "best after costs: -127.1R vs -165.0R"
+   }
+  }
+ },
  "window": {
   "from": "2023-10",
   "to": "2026-09"
