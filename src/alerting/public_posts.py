@@ -208,40 +208,49 @@ def weekly_caption(stats: dict[str, Any]) -> str:
 
 def render_weekly_card(stats: dict[str, Any], size: tuple[int, int] = (1080, 1080)) -> bytes:
     """Square results image (losses included) for Telegram and social posts."""
+    start = stats["week_start"]
+    title = f"Weekly results \u00b7 {eat_date(start)} \u2013 {eat_date(start + 4 * 86400)}"
+    return render_results_card(title, stats, size)
+
+
+def render_results_card(title: str, stats: dict[str, Any], size: tuple[int, int] = (1080, 1080)) -> bytes:
+    """Results image (any size: square, portrait or story), losses included."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     width, height = size
+    scale = min(width, height) / 1080
     figure = plt.figure(figsize=(width / 100, height / 100), dpi=100, facecolor="#0f172a")
-    start = stats["week_start"]
-    title = f"Weekly results \u00b7 {eat_date(start)} \u2013 {eat_date(start + 4 * 86400)}"
-    figure.text(0.5, 0.92, title, ha="center", color="#e2e8f0", fontsize=26, weight="bold")
+    figure.text(0.5, 0.92, title, ha="center", color="#e2e8f0", fontsize=26 * scale, weight="bold")
     net = stats["net_r"]
     figure.text(0.5, 0.78, f"{net:+.2f}R", ha="center", color="#22c55e" if net >= 0 else "#ef4444",
-                fontsize=72, weight="bold")
+                fontsize=72 * scale, weight="bold")
     figure.text(
         0.5, 0.71,
         f"{stats['trades']} trades \u00b7 {stats['wins']} won \u00b7 {stats['losses']} lost \u00b7 "
         f"{stats['flat']} at entry",
-        ha="center", color="#cbd5e1", fontsize=22,
+        ha="center", color="#cbd5e1", fontsize=22 * scale,
     )
     axis = figure.add_axes([0.1, 0.22, 0.8, 0.42], facecolor="#0f172a")
     curve = [0.0] + list(stats["curve"])
-    axis.plot(range(len(curve)), curve, color="#38bdf8", linewidth=4)
+    axis.plot(range(len(curve)), curve, color="#38bdf8", linewidth=4 * scale)
     axis.axhline(0, color="#475569", linewidth=1)
-    axis.set_ylabel("Running total (R)", color="#cbd5e1", fontsize=16)
-    axis.set_xlabel("Trades in order", color="#cbd5e1", fontsize=16)
-    axis.tick_params(colors="#94a3b8", labelsize=13)
+    from matplotlib.ticker import MaxNLocator
+
+    axis.xaxis.set_major_locator(MaxNLocator(integer=True))
+    axis.set_ylabel("Running total (R)", color="#cbd5e1", fontsize=16 * scale)
+    axis.set_xlabel("Trades in order", color="#cbd5e1", fontsize=16 * scale)
+    axis.tick_params(colors="#94a3b8", labelsize=13 * scale)
     for spine in axis.spines.values():
         spine.set_color("#334155")
     markets = " \u00b7 ".join(
         f"{get_instrument(s).display_name} {v:+.2f}R" for s, v in stats["markets"].items()
     ) or "No finished trades"
-    figure.text(0.5, 0.12, markets, ha="center", color="#e2e8f0", fontsize=18)
+    figure.text(0.5, 0.12, markets, ha="center", color="#e2e8f0", fontsize=18 * scale, wrap=True)
     figure.text(0.5, 0.05, "Every trade counted, losses included. 1R = the amount risked per trade.",
-                ha="center", color="#94a3b8", fontsize=15)
+                ha="center", color="#94a3b8", fontsize=15 * scale)
     buffer = io.BytesIO()
     figure.savefig(buffer, format="png", facecolor=figure.get_facecolor())
     plt.close(figure)

@@ -117,3 +117,36 @@ class TelegramClient:
             return int(payload_json["result"]["message_id"])
         except (KeyError, TypeError, ValueError) as exc:
             raise TelegramAPIError("Telegram API response missing result.message_id") from exc
+
+    def send_document(
+        self,
+        document_bytes: bytes,
+        filename: str,
+        caption: Optional[str] = None,
+    ) -> int:
+        if not self.bot_token:
+            raise ValueError("TELEGRAM_BOT_TOKEN is not configured")
+        if not self.chat_id:
+            raise ValueError("TELEGRAM_CHAT_ID is not configured")
+        data: dict[str, Any] = {"chat_id": str(self.chat_id)}
+        if caption:
+            data["caption"] = str(caption)
+            data["parse_mode"] = "HTML"
+        endpoint = f"{self.base_url}/bot{self.bot_token}/sendDocument"
+        try:
+            response = requests.post(
+                endpoint,
+                data=data,
+                files={"document": (filename, document_bytes, "application/pdf")},
+                timeout=max(self.timeout_seconds, 60),
+            )
+        except requests.RequestException as exc:
+            raise TelegramAPIError(f"Telegram API request failed: {exc}") from exc
+        if response.status_code != 200:
+            raise TelegramAPIError(
+                f"Telegram API returned status {response.status_code}: {response.text}"
+            )
+        try:
+            return int(response.json()["result"]["message_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TelegramAPIError("Telegram API response missing result.message_id") from exc

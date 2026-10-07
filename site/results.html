@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Results: every signal, every result</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="results">
+  <header>
+    <nav>
+      <a class="brand" href="index.html">Gold Signals</a>
+      <a href="results.html">Results</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="reports.html">Monthly reports</a>
+      <a href="verify.html">Check the record</a>
+    </nav>
+  </header>
+  <main>
+    <h1 id="title">Results</h1>
+    <p class="lead">Results are in R: 1R is the amount risked on one trade. With 1% risk per trade,
+      +10R means +10% on the account and -3R means -3%. Bad months are shown too.</p>
+    <div id="filters" class="filters"></div>
+    <p id="error" class="bad"></p>
+    <div id="stats"></div>
+    <h2>Running total</h2>
+    <canvas id="equity" aria-label="Running total of results in R"></canvas>
+    <h2>Month by month</h2>
+    <div id="months"></div>
+    <h2>By market</h2>
+    <div id="markets"></div>
+    <h2>By strategy</h2>
+    <div id="strategies"></div>
+    <h2>Every signal</h2>
+    <div id="signals"></div>
+  </main>
+  <footer>
+    Times are East Africa Time (EAT). The record's full change history is on
+    <a data-repo-path="/commits/main/site/data/ledger.jsonl" href="#">GitHub</a>.
+  </footer>
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

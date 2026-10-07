@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How it works, and the risks</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="how">
+  <header>
+    <nav>
+      <a class="brand" href="index.html">Gold Signals</a>
+      <a href="results.html">Results</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="reports.html">Monthly reports</a>
+      <a href="verify.html">Check the record</a>
+    </nav>
+  </header>
+  <main>
+    <h1>How it works</h1>
+    <h2>Who sends the signals</h2>
+    <p>A program checks gold and forex charts every 5 minutes. When its fixed rules find a setup,
+      it sends a signal to Telegram with an entry price, a stop, two targets and the lot size for
+      your balance. Then it follows the trade and replies in the same thread: entry hit, target 1,
+      stop moved to entry, target 2, or stop hit.</p>
+
+    <h2>What +R means in money</h2>
+    <p>Every result is counted in R. 1R is the amount you risk on one trade, the money you lose if
+      the stop is hit. If you risk 1% of a $500 account, 1R = $5:</p>
+    <ul>
+      <li>+2.25R (both targets hit) = +$11.25</li>
+      <li>-1R (stop hit) = -$5</li>
+      <li>+20R over a month = +$100, or +20% of the account</li>
+    </ul>
+    <p>Results on this site are shown before your broker's costs. The history test below takes
+      spread and slippage off every trade.</p>
+
+    <h2>How each trade is handled</h2>
+    <ul>
+      <li>Half the position closes at target 1 and the stop moves to the entry price.</li>
+      <li>Orders that do not open in time are cancelled; trades that go nowhere are closed.</li>
+      <li>New signals pause 30 minutes before big news, and open trades get a warning.</li>
+      <li>Trades are closed before the weekend, when markets can jump at the reopening.</li>
+      <li>Signals stop for the day after a 3R loss, and for the week after a 6R loss.</li>
+      <li>New markets and new methods are first tested privately ("trial") and only appear here once they prove themselves.</li>
+    </ul>
+
+    <h2>Tested on years of history</h2>
+    <div id="history"></div>
+    <p>Strategy and market pairs that lose after costs in this test are switched off
+      automatically.</p>
+
+    <div class="warning">
+      <b>Risk warning.</b> Trading gold, forex and crypto with leverage can lose you money quickly,
+      including more than you planned if prices jump. Past results, live or tested, do not promise
+      future results. Losing streaks happen even when a method works. Only trade money you can
+      afford to lose, use a demo account first, and never risk more than about 1% per trade.
+      These signals are general information, not personal financial advice.
+    </div>
+  </main>
+  <footer>Questions? Ask in the Telegram channel.</footer>
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

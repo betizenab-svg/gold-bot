@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Check the record yourself</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="verify">
+  <header>
+    <nav>
+      <a class="brand" href="index.html">Gold Signals</a>
+      <a href="results.html">Results</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="reports.html">Monthly reports</a>
+      <a href="verify.html">Check the record</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Check the record yourself</h1>
+    <p>Every signal is written to a public file on GitHub the same run it is sent to Telegram,
+      and every result is added the run it happens. Nothing is ever edited afterwards:</p>
+    <ol>
+      <li><b>Each record carries a fingerprint</b> (SHA-256) of the record before it. Changing or
+        deleting any old record breaks every fingerprint after it.</li>
+      <li><b>GitHub keeps the full history</b> of the file with dates. Anyone can see exactly
+        when each line was added.</li>
+    </ol>
+    <div class="buttons"><button id="check" class="button primary">Check every record now</button></div>
+    <p id="result"></p>
+    <p><a data-repo-path="/blob/main/site/data/ledger.jsonl" href="#">The record file</a> ·
+      <a data-repo-path="/commits/main/site/data/ledger.jsonl" href="#">its full change history</a></p>
+  </main>
+  <footer>The check runs in your own browser; nothing is sent anywhere.</footer>
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
