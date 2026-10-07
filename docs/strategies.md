@@ -50,6 +50,41 @@ By year:
 
 `GOLD_SYSTEM_ONLY` (default on) makes this the only signal source. The 5-minute gold chart then only supplies prices: it watches open trades and feeds the morning briefing. Switching it off brings back the older strategies below. They did not hold up in the 3-year tests.
 
+### More markets? (scripts/research/portfolio.py)
+
+The system's exact code was replayed on every other market with history. Same rules, costs, weekend close and 5-minute resolution. None passed (3-year total, then each year):
+
+| Market | Total | Each year |
+|---|---|---|
+| Silver | -30R | |
+| Euro | +1R | |
+| Pound | -35R | |
+| Yen | +14R | -9.8R in year 2 |
+| Aussie | -8R | |
+| US100 | +15R | negative in years 2 and 3 |
+| US500 | -8R | |
+
+Gold's trend behaviour is what makes the system work.
+
+Only one other edge passed the strict test: buying S&P 500 dips (RSI(2) under 10 above the 200-day average, 3 ATR stop, 0.75 ATR target, 5-day limit, closed before the weekend). It made 37 trades, won 78%, and averaged +0.12R per trade, positive every year. That is only about 12 trades a year. Added to gold, it moved the typical challenge pass about 1 week sooner. For that reason it is not switched on: index contract sizes differ between brokers, and a wrong size is a bigger danger than one week.
+
+### Sizing for a challenge (scripts/research/sizing.py)
+
+Same signals, walked through the real 3-year sequence from every start day (Alpha Pro 8%: +8% then +5%; fail at -8% total or -4% in one day):
+
+| Risk per trade | Passes | Median time |
+|---|---|---|
+| Flat 1% | 99% | 28 weeks |
+| Flat 1.25% | 95% | 21 weeks |
+| Flat 1.5% | 89% | 16 weeks |
+| **Ladder: 1.5%, 1% once 2% down, 0.5% once 4% down** | **100%** | **21 weeks** |
+
+The ladder is about 7 weeks faster than flat 1% with no lower pass rate. In the bot it is the `/challenge` command.
+
+The worst day in 3 years lost 2.06R, and at most 2 trades were open at once. The 2R daily stop (`RISK_DAILY_MAX_LOSS_R`) therefore keeps a 1.5% size inside the 4% daily limit.
+
+Letting the same trigger stack trades gave more trades. Measured per unit of risk, it was no better, so it stays off.
+
 ## Strategy 1: Big Bulls and Bears
 
 Trend-continuation setup built around SMA value-area pullbacks and engulfing confirmation.

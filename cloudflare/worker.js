@@ -107,6 +107,7 @@ export function helpText(env, admin = false) {
     "/open - signals open right now",
     "/last10 - the last 10 finished trades",
     "/calc 500 - lot sizes for a $500 account (add a risk %, e.g. /calc 500 2)",
+    "/challenge 9850 10000 - prop-firm challenge: safe risk and lot sizes (balance now, balance the phase started with)",
     "/news - big news coming up (Ethiopian time)",
     "",
     "<b>VIP</b>",
@@ -149,11 +150,14 @@ export function openText(data) {
   for (const s of rows) {
     const decimals = (data.instruments?.[s.symbol]?.decimals) ?? 2;
     const state = s.status === "PENDING" ? "waiting for entry" : s.status === "PARTIAL_TP1" ? "target 1 hit" : "running";
+    const targets = Number(s.tp1) === Number(s.tp2)
+      ? `Target <code>${fmtPrice(s.tp2, decimals)}</code> (close the whole trade there)`
+      : `Target 1 <code>${fmtPrice(s.tp1, decimals)}</code> \u00b7 Target 2 <code>${fmtPrice(s.tp2, decimals)}</code>`;
     lines.push(
       "",
       `<b>${esc(s.code)}</b> ${s.direction === "LONG" ? "BUY" : "SELL"} ${esc(s.name || s.symbol)} (${state})`,
       `Entry <code>${fmtPrice(s.entry, decimals)}</code> \u00b7 Stop <code>${fmtPrice(s.stop, decimals)}</code>`,
-      `Target 1 <code>${fmtPrice(s.tp1, decimals)}</code> \u00b7 Target 2 <code>${fmtPrice(s.tp2, decimals)}</code>`,
+      targets,
     );
   }
   return lines.join("\n");
@@ -196,6 +200,28 @@ export function calcText(data, args) {
     );
   }
   return lines.join("\n");
+}
+
+// Challenge ladder (scripts/research/sizing.py): full size only while the account
+// is near its start, smaller after losses, so a bad run cannot reach the loss limits.
+export function challengeRisk(balance, start) {
+  const change = (100 * (balance - start)) / start;
+  return { change, risk: change > -2 ? 1.5 : change > -4 ? 1 : 0.5 };
+}
+
+export function challengeText(data, args) {
+  const balance = Number(String(args[0] || "").replace(/[$,]/g, ""));
+  const start = Number(String(args[1] || "").replace(/[$,]/g, ""));
+  if (!(balance > 0) || !(start > 0)) {
+    return "Write your balance now and the balance this phase started with, for example: /challenge 9850 10000";
+  }
+  const { change, risk } = challengeRisk(balance, start);
+  return [
+    `\u{1F3AF} <b>Challenge size</b>: you are ${change >= 0 ? "+" : ""}${change.toFixed(1)}% from the start, so risk <b>${risk}%</b> per trade.`,
+    "<i>1.5% while you are less than 2% down, 1% once 2% down, 0.5% once 4% down. After 2 losing trades in a day, stop for that day.</i>",
+    "",
+    calcText(data, [String(balance), String(risk)]),
+  ].join("\n");
 }
 
 export function newsText(data) {
@@ -609,6 +635,7 @@ export async function handleUpdate(update, env) {
       case "/open":
       case "/last10":
       case "/calc":
+      case "/challenge":
       case "/news": {
         const data = await getData(env).catch(() => null);
         if (!data) return say(env, chatId, "The track record is not reachable right now; try again in a minute.");
@@ -617,6 +644,7 @@ export async function handleUpdate(update, env) {
           "/open": () => openText(data),
           "/last10": () => last10Text(data),
           "/calc": () => calcText(data, args),
+          "/challenge": () => challengeText(data, args),
           "/news": () => newsText(data),
         }[command]();
         return say(env, chatId, reply);

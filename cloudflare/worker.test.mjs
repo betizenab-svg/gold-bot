@@ -7,6 +7,8 @@ import { test, beforeEach } from "node:test";
 
 import worker, {
   calcText,
+  challengeRisk,
+  challengeText,
   checkUsdt,
   eatTime,
   expireMembers,
@@ -122,6 +124,20 @@ test("public answers read the track record", () => {
   assert.equal(lotFor(10000, 1, 4196.4, 4187.86, data.instruments.XAUUSD).lot, 0.12);
   assert.match(calcText(data, ["100"]), /0\.01 lot.*risks 8\.5%/);
   assert.match(calcText(data, []), /Write your balance/);
+});
+
+test("challenge sizing: full size near the start, smaller after losses", () => {
+  assert.equal(challengeRisk(10400, 10000).risk, 1.5);
+  assert.equal(challengeRisk(9850, 10000).risk, 1.5);
+  assert.equal(challengeRisk(9800, 10000).risk, 1);
+  assert.equal(challengeRisk(9600, 10000).risk, 0.5);
+  const text = challengeText(data, ["9,850", "$10000"]);
+  assert.match(text, /-1\.5% from the start, so risk <b>1\.5%<\/b>/);
+  assert.match(text, /\$9,850 at 1\.5% risk.*#G142 Gold: <b>0\.17 lot<\/b>/s);
+  assert.match(challengeText(data, ["9850"]), /for example: \/challenge 9850 10000/);
+  const system = { ...data, open: [{ ...data.open[0], tp1: 4209.21, tp2: 4209.21 }] };
+  assert.match(openText(system), /Target <code>4209\.21<\/code> \(close the whole trade there\)/);
+  assert.doesNotMatch(openText(system), /Target 2/);
 });
 
 test("VIP opens only on a proven record (auto mode)", () => {

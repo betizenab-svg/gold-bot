@@ -23,7 +23,7 @@ Version 2 upgrades (see docs/knowledge_base.md for the evidence base):
 - Full trade lifecycle: TP1 partial, breakeven runner, pending-order expiry, and a time stop for stagnant trades.
 - Confluence engines: session killzones, volatility regime, RSI/EMA momentum with exhaustion vetoes, multi-timeframe bias, barbwire/climax market-state vetoes, and fib OTE confluence.
 - Self-learning: per-strategy weights driven by rolling expectancy (R), not win rate — plus daily auto-quarantine of strategies whose live expectancy turns clearly negative, and a 14-day regime-drift warning in the daily status message.
-- Risk governor: daily signal caps, stop-loss cooldowns, losing-streak halts, daily -3R circuit breaker, +4R profit lock, and news blackouts.
+- Risk governor: daily signal caps, stop-loss cooldowns, losing-streak halts, daily -2R circuit breaker, +4R profit lock, and news blackouts.
 - Trendline gate: counter-trend signals are blocked until the trendline through the last two swing pivots is broken by a body close.
 - Evidence loop: every trade records its max favorable/adverse excursion in R; scripts/calibrate_from_history.py turns that into concrete tuning recommendations.
 - Four strategy families: pin bars (two grades), engulfing-at-zone, Brooks H2/L2 with-trend pullbacks, inside-bar traps — plus SMC zone retests and Quasimodo sweep-reversal limits.

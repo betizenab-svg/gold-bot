@@ -151,8 +151,9 @@ RISK_HALT_HOURS = int(os.getenv("RISK_HALT_HOURS", "6"))
 RISK_MAX_CONCURRENT_SIGNALS = int(os.getenv("RISK_MAX_CONCURRENT_SIGNALS", "3"))
 # Escalation tier: this many consecutive stop losses suspends signals for 24h.
 RISK_TIER2_CONSECUTIVE_SL = int(os.getenv("RISK_TIER2_CONSECUTIVE_SL", "5"))
-# Daily realized-R circuit breakers (Link/Kiev/Bennett consensus).
-RISK_DAILY_MAX_LOSS_R = float(os.getenv("RISK_DAILY_MAX_LOSS_R", "3.0"))
+# Daily realized-R circuit breakers (Link/Kiev/Bennett consensus). 2R keeps a
+# 1.5% challenge risk (/challenge ladder) inside a 4% daily loss limit.
+RISK_DAILY_MAX_LOSS_R = float(os.getenv("RISK_DAILY_MAX_LOSS_R", "2.0"))
 RISK_DAILY_PROFIT_LOCK_R = float(os.getenv("RISK_DAILY_PROFIT_LOCK_R", "4.0"))
 # High-impact news blackout window in minutes (before/after event).
 NEWS_BLACKOUT_BEFORE_MIN = int(os.getenv("NEWS_BLACKOUT_BEFORE_MIN", "30"))
