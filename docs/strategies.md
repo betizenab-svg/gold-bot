@@ -92,6 +92,35 @@ Only one other edge passed the strict test: buying S&P 500 dips (RSI(2) under 10
 
 **Conclusion for now:** the Gold 4-hour System plus the size ladder is the best combination found. Other pairs and indices stay off until a new test finds an edge that survives a hidden period. Any market can be retested with `python scripts/research/discover.py <MARKET>`.
 
+### The books, tested properly (scripts/research/book_families.py, book_discover.py, book_replay.py)
+
+The 21 books in `books/` were read again. Every rule that can be written as exact code on 1-hour, 4-hour or daily charts was coded. That gave 20 rules, including:
+- Brooks: the first touch of the 20 average, the failed failure, and fading a giant climax bar.
+- Morning and evening stars.
+- Double bottoms and tops.
+- Spike and flag.
+- Fresh supply and demand zones (Moreno), entered with a limit order.
+- The 70.5% retracement (Market Makers Method).
+- Boroden's symmetry pullback.
+- Kennedy's moving-average channel.
+- Langer's daily outside bar and Bollinger pierce.
+- Bassal's day of strength, MACD with ADX, and range stochastic.
+- Boxer's stochastic and CCI trend pullbacks.
+- Kratter's Monday panic buy.
+
+Each rule went through the same honest test, on 13 markets: chosen on 24 months, neighbouring settings checked, then the 12 hidden months.
+
+**What came out:**
+- **The tuned search:** 3,418 versions were tested and 1 survived the hidden year: Kennedy's channel on gold 4-hour (+0.22R per trade, t = 1.5). With 5 robust candidates, luck alone would be expected to let about 1 through.
+- **Each rule exactly as the book wrote it, all markets together:** almost every rule loses money after costs. The 1-hour versions lose the most. None is clearly positive on both the 24 months and the hidden year.
+- **Added to the live gold system,** the channel made the challenge slower at equal safety. The safe size fell from 1.65% to 1.20% at the top of the ladder.
+  - Live system alone: median 16 weeks on the hidden year.
+  - Live system plus the channel: 21 weeks.
+
+  Its extra trades were weak in the hidden year (+0.08R each) and run at the same time as the other gold trades, so the safe size had to shrink. It is not switched on.
+
+The books' money rules match what the bot already does: risk small, stop for the day after losses, treat trades on the same currency as one bet, and avoid big news.
+
 ### Sizing for a challenge (scripts/research/sizing.py)
 
 Same signals, walked through the real 3-year sequence from every start day (Alpha Pro 8%: +8% then +5%; fail at -8% total or -4% in one day):

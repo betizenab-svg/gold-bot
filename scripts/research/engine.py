@@ -177,6 +177,70 @@ def simulate(data: Data, f: pd.DataFrame, signal: np.ndarray, stop: np.ndarray, 
     return np.array(out, dtype=float).reshape(-1, 4)
 
 
+def simulate_levels(data: Data, f: pd.DataFrame, signal: np.ndarray, entry: np.ndarray, stop: np.ndarray,
+                    target: np.ndarray, valid: int, hold: int, bar_seconds: int) -> np.ndarray:
+    """Like simulate, with explicit price levels per signal bar. valid = 0 enters at
+    the bar's close; valid > 0 places a limit order at `entry` for that many bars
+    (filled at the limit, or at a better open). Returns (entry time, exit time, direction, R)."""
+    times, closes = f["t"].to_numpy(), f["c"].to_numpy()
+    ts, high, low, op, close = data.ts, data.h, data.l, data.o, data.c
+    out = []
+    free_from = 0
+    for k in np.flatnonzero(signal):
+        t0 = int(times[k])
+        if t0 < free_from:
+            continue
+        d = int(signal[k])
+        cut = cutoff_after(t0)
+        stop_price, goal = float(stop[k]), float(target[k])
+        if not (np.isfinite(stop_price) and np.isfinite(goal)):
+            continue
+        i = int(np.searchsorted(ts, t0, side="left"))
+        if i >= len(ts):
+            continue
+        if valid <= 0:
+            if t0 >= cut - NO_ENTRY:
+                continue
+            j, price = i, float(closes[k])
+        else:
+            last = int(np.searchsorted(ts, min(t0 + valid * bar_seconds, cut - NO_ENTRY), side="left")) - 1
+            level = float(entry[k])
+            if last < i or not np.isfinite(level):
+                continue
+            touched = low[i:last + 1] <= level if d > 0 else high[i:last + 1] >= level
+            if not touched.any():
+                continue
+            j = i + int(np.argmax(touched))
+            price = min(level, float(op[j])) if d > 0 else max(level, float(op[j]))
+        risk = d * (price - stop_price)
+        if risk <= 0 or d * (goal - price) <= 0:
+            continue
+        fill_time = int(ts[j])
+        deadline = min(fill_time + hold * bar_seconds, cutoff_after(fill_time))
+        end = int(np.searchsorted(ts, deadline, side="left")) - 1
+        if end < j:
+            continue
+        if d > 0:
+            hit_stop, hit_goal = low[j:end + 1] <= stop_price, high[j:end + 1] >= goal
+        else:
+            hit_stop, hit_goal = high[j:end + 1] >= stop_price, low[j:end + 1] <= goal
+        js = int(np.argmax(hit_stop)) if hit_stop.any() else 1 << 30
+        jg = int(np.argmax(hit_goal)) if hit_goal.any() else 1 << 30
+        if js <= jg and js < (1 << 30):
+            x = j + js
+            gapped = op[x] < stop_price if d > 0 else op[x] > stop_price
+            exit_price = op[x] if gapped and x > j else stop_price
+        elif jg < (1 << 30):
+            x, exit_price = j + jg, goal
+        else:
+            x, exit_price = end, close[end]
+        r = (d * (exit_price - price) - data.cost) / risk
+        exit_time = int(ts[x]) + 300
+        out.append((fill_time, exit_time, d, r))
+        free_from = exit_time
+    return np.array(out, dtype=float).reshape(-1, 4)
+
+
 # --- statistics --------------------------------------------------------------------------------
 
 def stats(r: np.ndarray) -> dict:

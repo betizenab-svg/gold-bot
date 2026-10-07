@@ -128,6 +128,26 @@ Shipped as the default (`BE_ARM_R`, env-overridable). GBP verification
 via the weekly scheduled cloud replay (Yahoo rate limits blocked local runs);
 the workflow now accepts a `be_arm_r` input for future experiments.
 
+## Round 5 — the books tested on 3 years with a hidden year (2026-10)
+
+The old rounds were judged on 45-day replays, and those replays flattered
+the rules: the same M5 strategies lost about 477R over 3 years. Round 5
+coded 20 book rules for 1-hour, 4-hour and daily charts
+(`scripts/research/book_families.py`) and tested them on 13 markets with
+the hidden-year protocol (`scripts/research/book_discover.py`):
+
+- 3,418 versions were tested; 5 were robust on the first 24 months and 1
+  survived the hidden 12 (Kennedy's moving-average channel, gold 4-hour).
+  That is about what luck alone would give.
+- As written, pooled over all markets, almost every rule loses after costs.
+  The 1-hour versions lose the most.
+- Added to the live gold system, the channel made the challenge slower at
+  equal safety: 21 weeks instead of 16 on the hidden year
+  (`scripts/research/book_replay.py`). Not adopted.
+
+Lesson: judge a rule on years of data with a period that was never used to
+choose it. A few good weeks prove nothing.
+
 ## Deliberately not implemented (and why)
 
 1. **Range-day edge-fade strategy family** — the barbwire veto, day-extension
