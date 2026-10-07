@@ -91,3 +91,20 @@ def test_price_sources_and_build():
     assert sources["yahoo"]["failures"] == 1
     data = room.build(conn, days=7, now=NOW)
     assert set(data) >= {"curve", "funnel", "filters", "lights", "sources"}
+
+
+def test_control_room_script_builds_the_dashboard_on_a_private_copy(tmp_path, monkeypatch):
+    import importlib
+
+    from scripts import control_room
+
+    module = importlib.import_module("src.dashboard.app")
+    monkeypatch.setattr(module, "DB_PATH", module.DB_PATH)  # restored after the test
+    monkeypatch.setenv("DASHBOARD_USERNAME", "owner")
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "test-password")
+    copy = tmp_path / "control_room.db"
+    app = control_room.build_app(copy)
+    app.config["LOGIN_DISABLED"] = True
+    assert module.DB_PATH == str(copy)
+    response = app.test_client().get("/control")
+    assert response.status_code == 200 and b"Traffic lights" in response.data

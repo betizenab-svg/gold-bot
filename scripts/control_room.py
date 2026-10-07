@@ -11,6 +11,7 @@ the live bot: it only reads a private copy in data/control_room.db.
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 import shutil
 import sqlite3
@@ -35,6 +36,20 @@ def download(url: str, target: Path) -> None:
         shutil.copyfileobj(response, handle)
     sqlite3.connect(partial).execute("PRAGMA schema_version;").fetchone()  # is it a database?
     partial.replace(target)
+
+
+def build_app(local_copy: Path):
+    """The dashboard, reading the private copy (never the live database)."""
+    from src.persistence.schema import SchemaInitializer
+
+    conn = sqlite3.connect(local_copy)
+    SchemaInitializer(conn).initialize()
+    conn.commit()
+    conn.close()
+    # The package also exports a Flask object named "app"; load the module itself.
+    dashboard = importlib.import_module("src.dashboard.app")
+    dashboard.DB_PATH = str(local_copy)
+    return dashboard.create_app()
 
 
 def main() -> int:
@@ -63,16 +78,7 @@ def main() -> int:
     from config import settings
 
     settings.DB_PATH = str(LOCAL_COPY)
-    from src.persistence.schema import SchemaInitializer
-
-    conn = sqlite3.connect(LOCAL_COPY)
-    SchemaInitializer(conn).initialize()
-    conn.commit()
-    conn.close()
-    import src.dashboard.app as dashboard
-
-    dashboard.DB_PATH = str(LOCAL_COPY)
-    app = dashboard.create_app()
+    app = build_app(LOCAL_COPY)
 
     address = f"http://127.0.0.1:{args.port}/control"
     print(f"Control room: {address}  (log in with DASHBOARD_USERNAME / DASHBOARD_PASSWORD from .env)")
