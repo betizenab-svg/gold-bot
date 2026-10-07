@@ -94,11 +94,14 @@ class TwelveDataClient:
         bars = max(1, ceil(delta / seconds_per_bar) + 1)
         return min(bars, self.MAX_OUTPUTSIZE)
 
-    def fetch_latest_candles(self, symbol: str, timeframe: str) -> List[Candle]:
+    def fetch_latest_candles(
+        self, symbol: str, timeframe: str, since: Optional[int] = None
+    ) -> List[Candle]:
+        """Closed candles newer than the last stored one (or than `since`)."""
         if self.circuit_breaker.is_open("TWELVEDATA"):
             return []
 
-        last_timestamp = self._get_last_timestamp(symbol, timeframe)
+        last_timestamp = int(since) if since is not None else self._get_last_timestamp(symbol, timeframe)
         interval = self._map_timeframe(timeframe)
         provider_symbol = self._normalize_symbol(symbol)
         outputsize = self._calculate_outputsize(last_timestamp, timeframe)

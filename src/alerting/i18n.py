@@ -18,6 +18,14 @@ STRINGS: dict[str, tuple[str, str]] = {
     "stop": ("Stop", "ማቆሚያ"),
     "target1": ("Target 1", "ዒላማ 1"),
     "target2": ("Target 2", "ዒላማ 2"),
+    "target": ("Target", "ዒላማ"),
+    "close_all": ("close the whole trade", "ሙሉውን ንግድ ይዝጉ"),
+    "fixed_plan": (
+        "Plan: no half-close and no stop move. If neither level is hit within "
+        "{hours} hours, close at the market price. Always closed before the weekend.",
+        "ዕቅድ፦ ግማሹን መዝጋትም ሆነ ማቆሚያውን ማንቀሳቀስ የለም። በ{hours} ሰዓታት ውስጥ "
+        "ሁለቱም ደረጃዎች ካልተነኩ በገበያ ዋጋ ይዝጉ። ከሳምንቱ መጨረሻ በፊት ሁልጊዜ ይዘጋል።",
+    ),
     "pips": ("pips", "ፒፕ"),
     "per_lot": ("per 0.01 lot", "በ0.01 ሎት"),
     "bank_half": ("close half, move stop to entry", "ግማሹን ዝጉ፣ ማቆሚያውን ወደ መግቢያ ያዛውሩ"),
@@ -124,6 +132,30 @@ STRINGS: dict[str, tuple[str, str]] = {
     "why_ASIAN_RANGE_BREAKOUT_SHORT": (
         "Gold broke below its quiet Asian-session range.",
         "ወርቅ ጸጥ ያለውን የእስያ ሰዓት ክልል ወደ ታች ሰብሯል።",
+    ),
+    "why_GOLD_BREAKOUT_LONG": (
+        "Gold's 4-hour close broke above the highest price of the last 30 candles (about 5 days): a fresh push up.",
+        "የወርቅ የ4 ሰዓት መዝጊያ ዋጋ የመጨረሻዎቹን 30 ሻማዎች (5 ቀን ገደማ) ከፍተኛ ዋጋ ወደ ላይ ሰብሯል፤ አዲስ ወደ ላይ ግፊት ነው።",
+    ),
+    "why_GOLD_BREAKOUT_SHORT": (
+        "Gold's 4-hour close broke below the lowest price of the last 30 candles (about 5 days): a fresh push down.",
+        "የወርቅ የ4 ሰዓት መዝጊያ ዋጋ የመጨረሻዎቹን 30 ሻማዎች (5 ቀን ገደማ) ዝቅተኛ ዋጋ ወደ ታች ሰብሯል፤ አዲስ ወደ ታች ግፊት ነው።",
+    ),
+    "why_GOLD_SQUEEZE_LONG": (
+        "Gold was unusually quiet (its tightest range in 60 four-hour candles) and has now broken out upward.",
+        "ወርቅ ባልተለመደ ሁኔታ ጸጥ ብሎ ነበር (በ60 የ4 ሰዓት ሻማዎች ውስጥ በጣም ጠባቡ ክልል)፤ አሁን ወደ ላይ ወጥቷል።",
+    ),
+    "why_GOLD_SQUEEZE_SHORT": (
+        "Gold was unusually quiet (its tightest range in 60 four-hour candles) and has now broken out downward.",
+        "ወርቅ ባልተለመደ ሁኔታ ጸጥ ብሎ ነበር (በ60 የ4 ሰዓት ሻማዎች ውስጥ በጣም ጠባቡ ክልል)፤ አሁን ወደ ታች ወርዷል።",
+    ),
+    "why_GOLD_PULLBACK_LONG": (
+        "Gold is in a strong uptrend; the price dipped to its 20-candle average and bounced back up.",
+        "ወርቅ በጠንካራ ወደ ላይ አዝማሚያ ላይ ነው፤ ዋጋው ወደ 20-ሻማ አማካዩ ወርዶ ተመልሶ ወደ ላይ ወጥቷል።",
+    ),
+    "why_GOLD_PULLBACK_SHORT": (
+        "Gold is in a strong downtrend; the price rose to its 20-candle average and turned back down.",
+        "ወርቅ በጠንካራ ወደ ታች አዝማሚያ ላይ ነው፤ ዋጋው ወደ 20-ሻማ አማካዩ ወጥቶ ተመልሶ ወደ ታች ወርዷል።",
     ),
     "why_default": (
         "The trend and a key price area line up for this trade.",

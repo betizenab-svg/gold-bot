@@ -934,14 +934,36 @@ class Repository:
             (round(float(mfe_r), 4), round(float(mae_r), 4), signal_hash),
         )
 
-    def prune_market_data(self, retention_days: int) -> None:
+    SLOW_TIMEFRAMES = ("H1", "H4", "D")
+
+    def prune_market_data(self, retention_days: int, slow_retention_days: Optional[int] = None) -> None:
         # Anchor to the newest stored candle (not wall clock) so backfilled or
         # historical datasets are never wiped wholesale.
         row = self._fetchone("SELECT MAX(timestamp) FROM market_data;")
         if row is None or row[0] is None:
             return
-        cutoff = int(row[0]) - int(retention_days) * 86400
+        newest = int(row[0])
+        cutoff = newest - int(retention_days) * 86400
+        if slow_retention_days is None:
+            self._execute(
+                "DELETE FROM market_data WHERE timestamp < ?;",
+                (cutoff,),
+            )
+            return
+        marks = ",".join("?" for _ in self.SLOW_TIMEFRAMES)
         self._execute(
-            "DELETE FROM market_data WHERE timestamp < ?;",
-            (cutoff,),
+            f"DELETE FROM market_data WHERE timestamp < ? AND timeframe NOT IN ({marks});",
+            (cutoff, *self.SLOW_TIMEFRAMES),
         )
+        self._execute(
+            f"DELETE FROM market_data WHERE timestamp < ? AND timeframe IN ({marks});",
+            (newest - int(slow_retention_days) * 86400, *self.SLOW_TIMEFRAMES),
+        )
+
+    def replace_candles(self, symbol: str, timeframe: str, candles: Iterable[Candle]) -> None:
+        """Swap one chart's stored candles for a longer history from the same feed."""
+        self._execute(
+            "DELETE FROM market_data WHERE symbol = ? AND timeframe = ?;",
+            (str(symbol).upper(), str(timeframe).upper()),
+        )
+        self.save_candles(candles)

@@ -45,11 +45,13 @@ def _bar(symbol: str, ts: int, high: float, low: float, close: float, open_: flo
 
 def test_new_markets_and_swing_charts_are_registered(monkeypatch) -> None:
     monkeypatch.delenv("SYMBOLS", raising=False)
-    live = active_symbols()
+    # Gold only by default (owner's decision); the other markets stay registered
+    # for history tests and can be switched back on with the SYMBOLS variable.
+    assert active_symbols() == ["XAUUSD", "XAUUSD_H4"]
     for symbol in ("US100", "US500", "USDJPY", "AUDUSD", "ETHUSD", "XAUUSD_H1", "XAUUSD_H4", "EURUSD_H1"):
-        assert symbol in live
+        assert symbol in INSTRUMENTS and INSTRUMENTS[symbol].live_feed
     # No free on-time price feed: history tests only.
-    assert "XAGUSD" not in live and "WTIUSD" not in live
+    assert not INSTRUMENTS["XAGUSD"].live_feed and not INSTRUMENTS["WTIUSD"].live_feed
     assert INSTRUMENTS["XAGUSD"].history_source == "HISTDATA"
     assert history_key("XAUUSD_H4") == "XAUUSD" and INSTRUMENTS["XAUUSD_H4"].signal_timeframe == "H4"
     assert INSTRUMENTS["XAUUSD_H1"].yahoo_ticker == "GC=F" and INSTRUMENTS["XAUUSD_H1"].spot_symbol == "XAU/USD"

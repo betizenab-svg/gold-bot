@@ -214,6 +214,9 @@ class SignalFactory:
         if direction not in {"LONG", "SHORT"}:
             raise ValueError(f"Unsupported trade direction: {trade_direction}")
 
+        if zone_dict.get("fixed_plan") and zone_dict.get("tp_price") is not None:
+            return self._fixed_plan_parameters(direction, zone_dict, symbol)
+
         if "entry_price" in zone_dict and "sl_price" in zone_dict:
             entry = float(zone_dict["entry_price"])
             sl = float(zone_dict["sl_price"])
@@ -275,6 +278,61 @@ class SignalFactory:
             round(tp2, nd),
         )
 
+    @staticmethod
+    def _fixed_plan_parameters(
+        direction: str, zone_dict: dict[str, Any], symbol: str
+    ) -> tuple[float, float, float, float]:
+        """Gold system levels exactly as tested: entry at the candle close, the
+        stop a set number of ATRs away, one target (TP1 = TP2). No minimum
+        stop, round-number or measured-move changes; only the broker spread."""
+        entry = float(zone_dict["entry_price"])
+        sl = float(zone_dict["sl_price"])
+        tp = float(zone_dict["tp_price"])
+        sign = 1.0 if direction == "LONG" else -1.0
+        if (entry - sl) * sign <= 0 or (tp - entry) * sign <= 0:
+            raise ValueError("Signal risk must be positive")
+        cushion = spread_cushion(symbol)
+        if cushion:
+            if direction == "LONG":
+                entry += cushion
+            else:
+                sl += cushion
+                tp += cushion
+        nd = get_instrument(symbol).price_decimals
+        return round(entry, nd), round(sl, nd), round(tp, nd), round(tp, nd)
+
+    @staticmethod
+    def _render_fixed_plan(
+        zone_dict: dict[str, Any],
+        entry: float,
+        sl: float,
+        tp: float,
+        risk_fraction: float,
+        symbol: str,
+    ) -> str:
+        from src.analysis.trade_windows import candle_seconds
+        from src.strategies.gold_system import PLANS
+
+        nd = get_instrument(symbol).price_decimals
+        strategy = str(zone_dict.get("strategy") or "").upper()
+        plan = PLANS.get(strategy)
+        hours = int(zone_dict.get("hold_candles") or 0) * candle_seconds(symbol) // 3600
+        stop_note = f"{plan.stop_atr:g} ATR" if plan else "fixed"
+        target_note = f"{plan.target_r:g}R" if plan else "fixed"
+        return "\n".join(
+            [
+                f"GOLD 4-HOUR SYSTEM | {strategy.replace('_', ' ').title()}",
+                f"Trigger: {zone_dict.get('why') or strategy}.",
+                f"Numbers: entry {entry:.{nd}f} (MARKET) | stop {sl:.{nd}f} ({stop_note}) | "
+                f"target {tp:.{nd}f} ({target_note}, the whole trade closes there)",
+                "Plan: no half-close and no stop move. Closed at market after "
+                f"{hours}h if neither level is hit, and always before the weekend.",
+                f"Risk: {risk_fraction * 100:g}% of the account (lot table below).",
+                "Tested: every trigger of this system made money after costs over 3 years "
+                "of gold history, with every trade closed before the weekend.",
+            ]
+        )
+
     def build_signal(
         self,
         symbol: str,
@@ -290,7 +348,12 @@ class SignalFactory:
         zone_type = str(zone_dict.get("type", "ZONE")).replace("_", " ")
 
         plan_context = zone_dict.get("plan_context")
-        if isinstance(plan_context, dict):
+        fixed_plan = bool(zone_dict.get("fixed_plan"))
+        if fixed_plan:
+            base_reasoning = self._render_fixed_plan(
+                zone_dict, entry, sl, tp2, risk_fraction_for_score(int(score)), symbol
+            )
+        elif isinstance(plan_context, dict):
             base_reasoning = self._render_trade_plan(
                 plan_context, zone_dict, signal_type, entry, sl, tp1, tp2, int(score), symbol
             )
@@ -331,7 +394,7 @@ class SignalFactory:
         if order_type not in {"STOP", "LIMIT"}:
             order_type = "LIMIT"
         status = "PENDING"
-        if market_entry_requested(zone_dict):
+        if market_entry_requested(zone_dict) or fixed_plan:
             order_type, status = "MARKET", "ACTIVE"
 
         return Signal(

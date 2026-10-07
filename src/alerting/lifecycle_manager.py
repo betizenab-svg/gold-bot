@@ -17,6 +17,7 @@ from src.analysis.position_sizing import LotSizeCalculator
 from src.analysis.risk_governor import RiskGovernor
 from src.domain.candle import Candle
 from src.persistence.repository import Repository
+from src.strategies.gold_system import is_fixed_plan
 
 
 class SignalLifecycleManager:
@@ -283,7 +284,10 @@ class SignalLifecycleManager:
     def _breakeven_armed(self, signal: Any, current_candle: Optional[Candle] = None) -> bool:
         """True once the trade has already run >= BE_ARM_R in favor (tracked
         MFE), or was held into the weekend under the "breakeven" plan: the
-        stop is then treated as sitting at entry."""
+        stop is then treated as sitting at entry. Gold system trades keep
+        their stop where it was tested."""
+        if is_fixed_plan(self._get_optional_value(signal, "strategy")):
+            return False
         if (
             current_candle is not None
             and str(app_settings.WEEKEND_ACTION).lower() == "breakeven"
@@ -354,7 +358,9 @@ class SignalLifecycleManager:
             int(current_candle.timestamp),
             weekend_closed=not self._signal_instrument(signal).weekend_trading,
         )
-        return age_seconds > max_hold_seconds(self._signal_instrument(signal).symbol)
+        return age_seconds > max_hold_seconds(
+            self._signal_instrument(signal).symbol, self._get_optional_value(signal, "strategy")
+        )
 
     def process_open_signals(
         self,
@@ -416,7 +422,9 @@ class SignalLifecycleManager:
             except KeyError:
                 if uses_outbox(active_repository) and chat_id is not None:
                     # The signal card itself is still queued: thread these under it later.
-                    for text in active_formatter.format_lifecycle_update(event_type, reason):
+                    for text in active_formatter.format_lifecycle_update(
+                        self._display_type(signal, event_type), reason
+                    ):
                         active_repository.outbox_add(
                             str(chat_id), text, kind="reply",
                             signal_hash=signal_hash, status="PENDING",
@@ -430,7 +438,7 @@ class SignalLifecycleManager:
                 continue
 
             alert_message, explanation_message = active_formatter.format_lifecycle_update(
-                event_type,
+                self._display_type(signal, event_type),
                 reason,
             )
 
@@ -683,11 +691,19 @@ class SignalLifecycleManager:
             logging.debug("Risk outcome recording skipped: %s", exc)
 
     @staticmethod
+    def _display_type(signal: Any, event_type: str) -> str:
+        """Gold system trades have one target, so no "TP 2" / "TP1" wording."""
+        if is_fixed_plan(SignalLifecycleManager._get_optional_value(signal, "strategy")):
+            return {"TP2_SMASH": "TARGET_HIT", "TIME_STOP": "TIME_LIMIT"}.get(event_type, event_type)
+        return event_type
+
+    @staticmethod
     def _build_lifecycle_reason(
         signal: Any, event_type: str, current_candle: Optional[Candle] = None
     ) -> str:
         normalized = event_type.upper()
         nd = SignalLifecycleManager._signal_instrument(signal).price_decimals
+        fixed = is_fixed_plan(SignalLifecycleManager._get_optional_value(signal, "strategy"))
         if normalized == "ACTIVATED":
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return f"Entry activated at {price:.{nd}f}."
@@ -696,6 +712,8 @@ class SignalLifecycleManager:
             return f"Price hit TP1 at {price:.{nd}f}."
         if normalized == "TP2_SMASH":
             price = float(SignalLifecycleManager._get_required_value(signal, "tp2_price", "tp2"))
+            if fixed:
+                return f"Price hit the target at {price:.{nd}f}; the whole trade is closed."
             return f"Price hit TP2 at {price:.{nd}f}."
         if normalized == "SL_HIT":
             price = float(SignalLifecycleManager._get_required_value(signal, "sl_price", "sl"))
@@ -713,14 +731,16 @@ class SignalLifecycleManager:
             price = float(SignalLifecycleManager._get_required_value(signal, "entry_price", "entry"))
             return f"Pending entry at {price:.{nd}f} was never triggered; signal cancelled."
         if normalized == "TIME_STOP":
+            lead = (
+                "The time limit passed without the target or the stop being hit"
+                if fixed
+                else "Trade never reached TP1 within the holding window"
+            )
             if current_candle is not None:
                 result = SignalLifecycleManager._event_realized_r(signal, event_type, current_candle)
                 if result is not None:
-                    return (
-                        "Trade never reached TP1 within the holding window; closed at "
-                        f"{float(current_candle.close):.{nd}f} ({result:+.2f}R)."
-                    )
-            return "Trade never reached TP1 within the holding window; closed as stagnant."
+                    return f"{lead}; closed at {float(current_candle.close):.{nd}f} ({result:+.2f}R)."
+            return f"{lead}; closed at market." if fixed else f"{lead}; closed as stagnant."
         if normalized == "STRUCTURE_EXIT":
             return "Market structure flipped against the runner; closed to protect banked TP1 gains."
         if normalized == "WEEKEND_CANCEL":

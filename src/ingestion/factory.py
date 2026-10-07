@@ -136,6 +136,17 @@ class MarketDataRouter:
         self.last_source[symbol] = SOURCE_YAHOO
         return candles
 
+    def fetch_history(self, symbol: str, timeframe: str, since: int) -> List[Candle]:
+        """Closed spot candles since `since` in one request (one TwelveData
+        credit). Empty when the market has no spot feed: futures prices must
+        never be mixed into a spot chart."""
+        if not self.uses_spot(symbol) or self.circuit_breaker.is_open("TWELVEDATA"):
+            return []
+        spot = self._spot_client()
+        if spot is None:
+            return []
+        return spot.fetch_latest_candles(symbol, timeframe, since=since)
+
     def _fetch_spot_market(self, symbol: str, timeframe: str) -> List[Candle]:
         spot = self._spot_client()
         if spot is not None and not self.circuit_breaker.is_open("TWELVEDATA"):

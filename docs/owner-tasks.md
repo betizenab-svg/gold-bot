@@ -6,6 +6,24 @@ GitHub settings live at **github.com/betizenab-svg/gold-bot → Settings → Sec
 
 ---
 
+## Part 0: The new Gold 4-hour System (do these now)
+
+The bot now trades **gold only**, using one combined strategy: the Gold 4-hour System. It sends about **2 signals a week**. Each signal has one entry, one stop and one target. Nothing needs switching on.
+
+1. **Remove the old market list, if you made one.** Open the GitHub **Variables** tab. If you see `SYMBOLS`, delete it. `PROMOTED_SYMBOLS` and `TRIAL_STRATEGIES` no longer matter, so you can leave them.
+2. **Fix the admin chat number.** Open the **Secrets** tab, edit `TELEGRAM_ADMIN_CHAT_ID`, and paste `-5384019257` exactly, minus sign included.
+3. **How to take each signal on your $10,000 Alpha challenge:**
+   1. When a signal arrives, send `/calc 10000 1` to the bot. It replies with the lot size for 1% risk, which is $100.
+   2. Open the trade at market with that lot size. Type the signal's stop and target into MT5.
+   3. Don't move the stop and don't close half. Let the stop or the target close the trade.
+   4. When the bot replies **Time Limit** or **Closed Before The Weekend**, close the trade yourself at market.
+   5. Take every signal. The tests count on all of them, and skipping some at random usually hurts.
+4. **Ask Alpha Capital support one question, and get the answer in writing:** "May I trade signals from my own Telegram bot?" Their rules ban following other people's signals.
+5. **Funded-stage news rule.** Once you're funded, Alpha forbids opening or closing a trade from 5 minutes before to 5 minutes after big news. The bot never opens a trade near big news. A stop or target can still be hit during news, though, so ask support how they treat that.
+6. **Your choice: free channel.** With about 2 signals a week, "1 free signal a day" means the free channel gets almost every signal. To keep VIP worth paying for, set the **Variable** `FREE_SIGNALS_PER_DAY` to `0`. The free channel then gets each trade's result and the VIP invite. To keep giving free signals, do nothing.
+
+---
+
 ## Part 1: Safety first (do these now)
 
 1. **Change your TwelveData key.** An old key (starting `7b8a…`) was saved in the public code history in March, so treat it as known to everyone.

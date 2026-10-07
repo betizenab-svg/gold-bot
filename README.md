@@ -1,5 +1,15 @@
 # Signal Desk — Multi-Asset Signal Intelligence System
 
+> **Current mode: gold only.** By default the only signal source is the **Gold 4-hour System** (`src/strategies/gold_system.py`, described in `docs/strategies.md`):
+>
+> - three trend triggers on gold's 4-hour chart;
+> - one fixed plan per trade: market entry, ATR stop and a single 1R target;
+> - a time limit, and every trade is closed before the weekend.
+>
+> Over 36 months of history, after costs, it was positive every year.
+>
+> The multi-asset engine described below can still be switched back on with `GOLD_SYSTEM_ONLY=0` and the `SYMBOLS` variable.
+
 ## Project Overview
 
 Signal Desk is a stateless, cron-driven trading automation platform covering gold (XAUUSD), Bitcoin (BTCUSD), and the FX majors (EURUSD, GBPUSD). It ingests live market and macro data, applies Smart Money Concepts (SMC) and macro-fundamental filters, scores opportunities through a multi-engine confluence stack, and publishes threaded Telegram alerts.

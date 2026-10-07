@@ -91,8 +91,10 @@ from config.settings import (
 from src.analysis.fsr_engine import FSREngine
 from src.analysis.bias_engine import MacroBiasAggregator
 from src.analysis.confluence import ConfluenceEngineV2
-from src.analysis.risk_governor import RiskGovernor
+from src.analysis.risk_governor import WEEKEND_NO_NEW_MINUTES, RiskGovernor
+from src.analysis.market_hours import minutes_to_weekly_close
 from src.analysis.trendline import TrendlineEngine
+from src.strategies import gold_system
 from src.strategies.engulfing_zone import EngulfingZoneStrategy
 from src.strategies.inside_bar_trap import InsideBarTrapStrategy
 from src.strategies.pin_bar_rejection import PinBarRejectionStrategy
@@ -103,6 +105,11 @@ from src.strategies.quasimodo import QuasimodoStrategy
 MACRO_CACHE_TTL_SECONDS = 86400  # 24 hours
 MACRO_HISTORY_DAYS = 90
 DXY_HISTORY_DAYS = 30
+# Gold system signals skip the 0-100 scoring; this is the score they are stored with.
+GOLD_SYSTEM_SCORE = 80
+# One request loads this much 4-hour history (about 820 candles) when the
+# system chart has less than ANALYSIS_LOOKBACK_CANDLES stored.
+GOLD_SYSTEM_HISTORY_DAYS = 200
 
 # Legacy per-status values for rows written before exact results were stored.
 STATUS_R = {
@@ -646,11 +653,18 @@ class PulseOrchestrator:
     @staticmethod
     def _signal_symbol_matches(signal: Any, symbol: str) -> bool:
         """Only compare a signal against candles of its own market. Non-string
-        symbols (mocks/legacy rows) keep the legacy match-everything behavior."""
+        symbols (mocks/legacy rows) keep the legacy match-everything behavior.
+        Gold system trades (4-hour chart) are also watched on the 5-minute
+        gold prices, so stops and targets are caught as they happen."""
         sig_symbol = getattr(signal, "symbol", None)
         if not isinstance(sig_symbol, str) or not sig_symbol:
             return True
-        return sig_symbol.upper() == str(symbol).upper()
+        if sig_symbol.upper() == str(symbol).upper():
+            return True
+        return (
+            gold_system.is_fixed_plan(getattr(signal, "strategy", None))
+            and get_instrument(sig_symbol).base_symbol == str(symbol).upper()
+        )
 
     def _monitor_open_signals(
         self,
@@ -888,6 +902,10 @@ class PulseOrchestrator:
             "confluence_notes",
             "measured_move",
             "plan_context",
+            "tp_price",
+            "fixed_plan",
+            "hold_candles",
+            "why",
         ):
             if key in potential_setup:
                 signal_context[key] = potential_setup[key]
@@ -1228,7 +1246,9 @@ class PulseOrchestrator:
         if now - last_prune < 86400:
             return
         try:
-            repository.prune_market_data(MARKET_DATA_RETENTION_DAYS)
+            repository.prune_market_data(
+                MARKET_DATA_RETENTION_DAYS, app_settings.SLOW_CHART_RETENTION_DAYS
+            )
             repository.set_kv("last_prune_timestamp", str(now))
             logging.info("Pruned market_data older than %d days", MARKET_DATA_RETENTION_DAYS)
         except Exception as exc:
@@ -1472,6 +1492,10 @@ class PulseOrchestrator:
             newly = []
             for strategy, r_values in stats.items():
                 if len(r_values) < 8 or strategy in existing or strategy in DISABLED_STRATEGIES:
+                    continue
+                if gold_system.is_fixed_plan(strategy):
+                    # Judged on 3 years of history: 8 live trades are too few
+                    # (a trigger can lose for weeks inside a winning year).
                     continue
                 expectancy = sum(r_values) / len(r_values)
                 if expectancy <= -0.25:
@@ -2110,13 +2134,24 @@ class PulseOrchestrator:
                 logging.error("Failed to persist forced UAT signal: %s", exc)
             return signals_generated, errors_encountered
 
-        if not get_instrument(symbol).signals_enabled:
+        system_chart = symbol.upper() == gold_system.SYSTEM_SYMBOL
+        if not get_instrument(symbol).signals_enabled or (
+            app_settings.GOLD_SYSTEM_ONLY and not system_chart
+        ):
             # Watch-only market: data, zones and monitoring stay live, but no
-            # new signals are published (replay evidence gate).
+            # new signals are published (replay evidence gate, or the gold
+            # system is the only signal source).
             del recent_fvgs
             del recent_candles
             del valid_candles
             return signals_generated, errors_encountered
+
+        if system_chart:
+            del recent_fvgs
+            del valid_candles
+            return self._run_gold_system(
+                repository, client, symbol, current_candle, recent_candles, price_source
+            )
 
         potential_setup = self._detect_trade_setup(
             repository,
@@ -2416,6 +2451,152 @@ class PulseOrchestrator:
         del recent_candles
         del valid_candles
         return signals_generated, errors_encountered
+
+    def _run_gold_system(
+        self,
+        repository: Repository,
+        client: Any,
+        symbol: str,
+        current_candle: Candle,
+        recent_candles: List[Candle],
+        price_source: Optional[str] = None,
+    ) -> tuple[int, int]:
+        """Gold 4-hour System on the newest closed 4-hour candle. Its three
+        tested triggers replace the zone, scoring and macro steps; the risk
+        governor (news, weekend, loss limits, pause switch) keeps the final say.
+        Returns (signals_generated, errors_encountered)."""
+        candle_close = int(current_candle.timestamp) + int(
+            TIMEFRAME_SECONDS.get(current_candle.timeframe, 14400)
+        )
+        remaining = minutes_to_weekly_close(symbol, candle_close)
+        if (
+            str(app_settings.WEEKEND_ACTION).lower() in {"close", "breakeven"}
+            and remaining is not None
+            and remaining <= WEEKEND_NO_NEW_MINUTES
+        ):
+            return 0, 0  # too close to the weekend: tested as \"no trigger at all\"
+
+        recent_candles = self._gold_system_history(
+            repository, client, symbol, current_candle.timeframe, recent_candles
+        )
+        setups = [
+            setup
+            for setup in gold_system.detect_all(recent_candles)
+            if self._strategy_allowed(setup, symbol)
+        ]
+        if not setups:
+            return 0, 0
+        current_candle = recent_candles[-1]
+
+        open_trades = [
+            (str(signal.strategy).upper(), str(signal.signal_type).upper())
+            for signal in (repository.get_open_signals() or [])
+            if str(getattr(signal, "symbol", "")).upper() == symbol.upper()
+            and gold_system.is_fixed_plan(getattr(signal, "strategy", None))
+        ]
+        ages = {
+            name: self._gold_system_age(repository, symbol, name, recent_candles)
+            for name in gold_system.PLANS
+        }
+        chosen, fired, skipped = gold_system.choose(setups, open_trades, ages)
+        for name in fired:
+            repository.set_kv(
+                state_key(f"gold_system_fired_{name}", symbol), str(int(current_candle.timestamp))
+            )
+        for setup, reason in skipped:
+            self._log_blocked_setup(
+                repository, symbol, setup, current_candle, reason,
+                levels=self._hypothetical_levels(setup, recent_candles, symbol),
+            )
+        if chosen is None:
+            return 0, 0
+
+        allowed, governor_reason = RiskGovernor().is_trading_allowed(
+            repository,
+            candle_close,
+            symbol=symbol,
+            direction=str(chosen["trade_direction"]),
+            trial=is_trial(symbol, chosen["strategy"]),
+        )
+        if not allowed:
+            logging.info("Gold system setup blocked: %s", governor_reason)
+            self._log_blocked_setup(
+                repository, symbol, chosen, current_candle, governor_reason,
+                levels=self._hypothetical_levels(chosen, recent_candles, symbol),
+            )
+            self._maybe_post_brake_notice(repository, governor_reason, symbol, chosen)
+            return 0, 0
+
+        try:
+            repository.log_setup(
+                symbol=symbol,
+                strategy=str(chosen["strategy"]),
+                direction=str(chosen["trade_direction"]),
+                order_type="MARKET",
+                score=GOLD_SYSTEM_SCORE,
+                classification="ACTIONABLE",
+                vetoes="",
+                timestamp=int(current_candle.timestamp),
+                levels=None,
+            )
+        except Exception as exc:
+            logging.debug("Setup funnel logging skipped: %s", exc)
+        try:
+            saved, errors = self._persist_actionable_signal(
+                repository, chosen, recent_candles, current_candle, GOLD_SYSTEM_SCORE,
+                price_source=price_source,
+            )
+        except Exception as exc:
+            logging.error("Failed to persist gold system signal: %s", exc)
+            return 0, 1
+        return int(bool(saved)), errors
+
+    @staticmethod
+    def _gold_system_age(
+        repository: Repository, symbol: str, strategy: str, recent_candles: List[Candle]
+    ) -> Optional[int]:
+        """Candles since the trigger last fired (None = never or too long ago)."""
+        try:
+            fired_at = int(repository.get_kv(state_key(f"gold_system_fired_{strategy}", symbol)) or 0)
+        except (TypeError, ValueError):
+            return None
+        if fired_at <= 0:
+            return None
+        for offset, candle in enumerate(reversed(recent_candles)):
+            if int(candle.timestamp) <= fired_at:
+                return offset
+        return None
+
+    def _gold_system_history(
+        self,
+        repository: Repository,
+        client: Any,
+        symbol: str,
+        timeframe: str,
+        recent_candles: List[Candle],
+    ) -> List[Candle]:
+        """The trend trigger needs 250 candles and its 200-candle average settles
+        over ~600, but a new or switched feed starts with days, not months. Load
+        the missing 4-hour history once, in one request."""
+        if len(recent_candles) >= ANALYSIS_LOOKBACK_CANDLES:
+            return recent_candles
+        flag = state_key("gold_system_history_loaded", symbol)
+        fetch_history = getattr(client, "fetch_history", None)
+        if repository.get_kv(flag) or not callable(fetch_history):
+            return recent_candles
+        try:
+            history = fetch_history(
+                symbol, timeframe, int(time.time()) - GOLD_SYSTEM_HISTORY_DAYS * 86400
+            )
+        except (TwelveDataIngestionError, YahooDataIngestionError) as exc:
+            logging.warning("Gold system history load failed (retried next candle): %s", exc)
+            return recent_candles
+        repository.set_kv(flag, str(int(time.time())))
+        if not isinstance(history, list) or len(history) <= len(recent_candles):
+            return recent_candles
+        repository.replace_candles(symbol, timeframe, history)
+        logging.info("Gold system: loaded %d four-hour candles of history", len(history))
+        return repository.get_recent_candles(symbol, timeframe, ANALYSIS_LOOKBACK_CANDLES)
 
     def _flush_outbox(self, repository: Repository) -> None:
         if not uses_outbox(repository):

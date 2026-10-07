@@ -9,6 +9,7 @@ from config import settings as app_settings
 from config.instruments import get_instrument
 from src.alerting.i18n import t, why_this_trade
 from src.alerting.timefmt import eat_datetime, eat_time
+from src.strategies.gold_system import hold_candles, is_fixed_plan
 
 
 def signal_code(signal_obj: Any) -> str:
@@ -81,20 +82,34 @@ class SignalFormatter:
         dollars = pips * instrument.pip_value_per_lot * 0.01
         tp1_pips = abs(tp1_price - entry_price) / instrument.pip_size if instrument.pip_size else 0.0
         tp2_pips = abs(tp2_price - entry_price) / instrument.pip_size if instrument.pip_size else 0.0
+        strategy = self._optional(signal_obj, "strategy")
         lines += [
             "",
             f"{t('entry')} @ <code>{entry_price:.{nd}f}</code>",
             f"{t('stop')} @ <code>{sl_price:.{nd}f}</code>  (-{pips:.0f} {t('pips')} = ${dollars:.2f} {t('per_lot')})",
-            f"{t('target1')} @ <code>{tp1_price:.{nd}f}</code>  (+{tp1_pips:.0f} {t('pips')}, {t('bank_half')})",
-            f"{t('target2')} @ <code>{tp2_price:.{nd}f}</code>  (+{tp2_pips:.0f} {t('pips')})",
         ]
-        if risk > 0:
+        if is_fixed_plan(strategy):
+            # Gold system: one target, the whole trade closes there.
             lines.append(
-                f"{t('reward_risk')}: {abs(tp1_price - entry_price) / risk:.1f} : 1 \u2192 "
-                f"{abs(tp2_price - entry_price) / risk:.1f} : 1"
+                f"{t('target')} @ <code>{tp2_price:.{nd}f}</code>  (+{tp2_pips:.0f} {t('pips')}, {t('close_all')})"
             )
+            if risk > 0:
+                lines.append(f"{t('reward_risk')}: {abs(tp2_price - entry_price) / risk:.1f} : 1")
+            from src.analysis.trade_windows import candle_seconds
 
-        strategy = self._optional(signal_obj, "strategy")
+            hours = (hold_candles(strategy) or 0) * candle_seconds(symbol_name) // 3600
+            lines.append(f"\U0001f4cb {t('fixed_plan', hours=hours)}")
+        else:
+            lines += [
+                f"{t('target1')} @ <code>{tp1_price:.{nd}f}</code>  (+{tp1_pips:.0f} {t('pips')}, {t('bank_half')})",
+                f"{t('target2')} @ <code>{tp2_price:.{nd}f}</code>  (+{tp2_pips:.0f} {t('pips')})",
+            ]
+            if risk > 0:
+                lines.append(
+                    f"{t('reward_risk')}: {abs(tp1_price - entry_price) / risk:.1f} : 1 \u2192 "
+                    f"{abs(tp2_price - entry_price) / risk:.1f} : 1"
+                )
+
         lines += ["", f"\U0001f4a1 {t('why')}: {why_this_trade(strategy, direction)}"]
 
         try:
@@ -161,6 +176,15 @@ class SignalFormatter:
                 "🏆 <b>TP 2 Smashed</b>\n"
                 "🎬 GIF: https://media.giphy.com/media/3o7TKtnuHOHHUjR38Y/giphy.gif"
             )
+            explanation_title = "Reason"
+        elif normalized_type == "TARGET_HIT":
+            alert_message = (
+                "🏆 <b>Target Hit</b>\n"
+                "🎬 GIF: https://media.giphy.com/media/3o7TKtnuHOHHUjR38Y/giphy.gif"
+            )
+            explanation_title = "Reason"
+        elif normalized_type == "TIME_LIMIT":
+            alert_message = "⏱️ <b>Time Limit</b>\nNeither the target nor the stop was hit in time; closed at market."
             explanation_title = "Reason"
         elif normalized_type == "SL_HIT":
             alert_message = (

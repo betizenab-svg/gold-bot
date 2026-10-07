@@ -1,5 +1,55 @@
 # Strategy and Scoring Specification
 
+## The Gold 4-hour System (the only live signal source)
+
+Code: `src/strategies/gold_system.py`. Research: `scripts/research/` (gold_lab, gold_system, gold_system_replay).
+
+It watches gold's 4-hour chart and checks each candle when it closes. Three triggers:
+
+1. **Breakout** (`GOLD_BREAKOUT`): the close breaks the highest high or lowest low of the previous 30 candles (about 5 trading days). Stop 1.5 ATR. Time limit 30 candles. After it fires, it waits 10 candles.
+2. **Squeeze** (`GOLD_SQUEEZE`): the Bollinger bands (20, 2) are at their narrowest in 60 candles, then a close outside the band. Stop 1.5 ATR. Time limit 30 candles. Waits 6 candles.
+3. **Pullback** (`GOLD_PULLBACK`): the 20, 50 and 200-candle averages are stacked in trend order; the candle dips to the 20 average and closes back in the trend direction. Stop 2 ATR. Time limit 24 candles. Waits 3 candles.
+
+Every trade follows one fixed plan:
+
+- Enter at market when the candle closes.
+- Take the whole trade off at a single target 1R away. There is no half-close and no break-even move.
+- Close at market when the time limit runs out, and always before the weekend. No new trades in the last 2 hours before the weekend.
+
+The system's own rules:
+
+- One signal per candle. When several triggers fire together, the order is breakout, then squeeze, then pullback.
+- At most 2 open trades in the same direction.
+- A trigger never stacks a second trade on its own open trade in the same direction.
+- The usual risk governor still has the final say: news blackouts, loss limits, the pause switch and the weekend.
+
+Tested on 36 months of gold, October 2023 to September 2026. Costs were included (spread and slippage), the stop was counted first whenever a candle touched both the stop and the target, and trades were resolved on 5-minute prices.
+
+| | Trades | Win rate | Average per trade | Total |
+|---|---|---|---|---|
+| Whole period | 336 (about 2 a week) | 60% | +0.17R | +57.5R |
+
+By year:
+
+| Year | Total |
+|---|---|
+| 1 | +13.6R |
+| 2 | +22.0R |
+| 3 | +21.9R |
+
+- **Same code through the full live pipeline** (proof engine, 4-hour candles only): 319 trades, 58% wins, +47.5R. That breaks down as +9.3R, +15.2R and +23.0R by year.
+- **Buys and sells:** most of the profit came from buys, because gold rose strongly in these years. Sells roughly broke even.
+- **What was tried and dropped:** a long-term trend filter (EMA 100, 200 and 300) cut profits in every version tried. RSI pullbacks, session breakouts and New York momentum did not pass.
+- **Alpha Pro 8% challenge simulation** (both phases, 4% daily and 8% total loss limits):
+
+  | Risk per trade | Passes | Typical time |
+  |---|---|---|
+  | 0.5% | 100% | about 62 weeks |
+  | 1% | 95% | about 29 weeks |
+  | 1.5% | 85% | about 18 weeks |
+
+`GOLD_SYSTEM_ONLY` (default on) makes this the only signal source. The 5-minute gold chart then only supplies prices: it watches open trades and feeds the morning briefing. Switching it off brings back the older strategies below. They did not hold up in the 3-year tests.
+
 ## Strategy 1: Big Bulls and Bears
 
 Trend-continuation setup built around SMA value-area pullbacks and engulfing confirmation.

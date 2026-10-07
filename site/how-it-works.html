@@ -19,30 +19,33 @@
   <main>
     <h1>How it works</h1>
     <h2>Who sends the signals</h2>
-    <p>A program checks gold and forex charts every 5 minutes. When its fixed rules find a setup,
-      it sends a signal to Telegram with an entry price, a stop, two targets and the lot size for
-      your balance. Then it follows the trade and replies in the same thread: entry hit, target 1,
-      stop moved to entry, target 2, or stop hit.</p>
+    <p>A program checks gold's 4-hour chart every time a candle closes. It uses one combined
+      method, the Gold 4-hour System, with three fixed triggers: a breakout of the last 30
+      candles, a breakout after an unusually quiet spell, and a dip to the 20-candle average
+      inside a strong trend. When one fires, it sends a signal to Telegram with an entry price,
+      a stop, one target and the lot size for your balance. That is about 2 signals a week.
+      Then it follows the trade and replies in the same thread: target hit, stop hit, time limit
+      reached, or closed before the weekend.</p>
 
     <h2>What +R means in money</h2>
     <p>Every result is counted in R. 1R is the amount you risk on one trade, the money you lose if
       the stop is hit. If you risk 1% of a $500 account, 1R = $5:</p>
     <ul>
-      <li>+2.25R (both targets hit) = +$11.25</li>
+      <li>+1R (target hit) = +$5</li>
       <li>-1R (stop hit) = -$5</li>
-      <li>+20R over a month = +$100, or +20% of the account</li>
+      <li>+20R over a year = +$100, or +20% of the account</li>
     </ul>
     <p>Results on this site are shown before your broker's costs. The history test below takes
       spread and slippage off every trade.</p>
 
     <h2>How each trade is handled</h2>
     <ul>
-      <li>Half the position closes at target 1 and the stop moves to the entry price.</li>
-      <li>Orders that do not open in time are cancelled; trades that go nowhere are closed.</li>
+      <li>Buy or sell at market as soon as the signal arrives.</li>
+      <li>The whole trade closes at the target or at the stop. There is no half-close and no stop move.</li>
+      <li>A trade that reaches neither within its time limit (4 to 5 days) is closed at market.</li>
       <li>New signals pause 30 minutes before big news, and open trades get a warning.</li>
       <li>Trades are closed before the weekend, when markets can jump at the reopening.</li>
       <li>Signals stop for the day after a 3R loss, and for the week after a 6R loss.</li>
-      <li>New markets and new methods are first tested privately ("trial") and only appear here once they prove themselves.</li>
     </ul>
 
     <h2>Tested on years of history</h2>

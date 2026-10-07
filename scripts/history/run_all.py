@@ -20,6 +20,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from config.instruments import INSTRUMENTS, history_key  # noqa: E402
 from scripts.history.sources import iter_months, parse_month  # noqa: E402
+from src.strategies.gold_system import SYSTEM_SYMBOL  # noqa: E402
 
 PYTHON = sys.executable
 COT_FILE = ROOT_DIR / "data" / "proof" / "cot_gold.json"
@@ -52,6 +53,8 @@ def jobs(symbols: list[str], start: str, end: str) -> list[Job]:
     for symbol in symbols:
         if INSTRUMENTS.get(symbol) is not None and INSTRUMENTS[symbol].trial:
             continue  # trial markets first have to pass at all; settings come later
+        if symbol == SYSTEM_SYMBOL:
+            continue  # the gold system's fixed plans do not use these settings
         for variant, extra in SETTING_VARIANTS:
             batch.append((symbol, variant, list(extra), start, end))
     if "XAUUSD" in symbols and COT_FILE.exists():

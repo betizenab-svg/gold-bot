@@ -422,6 +422,12 @@ for _base, _timeframe, _prefix, _scale in (
     _swing_instrument = _swing(INSTRUMENTS[_base], _timeframe, _prefix, _scale)
     INSTRUMENTS[_swing_instrument.symbol] = _swing_instrument
 
+# The gold 4-hour chart runs the Gold 4-hour System (src/strategies/gold_system.py),
+# which passed 3 years of history after costs, so it posts to subscribers.
+INSTRUMENTS["XAUUSD_H4"] = replace(
+    INSTRUMENTS["XAUUSD_H4"], display_name="Gold 4-hour system", trial=False
+)
+
 _DEFAULT = INSTRUMENTS["XAUUSD"]
 
 
@@ -432,12 +438,14 @@ def get_instrument(symbol: str | None) -> Instrument:
     return INSTRUMENTS.get(str(symbol).upper(), _DEFAULT)
 
 
+# Gold only: 5-minute prices (watching open trades) and the 4-hour system chart.
+DEFAULT_SYMBOLS = "XAUUSD,XAUUSD_H4"
+
+
 def active_symbols() -> list[str]:
     """Symbols the pulse trades, from the SYMBOLS env (comma-separated).
-    Default: every market with a free, on-time price feed (trials included)."""
-    raw = os.getenv("SYMBOLS") or ",".join(
-        name for name, instrument in INSTRUMENTS.items() if instrument.live_feed
-    )
+    Default: gold (DEFAULT_SYMBOLS)."""
+    raw = os.getenv("SYMBOLS") or DEFAULT_SYMBOLS
     seen: list[str] = []
     for part in raw.split(","):
         name = part.strip().upper()

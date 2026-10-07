@@ -136,6 +136,11 @@ ANALYSIS_LOOKBACK_CANDLES = int(os.getenv("ANALYSIS_LOOKBACK_CANDLES", "600"))
 CHART_ALERTS_ENABLED = _env_bool("CHART_ALERTS_ENABLED", True)
 # Days of market_data retained in SQLite (keeps the DB small on free hosting).
 MARKET_DATA_RETENTION_DAYS = int(os.getenv("MARKET_DATA_RETENTION_DAYS", "45"))
+# 1-hour and 4-hour candles are few but the gold system needs ~600 of them.
+SLOW_CHART_RETENTION_DAYS = int(os.getenv("SLOW_CHART_RETENTION_DAYS", "200"))
+# On: only the Gold 4-hour System sends signals; the other charts just supply
+# prices (watching open trades, briefings). Off: the older strategies run too.
+GOLD_SYSTEM_ONLY = _env_bool("GOLD_SYSTEM_ONLY", True)
 
 # --- Risk Governor ---
 # Budgets are GLOBAL across all traded symbols (shared risk pool).
