@@ -1,6 +1,6 @@
 # History proof report
 
-Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result below is after spread and slippage. R = one unit of risk.
+Tested period: 2023-10 to 2026-09 (generated 2026-10-07 11:17 UTC). Every result below is after spread and slippage. R = one unit of risk.
 
 ## Markets
 - Aussie dollar (does not pass yet): 1896 trades, -435.0R after costs (-0.23R per trade, win rate 29%, profit factor 0.58, worst dip 436.6R)
@@ -19,7 +19,7 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result
 - Gold 1-hour swing (passes): 139 trades, +17.4R after costs (+0.12R per trade, win rate 37%, profit factor 1.3, worst dip 8.8R)
 - Gold 4-hour swing (does not pass yet): 45 trades, -1.3R after costs (-0.03R per trade, win rate 29%, profit factor 0.94, worst dip 8.8R)
 
-## Switched off (clear losers after costs)
+## Switched off (lost money after costs)
 - PIN_BAR_REJECTION on AUDUSD: 975 trades, -0.28R per trade
 - L2_PULLBACK on AUDUSD: 80 trades, -0.20R per trade
 - OPENING_RANGE_BREAKOUT on AUDUSD: 197 trades, -0.19R per trade
@@ -27,6 +27,7 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result
 - INSIDE_BAR_TRAP on AUDUSD: 147 trades, -0.13R per trade
 - ENGULFING_ZONE on AUDUSD: 143 trades, -0.07R per trade
 - H2_PULLBACK on AUDUSD: 93 trades, -0.26R per trade
+- PIN_BAR_REJECTION on BTCUSD: 473 trades, -0.03R per trade
 - ZONE_BOUNCE on BTCUSD: 128 trades, -0.18R per trade
 - H2_PULLBACK on BTCUSD: 72 trades, -0.13R per trade
 - ENGULFING_ZONE on BTCUSD: 44 trades, -0.11R per trade
@@ -43,6 +44,7 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result
 - OPENING_RANGE_BREAKOUT on EURUSD: 193 trades, -0.06R per trade
 - ENGULFING_ZONE on EURUSD: 145 trades, -0.06R per trade
 - H2_PULLBACK on EURUSD: 87 trades, -0.13R per trade
+- INSIDE_BAR_TRAP on EURUSD: 144 trades, -0.04R per trade
 - ZONE_BOUNCE on EURUSD_H1: 35 trades, -0.35R per trade
 - PIN_BAR_REJECTION on GBPUSD: 1027 trades, -0.17R per trade
 - INSIDE_BAR_TRAP on GBPUSD: 106 trades, -0.21R per trade
@@ -74,6 +76,7 @@ Tested period: 2023-10 to 2026-09 (generated 2026-10-07 04:11 UTC). Every result
 - OPENING_RANGE_BREAKOUT on XAGUSD: 238 trades, -0.19R per trade
 - ZONE_BOUNCE on XAUUSD: 331 trades, -0.11R per trade
 - PIN_BAR_REJECTION on XAUUSD: 295 trades, -0.22R per trade
+- OPENING_RANGE_BREAKOUT on XAUUSD: 234 trades, -0.03R per trade
 - INSIDE_BAR_TRAP on XAUUSD: 173 trades, -0.23R per trade
 - H2_PULLBACK on XAUUSD: 138 trades, -0.18R per trade
 - L2_PULLBACK on XAUUSD: 101 trades, -0.23R per trade

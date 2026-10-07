@@ -573,6 +573,12 @@
    "trades": 93
   },
   {
+   "expectancy_r": -0.033,
+   "strategy": "PIN_BAR_REJECTION",
+   "symbol": "BTCUSD",
+   "trades": 473
+  },
+  {
    "expectancy_r": -0.177,
    "strategy": "ZONE_BOUNCE",
    "symbol": "BTCUSD",
@@ -667,6 +673,12 @@
    "strategy": "H2_PULLBACK",
    "symbol": "EURUSD",
    "trades": 87
+  },
+  {
+   "expectancy_r": -0.036,
+   "strategy": "INSIDE_BAR_TRAP",
+   "symbol": "EURUSD",
+   "trades": 144
   },
   {
    "expectancy_r": -0.348,
@@ -855,6 +867,12 @@
    "trades": 295
   },
   {
+   "expectancy_r": -0.03,
+   "strategy": "OPENING_RANGE_BREAKOUT",
+   "symbol": "XAUUSD",
+   "trades": 234
+  },
+  {
    "expectancy_r": -0.23,
    "strategy": "INSIDE_BAR_TRAP",
    "symbol": "XAUUSD",
@@ -873,7 +891,7 @@
    "trades": 101
   }
  ],
- "generated_at": "2026-10-07 04:11 UTC",
+ "generated_at": "2026-10-07 11:17 UTC",
  "luck": {
   "ALL": {
    "actual_losing_streak": 34,
