@@ -1,0 +1,547 @@
+{
+ "equity": [
+  [
+   1787526000,
+   -1.0
+  ],
+  [
+   1787556300,
+   0.0
+  ],
+  [
+   1787572200,
+   0.75
+  ],
+  [
+   1787636700,
+   -0.25
+  ],
+  [
+   1787648400,
+   -1.25
+  ],
+  [
+   1787699700,
+   -2.25
+  ],
+  [
+   1787735700,
+   -2.25
+  ],
+  [
+   1787740200,
+   -3.25
+  ],
+  [
+   1788284700,
+   -2.5
+  ],
+  [
+   1788483000,
+   -3.5
+  ],
+  [
+   1788668100,
+   -4.5
+  ],
+  [
+   1788696000,
+   -5.5
+  ],
+  [
+   1788776100,
+   -6.5
+  ],
+  [
+   1788912300,
+   -5.75
+  ],
+  [
+   1789038900,
+   -3.5
+  ],
+  [
+   1789119000,
+   -1.25
+  ],
+  [
+   1789480200,
+   -2.25
+  ],
+  [
+   1789537800,
+   -2.25
+  ],
+  [
+   1789601400,
+   -0.02
+  ],
+  [
+   1789608600,
+   -0.02
+  ],
+  [
+   1789609200,
+   -1.02
+  ],
+  [
+   1789973400,
+   -0.27
+  ],
+  [
+   1790210100,
+   -0.27
+  ],
+  [
+   1790276100,
+   -0.27
+  ],
+  [
+   1790329800,
+   1.98
+  ],
+  [
+   1790870700,
+   2.73
+  ],
+  [
+   1791099000,
+   3.73
+  ],
+  [
+   1791111600,
+   2.73
+  ],
+  [
+   1791126000,
+   1.73
+  ],
+  [
+   1791164400,
+   3.98
+  ],
+  [
+   1791180000,
+   4.98
+  ],
+  [
+   1791180900,
+   3.98
+  ],
+  [
+   1791185700,
+   3.98
+  ],
+  [
+   1791196200,
+   6.23
+  ],
+  [
+   1791205800,
+   6.98
+  ],
+  [
+   1791252300,
+   6.98
+  ],
+  [
+   1791264600,
+   6.98
+  ],
+  [
+   1791269100,
+   5.98
+  ],
+  [
+   1791270600,
+   8.23
+  ],
+  [
+   1791283500,
+   10.48
+  ],
+  [
+   1791293400,
+   9.48
+  ],
+  [
+   1791303900,
+   8.48
+  ]
+ ],
+ "history": {
+  "bad_luck_dip_r": 975.39,
+  "bad_luck_losing_streak": 29,
+  "markets": {
+   "BTCUSD": {
+    "net_r_after_costs": -74.52,
+    "passed": false,
+    "profit_factor": 0.82,
+    "trades": 799
+   },
+   "ETHUSD": {
+    "net_r_after_costs": -138.35,
+    "passed": false,
+    "profit_factor": 0.68,
+    "trades": 829
+   },
+   "EURUSD": {
+    "net_r_after_costs": -210.24,
+    "passed": false,
+    "profit_factor": 0.78,
+    "trades": 1987
+   },
+   "EURUSD_H1": {
+    "net_r_after_costs": -25.74,
+    "passed": false,
+    "profit_factor": 0.7,
+    "trades": 180
+   },
+   "GBPUSD": {
+    "net_r_after_costs": -308.79,
+    "passed": false,
+    "profit_factor": 0.67,
+    "trades": 1813
+   },
+   "GBPUSD_H1": {
+    "net_r_after_costs": -14.62,
+    "passed": false,
+    "profit_factor": 0.85,
+    "trades": 226
+   },
+   "US100": {
+    "net_r_after_costs": -28.38,
+    "passed": false,
+    "profit_factor": 0.84,
+    "trades": 356
+   },
+   "XAUUSD": {
+    "net_r_after_costs": -171.36,
+    "passed": false,
+    "profit_factor": 0.76,
+    "trades": 1433
+   },
+   "XAUUSD_H1": {
+    "net_r_after_costs": 17.35,
+    "passed": true,
+    "profit_factor": 1.3,
+    "trades": 139
+   },
+   "XAUUSD_H4": {
+    "net_r_after_costs": -1.31,
+    "passed": false,
+    "profit_factor": 0.94,
+    "trades": 45
+   }
+  },
+  "window": {
+   "from": "2023-10",
+   "to": "2026-09"
+  }
+ },
+ "instruments": {
+  "BTCUSD": {
+   "decimals": 1,
+   "name": "Bitcoin",
+   "pip_size": 1.0,
+   "pip_value_per_lot": 1.0
+  },
+  "EURUSD": {
+   "decimals": 5,
+   "name": "Euro",
+   "pip_size": 0.0001,
+   "pip_value_per_lot": 10.0
+  },
+  "GBPUSD": {
+   "decimals": 5,
+   "name": "Pound",
+   "pip_size": 0.0001,
+   "pip_value_per_lot": 10.0
+  },
+  "XAUUSD": {
+   "decimals": 2,
+   "name": "Gold",
+   "pip_size": 0.1,
+   "pip_value_per_lot": 10.0
+  }
+ },
+ "last10": [
+  {
+   "closed_at": 1791303900,
+   "code": "#P61",
+   "direction": "SHORT",
+   "name": "Pound",
+   "result_r": -1.0,
+   "status": "CLOSED_SL",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791293400,
+   "code": "#E60",
+   "direction": "SHORT",
+   "name": "Euro",
+   "result_r": -1.0,
+   "status": "CLOSED_SL",
+   "symbol": "EURUSD"
+  },
+  {
+   "closed_at": 1791283500,
+   "code": "#P59",
+   "direction": "LONG",
+   "name": "Pound",
+   "result_r": 2.25,
+   "status": "CLOSED_TP2",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791270600,
+   "code": "#P58",
+   "direction": "LONG",
+   "name": "Pound",
+   "result_r": 2.25,
+   "status": "CLOSED_TP2",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791269100,
+   "code": "#B57",
+   "direction": "SHORT",
+   "name": "Bitcoin",
+   "result_r": -1.0,
+   "status": "CLOSED_SL",
+   "symbol": "BTCUSD"
+  },
+  {
+   "closed_at": 1791264600,
+   "code": "#P56",
+   "direction": "SHORT",
+   "name": "Pound",
+   "result_r": 0.0,
+   "status": "CLOSED_BE",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791252300,
+   "code": "#P54",
+   "direction": "SHORT",
+   "name": "Pound",
+   "result_r": 0.0,
+   "status": "CLOSED_BE",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791205800,
+   "code": "#P53",
+   "direction": "SHORT",
+   "name": "Pound",
+   "result_r": 0.75,
+   "status": "CLOSED_BE",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791196200,
+   "code": "#P52",
+   "direction": "SHORT",
+   "name": "Pound",
+   "result_r": 2.25,
+   "status": "CLOSED_TP2",
+   "symbol": "GBPUSD"
+  },
+  {
+   "closed_at": 1791185700,
+   "code": "#P51",
+   "direction": "LONG",
+   "name": "Pound",
+   "result_r": 0.0,
+   "status": "CLOSED_BE",
+   "symbol": "GBPUSD"
+  }
+ ],
+ "last_30_days": {
+  "deepest_dip_r": 2.0,
+  "flat": 7,
+  "losses": 9,
+  "net_r": 13.98,
+  "trades": 30,
+  "win_rate": 46.7,
+  "wins": 14,
+  "worst_losing_streak": 2
+ },
+ "markets": {
+  "BTCUSD": {
+   "deepest_dip_r": 4.77,
+   "flat": 1,
+   "losses": 8,
+   "name": "Bitcoin",
+   "net_r": -4.77,
+   "trades": 11,
+   "win_rate": 18.2,
+   "wins": 2,
+   "worst_losing_streak": 4
+  },
+  "EURUSD": {
+   "deepest_dip_r": 2.25,
+   "flat": 3,
+   "losses": 5,
+   "name": "Euro",
+   "net_r": 2.75,
+   "trades": 14,
+   "win_rate": 42.9,
+   "wins": 6,
+   "worst_losing_streak": 1
+  },
+  "GBPUSD": {
+   "deepest_dip_r": 3.0,
+   "flat": 4,
+   "losses": 4,
+   "name": "Pound",
+   "net_r": 9.75,
+   "trades": 16,
+   "win_rate": 50.0,
+   "wins": 8,
+   "worst_losing_streak": 3
+  },
+  "XAUUSD": {
+   "deepest_dip_r": 0.0,
+   "flat": 0,
+   "losses": 0,
+   "name": "Gold",
+   "net_r": 0.75,
+   "trades": 1,
+   "win_rate": 100.0,
+   "wins": 1,
+   "worst_losing_streak": 0
+  }
+ },
+ "months": [
+  {
+   "deepest_dip_r": 4.0,
+   "flat": 1,
+   "losses": 5,
+   "month": "2026-08",
+   "net_r": -3.25,
+   "trades": 8,
+   "win_rate": 25.0,
+   "wins": 2,
+   "worst_losing_streak": 3
+  },
+  {
+   "deepest_dip_r": 4.0,
+   "flat": 4,
+   "losses": 6,
+   "month": "2026-09",
+   "net_r": 5.23,
+   "trades": 17,
+   "win_rate": 41.2,
+   "wins": 7,
+   "worst_losing_streak": 4
+  },
+  {
+   "deepest_dip_r": 2.0,
+   "flat": 3,
+   "losses": 6,
+   "month": "2026-10",
+   "net_r": 6.5,
+   "trades": 17,
+   "win_rate": 47.1,
+   "wins": 8,
+   "worst_losing_streak": 2
+  }
+ ],
+ "news": [
+  {
+   "currency": "USD",
+   "label": "FOMC Meeting Minutes",
+   "time": 1791396000
+  }
+ ],
+ "open": [
+  {
+   "code": "#E62",
+   "direction": "SHORT",
+   "entry": 1.12529,
+   "name": "Euro",
+   "order": "STOP",
+   "status": "PARTIAL_TP1",
+   "stop": 1.12609,
+   "symbol": "EURUSD",
+   "time": 1791331800,
+   "tp1": 1.12409,
+   "tp2": 1.12289
+  }
+ ],
+ "strategies": {
+  "ENGULFING_ZONE": {
+   "deepest_dip_r": 1.0,
+   "flat": 0,
+   "losses": 1,
+   "net_r": 6.48,
+   "trades": 5,
+   "win_rate": 80.0,
+   "wins": 4,
+   "worst_losing_streak": 1
+  },
+  "H2_PULLBACK": {
+   "deepest_dip_r": 2.0,
+   "flat": 0,
+   "losses": 2,
+   "net_r": -2.0,
+   "trades": 2,
+   "win_rate": 0.0,
+   "wins": 0,
+   "worst_losing_streak": 2
+  },
+  "INSIDE_BAR_TRAP": {
+   "deepest_dip_r": 1.0,
+   "flat": 0,
+   "losses": 1,
+   "net_r": 2.0,
+   "trades": 3,
+   "win_rate": 66.7,
+   "wins": 2,
+   "worst_losing_streak": 1
+  },
+  "L2_PULLBACK": {
+   "deepest_dip_r": 2.0,
+   "flat": 1,
+   "losses": 3,
+   "net_r": 2.5,
+   "trades": 7,
+   "win_rate": 42.9,
+   "wins": 3,
+   "worst_losing_streak": 2
+  },
+  "PIN_BAR_REJECTION": {
+   "deepest_dip_r": 2.25,
+   "flat": 5,
+   "losses": 8,
+   "net_r": 0.75,
+   "trades": 20,
+   "win_rate": 35.0,
+   "wins": 7,
+   "worst_losing_streak": 2
+  },
+  "ZONE_BOUNCE": {
+   "deepest_dip_r": 2.0,
+   "flat": 2,
+   "losses": 2,
+   "net_r": -1.25,
+   "trades": 5,
+   "win_rate": 20.0,
+   "wins": 1,
+   "worst_losing_streak": 2
+  }
+ },
+ "totals": {
+  "deepest_dip_r": 7.25,
+  "flat": 8,
+  "losses": 17,
+  "net_r": 8.48,
+  "net_r_after_costs": 6.27,
+  "trades": 42,
+  "win_rate": 40.5,
+  "wins": 17,
+  "worst_losing_streak": 4
+ },
+ "updated": "2026-10-07T03:01:08Z"
+}
