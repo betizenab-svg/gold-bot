@@ -286,6 +286,30 @@ def test_gold_system_only_turns_the_other_charts_into_price_feeds(tmp_path: Path
     repository.close()
 
 
+def test_history_evidence_keeps_only_markets_that_make_signals(monkeypatch) -> None:
+    from scripts.history.report import merge_evidence
+
+    monkeypatch.setattr(app_settings, "GOLD_SYSTEM_ONLY", True)
+    assert gold_system.signal_markets() == ["XAUUSD_H4"]
+    old = {
+        "markets": {"WTIUSD": {"trades": 0}, "XAUUSD_H4": {"trades": 300}},
+        "disabled_pairs": [{"symbol": "EURUSD", "strategy": "PIN_BAR_REJECTION"}],
+        "check_window": {"from": "2026-04", "to": "2026-09", "net_r_after_costs": {"WTIUSD": 0, "XAUUSD": -2.7}},
+    }
+    new = {
+        "markets": {"XAUUSD_H4": {"trades": 319}},
+        "disabled_pairs": [],
+        "check_window": {"from": "2026-04", "to": "2026-09", "net_r_after_costs": {"XAUUSD_H4": 5.7}},
+    }
+    merged = merge_evidence(old, new, gold_system.signal_markets())
+    assert merged["markets"] == {"XAUUSD_H4": {"trades": 319}} and merged["disabled_pairs"] == []
+    assert merged["check_window"]["net_r_after_costs"] == {"XAUUSD_H4": 5.7}
+    # Without a market list (old behaviour) a market missing from the batch keeps its evidence.
+    assert "WTIUSD" in merge_evidence(old, new)["markets"]
+    monkeypatch.setattr(app_settings, "GOLD_SYSTEM_ONLY", False)
+    assert "EURUSD" in gold_system.signal_markets() and "XAUUSD_H4" in gold_system.signal_markets()
+
+
 def test_four_hour_history_is_loaded_once(tmp_path: Path) -> None:
     repository = _repo(tmp_path)
     orchestrator = PulseOrchestrator(telegram_client_factory=_telegram)

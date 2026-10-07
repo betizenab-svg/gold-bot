@@ -14,7 +14,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Optional
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -25,6 +25,7 @@ from config.instruments import get_instrument  # noqa: E402
 from src.analysis.evidence import EVIDENCE_PATH, cost_in_r, summarize  # noqa: E402
 from src.analysis.luck_test import luck_test  # noqa: E402
 from src.analysis.outcomes import derive_realized_r, row_r  # noqa: E402
+from src.strategies.gold_system import signal_markets  # noqa: E402
 
 PROOF_DIR = ROOT_DIR / "data" / "proof"
 
@@ -417,26 +418,28 @@ def render_markdown(report: dict, evidence: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def merge_evidence(old: dict, new: dict) -> dict:
+def merge_evidence(old: dict, new: dict, markets: Optional[list[str]] = None) -> dict:
     """Markets missing from this batch (for example after a failed download)
-    keep their previous evidence instead of being wiped."""
+    keep their previous evidence instead of being wiped. Markets that no longer
+    make signals (not in `markets`) are dropped."""
     if not old:
         return new
     tested = set(new.get("markets") or {})
+    keep = (lambda s: s not in tested) if markets is None else (lambda s: s not in tested and s in markets)
     merged = dict(new)
     for key in ("quiet_hours", "luck", "markets"):
-        values = {s: v for s, v in (old.get(key) or {}).items() if s not in tested and s != "ALL"}
+        values = {s: v for s, v in (old.get(key) or {}).items() if keep(s) and s != "ALL"}
         values.update(new.get(key) or {})
         merged[key] = values
-    baselines = {k: v for k, v in (old.get("baselines") or {}).items() if k.split("|")[0] not in tested}
+    baselines = {k: v for k, v in (old.get("baselines") or {}).items() if keep(k.split("|")[0])}
     baselines.update(new.get("baselines") or {})
     merged["baselines"] = baselines
     merged["disabled_pairs"] = [
-        p for p in old.get("disabled_pairs") or [] if p.get("symbol") not in tested
+        p for p in old.get("disabled_pairs") or [] if keep(p.get("symbol"))
     ] + list(new.get("disabled_pairs") or [])
     suggested: dict = {}
     for key, per_symbol in (old.get("suggested_settings") or {}).items():
-        kept = {s: v for s, v in per_symbol.items() if s not in tested}
+        kept = {s: v for s, v in per_symbol.items() if keep(s)}
         if kept:
             suggested[key] = kept
     for key, per_symbol in (new.get("suggested_settings") or {}).items():
@@ -448,7 +451,7 @@ def merge_evidence(old: dict, new: dict) -> dict:
         new_check.get("from"), new_check.get("to")
     ):
         for field in ("net_r_after_costs", "trades"):
-            values = dict(old_check.get(field) or {})
+            values = {s: v for s, v in (old_check.get(field) or {}).items() if markets is None or s in markets}
             values.update(new_check.get(field) or {})
             new_check[field] = values
         merged["check_window"] = new_check
@@ -476,7 +479,7 @@ def main() -> int:
             old = json.loads(EVIDENCE_PATH.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             old = {}
-        evidence = merge_evidence(old if isinstance(old, dict) else {}, evidence)
+        evidence = merge_evidence(old if isinstance(old, dict) else {}, evidence, signal_markets())
         EVIDENCE_PATH.write_text(json.dumps(evidence, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(markdown)
     return 0

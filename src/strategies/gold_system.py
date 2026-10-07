@@ -54,6 +54,16 @@ def is_fixed_plan(strategy: Any) -> bool:
     return str(strategy or "").upper() in PLANS
 
 
+def signal_markets() -> list[str]:
+    """Markets that make signals, so the ones history tests must cover."""
+    from config import settings
+    from config.instruments import INSTRUMENTS
+
+    if settings.GOLD_SYSTEM_ONLY:
+        return [SYSTEM_SYMBOL]
+    return [name for name, instrument in INSTRUMENTS.items() if instrument.history_source]
+
+
 def hold_candles(strategy: Any) -> Optional[int]:
     plan = PLANS.get(str(strategy or "").upper())
     return plan.hold_candles if plan else None

@@ -48,12 +48,14 @@ jobs:
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from config.instruments import history_key
+          from src.strategies.gold_system import signal_markets
           window = {}
           try:
               window = json.load(open("config/evidence.json")).get("check_window") or {}
           except (OSError, ValueError):
               pass
-          symbols = sorted((window.get("net_r_after_costs") or {}).keys())
+          stored = window.get("net_r_after_costs") or {}
+          symbols = [s for s in signal_markets() if s in stored]
           print("matrix=" + json.dumps({"include": [{"symbol": s, "key": history_key(s)} for s in symbols]}))
           print("start=" + window.get("from", ""))
           print("end=" + window.get("to", ""))

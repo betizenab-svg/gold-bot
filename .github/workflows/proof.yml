@@ -46,17 +46,12 @@ jobs:
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from datetime import date
-          from config import settings
-          from config.instruments import INSTRUMENTS, history_key
-          from src.strategies.gold_system import SYSTEM_SYMBOL
+          from config.instruments import history_key
+          from src.strategies.gold_system import signal_markets
           today = date.today()
           last = today.year * 12 + today.month - 2
           first = last - 35
-          # Gold-only mode: only the gold system's chart makes signals.
-          symbols = (
-              [SYSTEM_SYMBOL] if settings.GOLD_SYSTEM_ONLY
-              else [s for s, i in INSTRUMENTS.items() if i.history_source]
-          )
+          symbols = signal_markets()
           print(f"start={first // 12:04d}-{first % 12 + 1:02d}")
           print(f"end={last // 12:04d}-{last % 12 + 1:02d}")
           print("symbols=" + json.dumps(symbols))
