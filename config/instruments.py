@@ -412,6 +412,34 @@ INSTRUMENTS: dict[str, Instrument] = {
     ),
 }
 
+# More FX pairs (trial, history tests first). Costs are conservative raw-spread
+# figures: spread plus commission, and slippage on both fills.
+for _template, _symbol, _name, _spread, _slip, _pip_value, _currencies, _usd, _prefix in (
+    ("AUDUSD", "USDCAD", "Dollar/Loonie", 0.00014, 0.00003, 7.3, ("USD", "CAD"), 1, "C"),
+    ("AUDUSD", "USDCHF", "Dollar/Franc", 0.00014, 0.00003, 12.5, ("USD", "CHF"), 1, "F"),
+    ("AUDUSD", "NZDUSD", "Kiwi", 0.00016, 0.00003, 10.0, ("USD", "NZD"), -1, "K"),
+    ("AUDUSD", "EURGBP", "Euro/Pound", 0.00014, 0.00003, 13.0, ("EUR", "GBP"), 0, "EG"),
+    ("USDJPY", "EURJPY", "Euro/Yen", 0.018, 0.004, 6.3, ("EUR", "JPY"), 0, "EJ"),
+    ("USDJPY", "GBPJPY", "Pound/Yen", 0.028, 0.006, 6.3, ("GBP", "JPY"), 0, "GJ"),
+    ("USDJPY", "AUDJPY", "Aussie/Yen", 0.020, 0.004, 6.3, ("AUD", "JPY"), 0, "AJ"),
+):
+    INSTRUMENTS[_symbol] = replace(
+        INSTRUMENTS[_template],
+        symbol=_symbol,
+        display_name=_name,
+        yahoo_ticker=f"{_symbol}=X",
+        pip_value_per_lot=_pip_value,
+        lot_note=f"1.00 lot = about ${_pip_value:g} per pip (changes with the price)",
+        typical_spread=_spread,
+        slippage=_slip,
+        news_currencies=_currencies,
+        usd_exposure=_usd,
+        code_prefix=_prefix,
+        correlation_group="",
+        trial=True,
+        history_symbol=_symbol,
+    )
+
 # Slower swing signals for people who cannot watch every 5 minutes.
 for _base, _timeframe, _prefix, _scale in (
     ("XAUUSD", "H1", "GH", 3.5),

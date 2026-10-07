@@ -68,6 +68,30 @@ Gold's trend behaviour is what makes the system work.
 
 Only one other edge passed the strict test: buying S&P 500 dips (RSI(2) under 10 above the 200-day average, 3 ATR stop, 0.75 ATR target, 5-day limit, closed before the weekend). It made 37 trades, won 78%, and averaged +0.12R per trade, positive every year. That is only about 12 trades a year. Added to gold, it moved the typical challenge pass about 1 week sooner. For that reason it is not switched on: index contract sizes differ between brokers, and a wrong size is a bigger danger than one week.
 
+### A strategy for every pair? (scripts/research/discover.py, breadth.py, fx_system.py)
+
+**What was searched.** 46 strategy families on 13 markets, on 1-hour, 4-hour and daily charts:
+- **Trend:** breakouts, squeezes, moving-average pullbacks and crosses, Keltner, time-series momentum, Supertrend, ADX, MACD, Ichimoku, Parabolic SAR, CCI, stochastics, Heikin-Ashi, Aroon.
+- **Mean reversion:** RSI(2), Bollinger fades, z-scores, turtle soup, IBS, losing streaks.
+- **Sessions:** the London breakout.
+- **Built for this search:** volatility-contraction breakout, breakout retest, pullback reclaim, trend/range regime switch.
+- **Markets:** gold, silver, 9 currency pairs and 2 US indices.
+
+**How it was tested.** Each strategy was chosen on the first 24 months, with a robustness check on neighbouring settings. It was then tested on the last 12 months, which were never used to choose. Costs, the weekend close and 5-minute resolution were included throughout.
+
+**What came out:**
+- **Gold:** 17 versions survived the hidden year, all of them trend strategies.
+- **Every other market:** about 9,500 versions were tested on the 12 non-gold markets, and 22 were found in the first 24 months. Every one of them lost its edge in the hidden year, so none survived.
+- **The same settings on all currency pairs at once:** only my volatility-contraction breakout worked on 8 of 9 pairs in the first 24 months. It was still positive in the hidden year, but weak: +0.09R per trade, t = 1.2.
+- **Added to the gold system, it made the challenge slower at equal safety.**
+  - Gold alone: median 16 weeks on the hidden year.
+  - Gold plus that breakout: 27 weeks.
+
+  The extra trades are weaker and share dollar risk with gold, so the safe trade size has to shrink.
+- **More gold triggers** (momentum burst, quiet-candle breakout and inside-candle breakout, each with 2R or 3R targets) made more money per year. On the challenge they were not faster at equal safety, because more trades run together. The live system stays as it is.
+
+**Conclusion for now:** the Gold 4-hour System plus the size ladder is the best combination found. Other pairs and indices stay off until a new test finds an edge that survives a hidden period. Any market can be retested with `python scripts/research/discover.py <MARKET>`.
+
 ### Sizing for a challenge (scripts/research/sizing.py)
 
 Same signals, walked through the real 3-year sequence from every start day (Alpha Pro 8%: +8% then +5%; fail at -8% total or -4% in one day):
