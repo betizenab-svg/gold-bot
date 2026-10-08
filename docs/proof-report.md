@@ -1,6 +1,6 @@
 # History proof report
 
-Tested period: 2023-10 to 2026-09 (generated 2026-10-07 12:08 UTC). Every result below is after spread and slippage. R = one unit of risk.
+Tested period: 2023-10 to 2026-09 (generated 2026-10-08 10:02 UTC). Every result below is after spread and slippage. R = one unit of risk.
 
 ## Markets
 - Gold 4-hour system (passes): 319 trades, +45.0R after costs (+0.14R per trade, win rate 58%, profit factor 1.34, worst dip 11.3R)
