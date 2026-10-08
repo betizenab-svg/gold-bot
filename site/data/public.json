@@ -410,11 +410,6 @@
  ],
  "news": [
   {
-   "currency": "GBP",
-   "label": "BOE Gov Bailey Speaks",
-   "time": 1791461700
-  },
-  {
    "currency": "CAD",
    "label": "Employment Change",
    "time": 1791549000
@@ -513,5 +508,5 @@
   "wins": 19,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-08T08:00:27Z"
+ "updated": "2026-10-08T13:15:16Z"
 }
