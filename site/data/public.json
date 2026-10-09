@@ -423,18 +423,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "CAD",
-   "label": "Employment Change",
-   "time": 1791549000
-  },
-  {
-   "currency": "CAD",
-   "label": "Unemployment Rate",
-   "time": 1791549000
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -519,5 +508,5 @@
   "wins": 19,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-09T04:00:24Z"
+ "updated": "2026-10-09T13:30:18Z"
 }
