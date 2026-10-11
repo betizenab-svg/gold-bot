@@ -423,7 +423,73 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "USD",
+   "label": "Core CPI m/m",
+   "time": 1791981000
+  },
+  {
+   "currency": "USD",
+   "label": "Core CPI y/y",
+   "time": 1791981000
+  },
+  {
+   "currency": "USD",
+   "label": "CPI m/m",
+   "time": 1791981000
+  },
+  {
+   "currency": "USD",
+   "label": "CPI y/y",
+   "time": 1791981000
+  },
+  {
+   "currency": "AUD",
+   "label": "Employment Change",
+   "time": 1792024200
+  },
+  {
+   "currency": "AUD",
+   "label": "Unemployment Rate",
+   "time": 1792024200
+  },
+  {
+   "currency": "GBP",
+   "label": "GDP m/m",
+   "time": 1792044000
+  },
+  {
+   "currency": "USD",
+   "label": "Core PPI m/m",
+   "time": 1792067400
+  },
+  {
+   "currency": "USD",
+   "label": "Core Retail Sales m/m",
+   "time": 1792067400
+  },
+  {
+   "currency": "USD",
+   "label": "PPI m/m",
+   "time": 1792067400
+  },
+  {
+   "currency": "USD",
+   "label": "Retail Sales m/m",
+   "time": 1792067400
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Gov Bailey Speaks",
+   "time": 1792116000
+  },
+  {
+   "currency": "USD",
+   "label": "Fed Chairman Warsh Speaks",
+   "time": 1792121400
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -508,5 +574,5 @@
   "wins": 19,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-11T09:30:21Z"
+ "updated": "2026-10-11T10:05:19Z"
 }
