@@ -429,26 +429,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "Core PPI m/m",
-   "time": 1792067400
-  },
-  {
-   "currency": "USD",
-   "label": "Core Retail Sales m/m",
-   "time": 1792067400
-  },
-  {
-   "currency": "USD",
-   "label": "PPI m/m",
-   "time": 1792067400
-  },
-  {
-   "currency": "USD",
-   "label": "Retail Sales m/m",
-   "time": 1792067400
-  },
-  {
    "currency": "GBP",
    "label": "BOE Gov Bailey Speaks",
    "time": 1792116000
@@ -543,5 +523,5 @@
   "wins": 20,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-15T07:00:25Z"
+ "updated": "2026-10-15T13:30:21Z"
 }
