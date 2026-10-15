@@ -429,11 +429,6 @@
  ],
  "news": [
   {
-   "currency": "GBP",
-   "label": "GDP m/m",
-   "time": 1792044000
-  },
-  {
    "currency": "USD",
    "label": "Core PPI m/m",
    "time": 1792067400
@@ -548,5 +543,5 @@
   "wins": 20,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-15T01:30:19Z"
+ "updated": "2026-10-15T07:00:25Z"
 }
