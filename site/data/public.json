@@ -427,13 +427,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "USD",
-   "label": "Fed Chairman Warsh Speaks",
-   "time": 1792121400
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -518,5 +512,5 @@
   "wins": 20,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-16T03:00:22Z"
+ "updated": "2026-10-16T04:30:22Z"
 }
