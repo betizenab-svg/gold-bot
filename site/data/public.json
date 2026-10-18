@@ -427,7 +427,33 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "CAD",
+   "label": "CPI m/m",
+   "time": 1792413000
+  },
+  {
+   "currency": "CAD",
+   "label": "Median CPI y/y",
+   "time": 1792413000
+  },
+  {
+   "currency": "CAD",
+   "label": "Trimmed CPI y/y",
+   "time": 1792413000
+  },
+  {
+   "currency": "GBP",
+   "label": "CPI y/y",
+   "time": 1792562400
+  },
+  {
+   "currency": "NZD",
+   "label": "CPI q/q",
+   "time": 1792619100
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -512,5 +538,5 @@
   "wins": 20,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-17T01:40:19Z"
+ "updated": "2026-10-18T10:35:19Z"
 }
