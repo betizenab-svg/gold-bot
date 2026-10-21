@@ -427,13 +427,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "NZD",
-   "label": "CPI q/q",
-   "time": 1792619100
-  }
- ],
+ "news": [],
  "open": [
   {
    "code": "#GF69",
@@ -532,5 +526,5 @@
   "wins": 20,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-21T07:00:21Z"
+ "updated": "2026-10-21T22:45:21Z"
 }
