@@ -337,10 +337,10 @@
   "deepest_dip_r": 2.0,
   "flat": 3,
   "losses": 7,
-  "net_r": 14.99,
-  "trades": 24,
-  "win_rate": 58.3,
-  "wins": 14,
+  "net_r": 12.74,
+  "trades": 23,
+  "win_rate": 56.5,
+  "wins": 13,
   "worst_losing_streak": 2
  },
  "markets": {
@@ -530,5 +530,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-24T18:55:23Z"
+ "updated": "2026-10-25T09:50:30Z"
 }
