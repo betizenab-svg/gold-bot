@@ -435,7 +435,123 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "AUD",
+   "label": "CPI m/m",
+   "time": 1793147400
+  },
+  {
+   "currency": "AUD",
+   "label": "CPI y/y",
+   "time": 1793147400
+  },
+  {
+   "currency": "AUD",
+   "label": "Trimmed Mean CPI m/m",
+   "time": 1793147400
+  },
+  {
+   "currency": "NZD",
+   "label": "Official Cash Rate",
+   "time": 1793149200
+  },
+  {
+   "currency": "NZD",
+   "label": "RBNZ Rate Statement",
+   "time": 1793149200
+  },
+  {
+   "currency": "NZD",
+   "label": "RBNZ Press Conference",
+   "time": 1793152800
+  },
+  {
+   "currency": "GBP",
+   "label": "Annual Budget Release",
+   "time": 1793190600
+  },
+  {
+   "currency": "CAD",
+   "label": "BOC Monetary Policy Report",
+   "time": 1793195100
+  },
+  {
+   "currency": "CAD",
+   "label": "BOC Rate Statement",
+   "time": 1793195100
+  },
+  {
+   "currency": "CAD",
+   "label": "Overnight Rate",
+   "time": 1793195100
+  },
+  {
+   "currency": "CAD",
+   "label": "BOC Press Conference",
+   "time": 1793197800
+  },
+  {
+   "currency": "USD",
+   "label": "Federal Funds Rate",
+   "time": 1793210400
+  },
+  {
+   "currency": "USD",
+   "label": "FOMC Statement",
+   "time": 1793210400
+  },
+  {
+   "currency": "USD",
+   "label": "FOMC Press Conference",
+   "time": 1793212200
+  },
+  {
+   "currency": "USD",
+   "label": "Advance GDP q/q",
+   "time": 1793277000
+  },
+  {
+   "currency": "USD",
+   "label": "Core PCE Price Index m/m",
+   "time": 1793277000
+  },
+  {
+   "currency": "EUR",
+   "label": "Main Refinancing Rate",
+   "time": 1793279700
+  },
+  {
+   "currency": "EUR",
+   "label": "Monetary Policy Statement",
+   "time": 1793279700
+  },
+  {
+   "currency": "EUR",
+   "label": "ECB Press Conference",
+   "time": 1793281500
+  },
+  {
+   "currency": "JPY",
+   "label": "BOJ Policy Rate",
+   "time": 1793327400
+  },
+  {
+   "currency": "JPY",
+   "label": "Monetary Policy Statement",
+   "time": 1793327400
+  },
+  {
+   "currency": "JPY",
+   "label": "BOJ Outlook Report",
+   "time": 1793327460
+  },
+  {
+   "currency": "JPY",
+   "label": "BOJ Press Conference",
+   "time": 1793338200
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -530,5 +646,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-25T09:50:30Z"
+ "updated": "2026-10-25T11:10:24Z"
 }
