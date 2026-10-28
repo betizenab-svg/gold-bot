@@ -438,11 +438,6 @@
  "news": [
   {
    "currency": "USD",
-   "label": "FOMC Press Conference",
-   "time": 1793212200
-  },
-  {
-   "currency": "USD",
    "label": "Advance GDP q/q",
    "time": 1793277000
   },
@@ -581,5 +576,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-28T19:00:21Z"
+ "updated": "2026-10-28T19:30:26Z"
 }
