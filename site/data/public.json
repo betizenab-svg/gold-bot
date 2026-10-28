@@ -438,21 +438,6 @@
  "news": [
   {
    "currency": "CAD",
-   "label": "BOC Monetary Policy Report",
-   "time": 1793195100
-  },
-  {
-   "currency": "CAD",
-   "label": "BOC Rate Statement",
-   "time": 1793195100
-  },
-  {
-   "currency": "CAD",
-   "label": "Overnight Rate",
-   "time": 1793195100
-  },
-  {
-   "currency": "CAD",
    "label": "BOC Press Conference",
    "time": 1793197800
   },
@@ -611,5 +596,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-28T13:30:19Z"
+ "updated": "2026-10-28T14:45:15Z"
 }
