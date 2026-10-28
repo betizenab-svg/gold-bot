@@ -437,11 +437,6 @@
  ],
  "news": [
   {
-   "currency": "CAD",
-   "label": "BOC Press Conference",
-   "time": 1793197800
-  },
-  {
    "currency": "USD",
    "label": "Federal Funds Rate",
    "time": 1793210400
@@ -596,5 +591,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-28T14:45:15Z"
+ "updated": "2026-10-28T15:30:30Z"
 }
