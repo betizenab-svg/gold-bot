@@ -438,16 +438,6 @@
  "news": [
   {
    "currency": "USD",
-   "label": "Federal Funds Rate",
-   "time": 1793210400
-  },
-  {
-   "currency": "USD",
-   "label": "FOMC Statement",
-   "time": 1793210400
-  },
-  {
-   "currency": "USD",
    "label": "FOMC Press Conference",
    "time": 1793212200
   },
@@ -591,5 +581,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-28T15:30:30Z"
+ "updated": "2026-10-28T19:00:21Z"
 }
