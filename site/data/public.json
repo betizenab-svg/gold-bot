@@ -437,11 +437,6 @@
  ],
  "news": [
   {
-   "currency": "GBP",
-   "label": "Annual Budget Release",
-   "time": 1793190600
-  },
-  {
    "currency": "CAD",
    "label": "BOC Monetary Policy Report",
    "time": 1793195100
@@ -616,5 +611,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-28T03:00:20Z"
+ "updated": "2026-10-28T13:30:19Z"
 }
