@@ -437,21 +437,6 @@
  ],
  "news": [
   {
-   "currency": "AUD",
-   "label": "CPI m/m",
-   "time": 1793147400
-  },
-  {
-   "currency": "AUD",
-   "label": "CPI y/y",
-   "time": 1793147400
-  },
-  {
-   "currency": "AUD",
-   "label": "Trimmed Mean CPI m/m",
-   "time": 1793147400
-  },
-  {
    "currency": "NZD",
    "label": "Official Cash Rate",
    "time": 1793149200
@@ -646,5 +631,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-25T11:10:24Z"
+ "updated": "2026-10-28T01:30:17Z"
 }
