@@ -437,16 +437,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "Advance GDP q/q",
-   "time": 1793277000
-  },
-  {
-   "currency": "USD",
-   "label": "Core PCE Price Index m/m",
-   "time": 1793277000
-  },
-  {
    "currency": "EUR",
    "label": "Main Refinancing Rate",
    "time": 1793279700
@@ -590,5 +580,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-29T04:00:26Z"
+ "updated": "2026-10-29T13:30:22Z"
 }
