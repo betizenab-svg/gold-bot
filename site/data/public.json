@@ -438,16 +438,6 @@
  "news": [
   {
    "currency": "EUR",
-   "label": "Main Refinancing Rate",
-   "time": 1793279700
-  },
-  {
-   "currency": "EUR",
-   "label": "Monetary Policy Statement",
-   "time": 1793279700
-  },
-  {
-   "currency": "EUR",
    "label": "ECB Press Conference",
    "time": 1793281500
   },
@@ -580,5 +570,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-29T13:30:22Z"
+ "updated": "2026-10-29T14:15:17Z"
 }
