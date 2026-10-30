@@ -195,6 +195,10 @@
   [
    1793333100,
    15.71
+  ],
+  [
+   1793367000,
+   16.69
   ]
  ],
  "history": {
@@ -246,6 +250,15 @@
   }
  },
  "last10": [
+  {
+   "closed_at": 1793367000,
+   "code": "#GF72",
+   "direction": "SHORT",
+   "name": "Gold 4-hour system",
+   "result_r": 0.98,
+   "status": "CLOSED_TP2",
+   "symbol": "XAUUSD_H4"
+  },
   {
    "closed_at": 1793333100,
    "code": "#GF71",
@@ -326,25 +339,16 @@
    "result_r": -1.0,
    "status": "CLOSED_SL",
    "symbol": "EURUSD"
-  },
-  {
-   "closed_at": 1791283500,
-   "code": "#P59",
-   "direction": "LONG",
-   "name": "Pound",
-   "result_r": 2.25,
-   "status": "CLOSED_TP2",
-   "symbol": "GBPUSD"
   }
  ],
  "last_30_days": {
   "deepest_dip_r": 2.0,
   "flat": 3,
   "losses": 7,
-  "net_r": 13.73,
-  "trades": 24,
-  "win_rate": 58.3,
-  "wins": 14,
+  "net_r": 14.72,
+  "trades": 25,
+  "win_rate": 60.0,
+  "wins": 15,
   "worst_losing_streak": 2
  },
  "markets": {
@@ -397,10 +401,10 @@
    "flat": 0,
    "losses": 1,
    "name": "Gold 4-hour system",
-   "net_r": 2.94,
-   "trades": 5,
-   "win_rate": 80.0,
-   "wins": 4,
+   "net_r": 3.93,
+   "trades": 6,
+   "win_rate": 83.3,
+   "wins": 5,
    "worst_losing_streak": 1
   }
  },
@@ -432,29 +436,15 @@
    "flat": 3,
    "losses": 7,
    "month": "2026-10",
-   "net_r": 13.73,
-   "trades": 24,
-   "win_rate": 58.3,
-   "wins": 14,
+   "net_r": 14.72,
+   "trades": 25,
+   "win_rate": 60.0,
+   "wins": 15,
    "worst_losing_streak": 2
   }
  ],
  "news": [],
- "open": [
-  {
-   "code": "#GF72",
-   "direction": "SHORT",
-   "entry": 3973.15,
-   "name": "Gold 4-hour system",
-   "order": "MARKET",
-   "status": "ACTIVE",
-   "stop": 4013.0,
-   "symbol": "XAUUSD_H4",
-   "time": 1793332800,
-   "tp1": 3933.91,
-   "tp2": 3933.91
-  }
- ],
+ "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
    "deepest_dip_r": 1.0,
@@ -470,10 +460,10 @@
    "deepest_dip_r": 0.0,
    "flat": 0,
    "losses": 0,
-   "net_r": 0.98,
-   "trades": 1,
+   "net_r": 1.97,
+   "trades": 2,
    "win_rate": 100.0,
-   "wins": 1,
+   "wins": 2,
    "worst_losing_streak": 0
   },
   "GOLD_PULLBACK": {
@@ -541,12 +531,12 @@
   "deepest_dip_r": 7.25,
   "flat": 8,
   "losses": 18,
-  "net_r": 15.71,
-  "net_r_after_costs": 13.4,
-  "trades": 49,
-  "win_rate": 46.9,
-  "wins": 23,
+  "net_r": 16.69,
+  "net_r_after_costs": 14.38,
+  "trades": 50,
+  "win_rate": 48.0,
+  "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-30T08:00:27Z"
+ "updated": "2026-10-30T13:35:21Z"
 }
