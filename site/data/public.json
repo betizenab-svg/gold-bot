@@ -438,16 +438,6 @@
  "news": [
   {
    "currency": "JPY",
-   "label": "BOJ Policy Rate",
-   "time": 1793327400
-  },
-  {
-   "currency": "JPY",
-   "label": "Monetary Policy Statement",
-   "time": 1793327400
-  },
-  {
-   "currency": "JPY",
    "label": "BOJ Outlook Report",
    "time": 1793327460
   },
@@ -565,5 +555,5 @@
   "wins": 22,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-29T14:45:16Z"
+ "updated": "2026-10-30T03:30:16Z"
 }
