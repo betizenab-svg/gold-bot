@@ -440,7 +440,21 @@
   }
  ],
  "news": [],
- "open": [],
+ "open": [
+  {
+   "code": "#GF72",
+   "direction": "SHORT",
+   "entry": 3973.15,
+   "name": "Gold 4-hour system",
+   "order": "MARKET",
+   "status": "ACTIVE",
+   "stop": 4013.0,
+   "symbol": "XAUUSD_H4",
+   "time": 1793332800,
+   "tp1": 3933.91,
+   "tp2": 3933.91
+  }
+ ],
  "strategies": {
   "ENGULFING_ZONE": {
    "deepest_dip_r": 1.0,
@@ -534,5 +548,5 @@
   "wins": 23,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-30T06:30:18Z"
+ "updated": "2026-10-30T08:00:27Z"
 }
