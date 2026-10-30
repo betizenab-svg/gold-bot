@@ -439,13 +439,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "JPY",
-   "label": "BOJ Press Conference",
-   "time": 1793338200
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -540,5 +534,5 @@
   "wins": 23,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-30T04:10:22Z"
+ "updated": "2026-10-30T06:30:18Z"
 }
