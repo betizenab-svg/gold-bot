@@ -443,7 +443,103 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "AUD",
+   "label": "Cash Rate",
+   "time": 1793676600
+  },
+  {
+   "currency": "AUD",
+   "label": "RBA Monetary Policy Statement",
+   "time": 1793676600
+  },
+  {
+   "currency": "AUD",
+   "label": "RBA Rate Statement",
+   "time": 1793676600
+  },
+  {
+   "currency": "AUD",
+   "label": "RBA Press Conference",
+   "time": 1793680200
+  },
+  {
+   "currency": "USD",
+   "label": "Congressional Elections",
+   "time": 1793718960
+  },
+  {
+   "currency": "NZD",
+   "label": "Employment Change q/q",
+   "time": 1793742300
+  },
+  {
+   "currency": "NZD",
+   "label": "Unemployment Rate",
+   "time": 1793742300
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Monetary Policy Report",
+   "time": 1793880000
+  },
+  {
+   "currency": "GBP",
+   "label": "Monetary Policy Summary",
+   "time": 1793880000
+  },
+  {
+   "currency": "GBP",
+   "label": "MPC Official Bank Rate Votes",
+   "time": 1793880000
+  },
+  {
+   "currency": "GBP",
+   "label": "Official Bank Rate",
+   "time": 1793880000
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Gov Bailey Speaks",
+   "time": 1793881800
+  },
+  {
+   "currency": "CAD",
+   "label": "Employment Change",
+   "time": 1793971800
+  },
+  {
+   "currency": "CAD",
+   "label": "Unemployment Rate",
+   "time": 1793971800
+  },
+  {
+   "currency": "USD",
+   "label": "Average Hourly Earnings m/m",
+   "time": 1793971800
+  },
+  {
+   "currency": "USD",
+   "label": "Non-Farm Employment Change",
+   "time": 1793971800
+  },
+  {
+   "currency": "USD",
+   "label": "Unemployment Rate",
+   "time": 1793971800
+  },
+  {
+   "currency": "JPY",
+   "label": "BOJ Gov Ueda Speaks",
+   "time": 1793980800
+  },
+  {
+   "currency": "NZD",
+   "label": "Parliamentary Elections",
+   "time": 1794001500
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -538,5 +634,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-10-31T16:05:16Z"
+ "updated": "2026-11-01T11:40:19Z"
 }
