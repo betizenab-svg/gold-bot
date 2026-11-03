@@ -446,21 +446,6 @@
  "news": [
   {
    "currency": "AUD",
-   "label": "Cash Rate",
-   "time": 1793676600
-  },
-  {
-   "currency": "AUD",
-   "label": "RBA Monetary Policy Statement",
-   "time": 1793676600
-  },
-  {
-   "currency": "AUD",
-   "label": "RBA Rate Statement",
-   "time": 1793676600
-  },
-  {
-   "currency": "AUD",
    "label": "RBA Press Conference",
    "time": 1793680200
   },
@@ -648,5 +633,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-02T20:00:27Z"
+ "updated": "2026-11-03T04:30:22Z"
 }
