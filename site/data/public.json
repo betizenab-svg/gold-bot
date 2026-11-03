@@ -445,11 +445,6 @@
  ],
  "news": [
   {
-   "currency": "AUD",
-   "label": "RBA Press Conference",
-   "time": 1793680200
-  },
-  {
    "currency": "USD",
    "label": "Congressional Elections",
    "time": 1793718960
@@ -633,5 +628,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-03T04:30:22Z"
+ "updated": "2026-11-03T05:30:32Z"
 }
