@@ -445,11 +445,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "Congressional Elections",
-   "time": 1793718960
-  },
-  {
    "currency": "NZD",
    "label": "Employment Change q/q",
    "time": 1793742300
@@ -628,5 +623,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-03T15:00:19Z"
+ "updated": "2026-11-03T16:20:26Z"
 }
