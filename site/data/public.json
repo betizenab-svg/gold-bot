@@ -445,16 +445,6 @@
  ],
  "news": [
   {
-   "currency": "NZD",
-   "label": "Employment Change q/q",
-   "time": 1793742300
-  },
-  {
-   "currency": "NZD",
-   "label": "Unemployment Rate",
-   "time": 1793742300
-  },
-  {
    "currency": "GBP",
    "label": "BOE Monetary Policy Report",
    "time": 1793880000
@@ -623,5 +613,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-03T16:20:26Z"
+ "updated": "2026-11-03T22:45:21Z"
 }
