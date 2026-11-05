@@ -203,6 +203,10 @@
   [
    1793772000,
    15.69
+  ],
+  [
+   1793893800,
+   14.69
   ]
  ],
  "history": {
@@ -254,6 +258,15 @@
   }
  },
  "last10": [
+  {
+   "closed_at": 1793893800,
+   "code": "#GF74",
+   "direction": "LONG",
+   "name": "Gold 4-hour system",
+   "result_r": -1.0,
+   "status": "CLOSED_SL",
+   "symbol": "XAUUSD_H4"
+  },
   {
    "closed_at": 1793772000,
    "code": "#GF73",
@@ -334,26 +347,17 @@
    "result_r": 2.25,
    "status": "CLOSED_TP2",
    "symbol": "EURUSD"
-  },
-  {
-   "closed_at": 1791303900,
-   "code": "#P61",
-   "direction": "SHORT",
-   "name": "Pound",
-   "result_r": -1.0,
-   "status": "CLOSED_SL",
-   "symbol": "GBPUSD"
   }
  ],
  "last_30_days": {
-  "deepest_dip_r": 1.0,
+  "deepest_dip_r": 2.0,
   "flat": 0,
-  "losses": 3,
-  "net_r": 6.22,
-  "trades": 10,
-  "win_rate": 70.0,
+  "losses": 4,
+  "net_r": 5.22,
+  "trades": 11,
+  "win_rate": 63.6,
   "wins": 7,
-  "worst_losing_streak": 1
+  "worst_losing_streak": 2
  },
  "markets": {
   "BTCUSD": {
@@ -401,15 +405,15 @@
    "worst_losing_streak": 0
   },
   "XAUUSD_H4": {
-   "deepest_dip_r": 1.0,
+   "deepest_dip_r": 2.0,
    "flat": 0,
-   "losses": 2,
+   "losses": 3,
    "name": "Gold 4-hour system",
-   "net_r": 2.93,
-   "trades": 7,
-   "win_rate": 71.4,
+   "net_r": 1.93,
+   "trades": 8,
+   "win_rate": 62.5,
    "wins": 5,
-   "worst_losing_streak": 1
+   "worst_losing_streak": 2
   }
  },
  "months": [
@@ -447,15 +451,15 @@
    "worst_losing_streak": 2
   },
   {
-   "deepest_dip_r": 1.0,
+   "deepest_dip_r": 2.0,
    "flat": 0,
-   "losses": 1,
+   "losses": 2,
    "month": "2026-11",
-   "net_r": -1.0,
-   "trades": 1,
+   "net_r": -2.0,
+   "trades": 2,
    "win_rate": 0.0,
    "wins": 0,
-   "worst_losing_streak": 1
+   "worst_losing_streak": 2
   }
  ],
  "news": [
@@ -495,21 +499,7 @@
    "time": 1794001500
   }
  ],
- "open": [
-  {
-   "code": "#GF74",
-   "direction": "LONG",
-   "entry": 4142.01,
-   "name": "Gold 4-hour system",
-   "order": "MARKET",
-   "status": "ACTIVE",
-   "stop": 4085.84,
-   "symbol": "XAUUSD_H4",
-   "time": 1793836800,
-   "tp1": 4197.58,
-   "tp2": 4197.58
-  }
- ],
+ "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
    "deepest_dip_r": 1.0,
@@ -522,14 +512,14 @@
    "worst_losing_streak": 1
   },
   "GOLD_BREAKOUT": {
-   "deepest_dip_r": 0.0,
+   "deepest_dip_r": 1.0,
    "flat": 0,
-   "losses": 0,
-   "net_r": 1.97,
-   "trades": 2,
-   "win_rate": 100.0,
+   "losses": 1,
+   "net_r": 0.97,
+   "trades": 3,
+   "win_rate": 66.7,
    "wins": 2,
-   "worst_losing_streak": 0
+   "worst_losing_streak": 1
   },
   "GOLD_PULLBACK": {
    "deepest_dip_r": 1.0,
@@ -595,13 +585,13 @@
  "totals": {
   "deepest_dip_r": 7.25,
   "flat": 8,
-  "losses": 19,
-  "net_r": 15.69,
-  "net_r_after_costs": 13.37,
-  "trades": 51,
-  "win_rate": 47.1,
+  "losses": 20,
+  "net_r": 14.69,
+  "net_r_after_costs": 12.37,
+  "trades": 52,
+  "win_rate": 46.2,
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-05T13:30:21Z"
+ "updated": "2026-11-05T15:55:23Z"
 }
