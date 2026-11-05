@@ -347,11 +347,11 @@
  ],
  "last_30_days": {
   "deepest_dip_r": 2.0,
-  "flat": 1,
+  "flat": 0,
   "losses": 5,
   "net_r": 8.72,
-  "trades": 15,
-  "win_rate": 60.0,
+  "trades": 14,
+  "win_rate": 64.3,
   "wins": 9,
   "worst_losing_streak": 2
  },
@@ -628,5 +628,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-05T04:00:33Z"
+ "updated": "2026-11-05T05:30:19Z"
 }
