@@ -464,11 +464,6 @@
  ],
  "news": [
   {
-   "currency": "JPY",
-   "label": "BOJ Gov Ueda Speaks",
-   "time": 1793980800
-  },
-  {
    "currency": "NZD",
    "label": "Parliamentary Elections",
    "time": 1794001500
@@ -568,5 +563,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-06T14:30:19Z"
+ "updated": "2026-11-06T17:00:32Z"
 }
