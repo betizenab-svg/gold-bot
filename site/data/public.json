@@ -462,13 +462,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "NZD",
-   "label": "Parliamentary Elections",
-   "time": 1794001500
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -563,5 +557,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-06T17:00:32Z"
+ "updated": "2026-11-06T22:45:22Z"
 }
