@@ -210,19 +210,19 @@
   ]
  ],
  "history": {
-  "bad_luck_dip_r": 15.08,
+  "bad_luck_dip_r": 15.16,
   "bad_luck_losing_streak": 9,
   "markets": {
    "XAUUSD_H4": {
-    "net_r_after_costs": 45.05,
+    "net_r_after_costs": 44.42,
     "passed": true,
     "profit_factor": 1.34,
-    "trades": 319
+    "trades": 318
    }
   },
   "window": {
-   "from": "2023-10",
-   "to": "2026-09"
+   "from": "2023-11",
+   "to": "2026-10"
   }
  },
  "instruments": {
@@ -557,5 +557,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-08T03:55:20Z"
+ "updated": "2026-11-08T10:00:18Z"
 }
