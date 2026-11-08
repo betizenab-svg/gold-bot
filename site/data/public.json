@@ -462,7 +462,33 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "USD",
+   "label": "Core CPI m/m",
+   "time": 1794317400
+  },
+  {
+   "currency": "USD",
+   "label": "CPI m/m",
+   "time": 1794317400
+  },
+  {
+   "currency": "GBP",
+   "label": "GDP m/m",
+   "time": 1794466800
+  },
+  {
+   "currency": "USD",
+   "label": "Core PPI m/m",
+   "time": 1794576600
+  },
+  {
+   "currency": "USD",
+   "label": "PPI m/m",
+   "time": 1794576600
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -557,5 +583,5 @@
   "wins": 24,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-08T10:00:18Z"
+ "updated": "2026-11-08T12:05:20Z"
 }
