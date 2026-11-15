@@ -466,7 +466,78 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "CAD",
+   "label": "CPI m/m",
+   "time": 1794835800
+  },
+  {
+   "currency": "CAD",
+   "label": "Median CPI y/y",
+   "time": 1794835800
+  },
+  {
+   "currency": "CAD",
+   "label": "Trimmed CPI y/y",
+   "time": 1794835800
+  },
+  {
+   "currency": "USD",
+   "label": "Fed Chairman Warsh Speaks",
+   "time": 1794848400
+  },
+  {
+   "currency": "AUD",
+   "label": "RBA Gov Bullock Speaks",
+   "time": 1794869400
+  },
+  {
+   "currency": "NZD",
+   "label": "Inflation Expectations q/q",
+   "time": 1794880800
+  },
+  {
+   "currency": "USD",
+   "label": "Core Retail Sales m/m",
+   "time": 1794922200
+  },
+  {
+   "currency": "USD",
+   "label": "Retail Sales m/m",
+   "time": 1794922200
+  },
+  {
+   "currency": "GBP",
+   "label": "CPI y/y",
+   "time": 1794985200
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Gov Bailey Speaks",
+   "time": 1794987000
+  },
+  {
+   "currency": "GBP",
+   "label": "BOE Gov Bailey Speaks",
+   "time": 1795014000
+  },
+  {
+   "currency": "USD",
+   "label": "FOMC Meeting Minutes",
+   "time": 1795028400
+  },
+  {
+   "currency": "AUD",
+   "label": "Employment Change",
+   "time": 1795048200
+  },
+  {
+   "currency": "AUD",
+   "label": "Unemployment Rate",
+   "time": 1795048200
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -561,5 +632,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-13T14:30:19Z"
+ "updated": "2026-11-15T12:40:24Z"
 }
