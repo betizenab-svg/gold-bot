@@ -515,11 +515,6 @@
   {
    "currency": "GBP",
    "label": "BOE Gov Bailey Speaks",
-   "time": 1794987000
-  },
-  {
-   "currency": "GBP",
-   "label": "BOE Gov Bailey Speaks",
    "time": 1795014000
   },
   {
@@ -632,5 +627,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-15T12:40:24Z"
+ "updated": "2026-11-16T12:45:16Z"
 }
