@@ -468,11 +468,6 @@
  ],
  "news": [
   {
-   "currency": "AUD",
-   "label": "RBA Gov Bullock Speaks",
-   "time": 1794869400
-  },
-  {
    "currency": "NZD",
    "label": "Inflation Expectations q/q",
    "time": 1794880800
@@ -607,5 +602,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-16T18:00:25Z"
+ "updated": "2026-11-16T23:50:37Z"
 }
