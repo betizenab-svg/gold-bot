@@ -468,11 +468,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "Fed Chairman Warsh Speaks",
-   "time": 1794848400
-  },
-  {
    "currency": "AUD",
    "label": "RBA Gov Bullock Speaks",
    "time": 1794869400
@@ -612,5 +607,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-16T14:30:32Z"
+ "updated": "2026-11-16T18:00:25Z"
 }
