@@ -468,11 +468,6 @@
  ],
  "news": [
   {
-   "currency": "NZD",
-   "label": "Inflation Expectations q/q",
-   "time": 1794880800
-  },
-  {
    "currency": "USD",
    "label": "Core Retail Sales m/m",
    "time": 1794922200
@@ -602,5 +597,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-16T23:50:37Z"
+ "updated": "2026-11-17T03:00:40Z"
 }
