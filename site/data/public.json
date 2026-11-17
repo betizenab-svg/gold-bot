@@ -468,16 +468,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "Core Retail Sales m/m",
-   "time": 1794922200
-  },
-  {
-   "currency": "USD",
-   "label": "Retail Sales m/m",
-   "time": 1794922200
-  },
-  {
    "currency": "GBP",
    "label": "CPI y/y",
    "time": 1794985200
@@ -597,5 +587,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-17T03:00:40Z"
+ "updated": "2026-11-17T14:30:36Z"
 }
