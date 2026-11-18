@@ -472,11 +472,6 @@
  ],
  "news": [
   {
-   "currency": "USD",
-   "label": "FOMC Meeting Minutes",
-   "time": 1795028400
-  },
-  {
    "currency": "AUD",
    "label": "Employment Change",
    "time": 1795048200
@@ -581,5 +576,5 @@
   "wins": 26,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-18T16:25:40Z"
+ "updated": "2026-11-18T20:00:20Z"
 }
