@@ -469,11 +469,6 @@
  "news": [
   {
    "currency": "GBP",
-   "label": "CPI y/y",
-   "time": 1794985200
-  },
-  {
-   "currency": "GBP",
    "label": "BOE Gov Bailey Speaks",
    "time": 1795014000
   },
@@ -601,5 +596,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-18T04:00:40Z"
+ "updated": "2026-11-18T08:00:25Z"
 }
