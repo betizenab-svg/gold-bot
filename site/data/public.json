@@ -468,11 +468,6 @@
  ],
  "news": [
   {
-   "currency": "GBP",
-   "label": "BOE Gov Bailey Speaks",
-   "time": 1795014000
-  },
-  {
    "currency": "USD",
    "label": "FOMC Meeting Minutes",
    "time": 1795028400
@@ -596,5 +591,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-18T08:00:25Z"
+ "updated": "2026-11-18T16:00:24Z"
 }
