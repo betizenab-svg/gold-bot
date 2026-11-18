@@ -493,7 +493,21 @@
    "time": 1795048200
   }
  ],
- "open": [],
+ "open": [
+  {
+   "code": "#GF76",
+   "direction": "SHORT",
+   "entry": 3788.56,
+   "name": "Gold 4-hour system",
+   "order": "MARKET",
+   "status": "ACTIVE",
+   "stop": 3836.14,
+   "symbol": "XAUUSD_H4",
+   "time": 1794960000,
+   "tp1": 3741.58,
+   "tp2": 3741.58
+  }
+ ],
  "strategies": {
   "ENGULFING_ZONE": {
    "deepest_dip_r": 1.0,
@@ -587,5 +601,5 @@
   "wins": 25,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-17T14:30:36Z"
+ "updated": "2026-11-18T04:00:40Z"
 }
