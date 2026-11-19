@@ -470,18 +470,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "AUD",
-   "label": "Employment Change",
-   "time": 1795048200
-  },
-  {
-   "currency": "AUD",
-   "label": "Unemployment Rate",
-   "time": 1795048200
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -576,5 +565,5 @@
   "wins": 26,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-18T20:00:20Z"
+ "updated": "2026-11-19T01:30:22Z"
 }
