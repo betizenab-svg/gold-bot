@@ -474,7 +474,33 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [],
+ "news": [
+  {
+   "currency": "AUD",
+   "label": "CPI m/m",
+   "time": 1795566600
+  },
+  {
+   "currency": "AUD",
+   "label": "CPI y/y",
+   "time": 1795566600
+  },
+  {
+   "currency": "AUD",
+   "label": "Trimmed Mean CPI m/m",
+   "time": 1795566600
+  },
+  {
+   "currency": "USD",
+   "label": "Core PCE Price Index m/m",
+   "time": 1795613400
+  },
+  {
+   "currency": "USD",
+   "label": "Prelim GDP q/q",
+   "time": 1795613400
+  }
+ ],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -569,5 +595,5 @@
   "wins": 27,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-21T14:00:18Z"
+ "updated": "2026-11-22T13:15:19Z"
 }
