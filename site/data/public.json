@@ -476,21 +476,6 @@
  ],
  "news": [
   {
-   "currency": "AUD",
-   "label": "CPI m/m",
-   "time": 1795566600
-  },
-  {
-   "currency": "AUD",
-   "label": "CPI y/y",
-   "time": 1795566600
-  },
-  {
-   "currency": "AUD",
-   "label": "Trimmed Mean CPI m/m",
-   "time": 1795566600
-  },
-  {
    "currency": "USD",
    "label": "Core PCE Price Index m/m",
    "time": 1795613400
@@ -609,5 +594,5 @@
   "wins": 27,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-23T20:00:43Z"
+ "updated": "2026-11-25T01:30:16Z"
 }
