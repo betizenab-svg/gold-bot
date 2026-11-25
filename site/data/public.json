@@ -478,18 +478,7 @@
    "worst_losing_streak": 2
   }
  ],
- "news": [
-  {
-   "currency": "USD",
-   "label": "Core PCE Price Index m/m",
-   "time": 1795613400
-  },
-  {
-   "currency": "USD",
-   "label": "Prelim GDP q/q",
-   "time": 1795613400
-  }
- ],
+ "news": [],
  "open": [],
  "strategies": {
   "ENGULFING_ZONE": {
@@ -584,5 +573,5 @@
   "wins": 28,
   "worst_losing_streak": 4
  },
- "updated": "2026-11-25T05:50:24Z"
+ "updated": "2026-11-25T14:30:31Z"
 }
